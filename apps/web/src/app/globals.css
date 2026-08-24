@@ -688,17 +688,19 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .nested-account-table { min-width: 1580px; border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: inset 2px 0 0 rgba(169,149,255,.5); }
 .nested-account-header, .nested-account-row { display: grid; grid-template-columns: minmax(320px, 1.55fr) 100px 96px 78px 100px 110px 110px 116px minmax(210px, .9fr) 110px 80px; align-items: center; gap: 16px; }
 .nested-account-header { min-height: 42px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.06); background: #101010; color: #777; font-size: 12px; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
-.nested-account-header > span:first-child { padding-left: 42px; }
-.nested-account-row { min-height: 78px; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,.055); color: #b8b8b8; font-size: 15px; }
+.nested-account-header > span:first-child { padding-left: 76px; }
+.nested-account-row { min-height: 70px; padding: 8px 18px; border-bottom: 1px solid rgba(255,255,255,.055); color: #b8b8b8; font-size: 15px; }
 .nested-account-row:last-child { border-bottom: 0; }
 .nested-account-row:hover { background: #151515; }
+.nested-account-row[data-link-state="suggested"] { background: linear-gradient(90deg,rgba(169,149,255,.055),transparent 42%); }
 .nested-account-row > strong { color: #f0f0f0; font-size: 16px; }
-.nested-account-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.nested-account-identity > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.nested-account-identity strong { overflow: hidden; color: #f2f2f2; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
-.nested-account-identity strong svg { width: 13px; margin-left: 6px; color: #777; vertical-align: -2px; }
+.nested-account-identity { min-width: 0; display: flex; align-items: center; gap: 9px; }
+.nested-account-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nested-account-handle { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.nested-account-handle strong { overflow: hidden; color: #f2f2f2; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.nested-account-handle svg { width: 13px; height: 13px; flex: 0 0 13px; color: #777; }
 .nested-account-identity small { overflow: hidden; color: #858585; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.nested-branch { width: 18px; height: 20px; flex: 0 0 18px; border-bottom: 1px solid #3a3a3a; border-left: 1px solid #3a3a3a; }
+.nested-branch { width: 18px; height: 18px; flex: 0 0 18px; border-bottom: 1px solid #454545; border-left: 1px solid #454545; }
 .nested-account-badges { display: flex; align-items: center; gap: 5px; }
 .account-assign-trigger { min-width: 96px; height: 34px; font-size: 12px; }
 .account-assign-trigger svg { width: 14px; }

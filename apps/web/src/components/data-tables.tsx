@@ -217,8 +217,8 @@ function CreatorAccountsTable({
                         <span>Account</span><span>Platform</span><span>Followers</span><span>Posts</span><span>Views</span><span>Avg. views</span><span>Engagement</span><span>Latest post</span><span>Status</span><span>Creator</span><span aria-hidden="true" />
                       </div>
                       {row.original.accounts.length ? row.original.accounts.map((account) => {
-                        const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span><strong>@{account.username}<ExternalLink /></strong><small>{account.displayName || row.original.displayName}</small></span></>;
-                        return <div className="nested-account-row" key={account.id}>
+                        const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span className="nested-account-copy"><span className="nested-account-handle"><strong>@{account.username}</strong><ExternalLink /></span><small>{account.displayName || row.original.displayName}</small></span></>;
+                        return <div className="nested-account-row" data-link-state={account.linkState} key={account.id}>
                           {account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>}
                           <StateBadge label={account.platform} tone="info" />
                           <span>{formatNumber(account.followers ?? 0)}</span>
