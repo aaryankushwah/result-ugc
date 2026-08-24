@@ -117,12 +117,7 @@ img { display: block; }
 
 .app-frame { min-height: 100vh; background: #0e0e0e; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 244px; padding: 10px; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: #121212; transition: width .2s ease, transform .2s ease; }
-.sidebar-brand { height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 0 7px; }
-.brand-lockup { min-width: 0; display: flex; align-items: center; gap: 10px; }
-.brand-mark { width: 32px; height: 32px; flex: 0 0 32px; display: grid; place-items: center; border-radius: 9px; background: #f1f1ee; color: #101010; font-size: 18px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
-.brand-text { display: flex; min-width: 0; flex-direction: column; line-height: 1.15; }
-.brand-text strong { font-size: 14px; letter-spacing: -.02em; }
-.brand-text small { margin-top: 3px; color: #707070; font-size: 10px; }
+.sidebar-controls { min-height: 30px; display: flex; align-items: center; justify-content: flex-end; }
 .icon-button { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #777; cursor: pointer; }
 .icon-button:hover { border-color: var(--border); background: #1a1a1a; color: #ddd; }
 .icon-button svg { width: 15px; height: 15px; }
@@ -156,9 +151,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .workspace-content { min-width: 0; padding: 26px 28px 48px; }
 .sidebar-collapsed .sidebar { width: 66px; }
 .sidebar-collapsed .workspace { padding-left: 66px; }
-.sidebar-collapsed .brand-text, .sidebar-collapsed .command-trigger span, .sidebar-collapsed .command-trigger kbd, .sidebar-collapsed .nav-group > p, .sidebar-collapsed .nav-group a span, .sidebar-collapsed .user-copy, .sidebar-collapsed .sidebar-user form { display: none; }
-.sidebar-collapsed .sidebar-brand { padding: 0; flex-direction: column; height: 72px; gap: 5px; }
-.sidebar-collapsed .brand-lockup { gap: 0; }
+.sidebar-collapsed .command-trigger span, .sidebar-collapsed .command-trigger kbd, .sidebar-collapsed .nav-group > p, .sidebar-collapsed .nav-group a span, .sidebar-collapsed .user-copy, .sidebar-collapsed .sidebar-user form { display: none; }
+.sidebar-collapsed .sidebar-controls { justify-content: center; }
 .sidebar-collapsed .command-trigger { justify-content: center; padding: 0; }
 .sidebar-collapsed .nav-group a { justify-content: center; padding: 0; }
 .sidebar-collapsed .sidebar-user { justify-content: center; padding: 7px 0; }
@@ -168,6 +162,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .page-title { min-height: 66px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .page-title .eyebrow, .eyebrow { margin: 0 0 7px; color: var(--accent); font-family: var(--font-geist-mono); font-size: 9px; font-weight: 650; letter-spacing: .14em; }
 .page-title h1 { margin: 0; font-size: clamp(26px, 3vw, 38px); font-weight: 580; letter-spacing: -.05em; }
+.page-title h1.result-ugc-title { font-size: clamp(40px, 5.2vw, 72px); font-weight: 700; letter-spacing: -.045em; line-height: .92; }
 .page-title > div > p:last-child { max-width: 710px; margin: 7px 0 0; color: #787878; font-size: 12px; line-height: 1.5; }
 .page-actions { display: flex; align-items: center; gap: 8px; }
 .primary-button, .secondary-button, .toolbar-button { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 8px; cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; }
