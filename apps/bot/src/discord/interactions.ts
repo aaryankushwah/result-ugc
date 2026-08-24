@@ -26,6 +26,7 @@ import {
   type CallPollRecord,
 } from "../data/store.js";
 import { createCreatorChannel, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
+import { archiveCreatorChannel } from "./platform-sync.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { launchpointGet } from "../integrations/launchpoint.js";
 import { runReminderSweep } from "./reminders.js";
@@ -331,7 +332,7 @@ async function deleteCreator(interaction: ChatInputCommandInteraction): Promise<
   if (!interaction.guild) return;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   if (!interaction.options.getBoolean("confirm", true)) {
-    await interaction.editReply("Nothing was deleted. Run `/delete-creator` again with `confirm:true`.");
+    await interaction.editReply("Nothing was changed. Run `/delete-creator` again with `confirm:true` to archive access and offboard this creator.");
     return;
   }
   const user = interaction.options.getUser("member", true);
@@ -340,11 +341,22 @@ async function deleteCreator(interaction: ChatInputCommandInteraction): Promise<
     await interaction.editReply(`No private creator channel was found for <@${user.id}>.`);
     return;
   }
-  await channel.delete(`Private creator channel deleted by ${interaction.user.tag}`);
-  const dmSent = await user.send("Your Result Discord creator access has been removed, including your private creator channel. If you have questions, please contact the Result team directly.").then(() => true).catch(() => false);
+  await archiveCreatorChannel(interaction.guild, channel);
+  const dmSent = await user.send("Your Result Discord creator access has been removed. Your private channel history was archived for the Result team. If you have questions, please contact the team directly.").then(() => true).catch(() => false);
   const member = await interaction.guild.members.fetch(user.id).catch(() => undefined);
+  if (member) {
+    for (const roleName of ["Verified Creator", "Member", "Applicant"]) {
+      const role = interaction.guild.roles.cache.find((candidate) => candidate.name === roleName);
+      if (role) await member.roles.remove(role, `Creator offboarded by ${interaction.user.tag}`).catch(() => undefined);
+    }
+  }
   const kicked = member ? await member.kick("Creator removed from Discord program").then(() => true).catch(() => false) : false;
-  await interaction.editReply(`Deleted <@${user.id}>'s private channel and ${kicked ? "kicked them from the server" : "could not kick them (they may already be gone or I lack permission)"}. DM ${dmSent ? "sent" : "could not be delivered"}. Their Launchpoint contract, mapping, and notes were left unchanged because Launchpoint does not provide a contract-cancellation API.`);
+  await updateGuildState(interaction.guild.id, (state) => {
+    state.creatorIds = state.creatorIds.filter((id) => id !== user.id);
+    const review = state.creatorReviews.find((item) => item.creatorId === user.id);
+    if (review) { review.status = "inactive"; review.updatedAt = new Date().toISOString(); }
+  });
+  await interaction.editReply(`Archived <@${user.id}>'s private channel for staff, removed access roles, and ${kicked ? "kicked them from the server" : "could not kick them (they may already be gone or I lack permission)"}. DM ${dmSent ? "sent" : "could not be delivered"}. Their Launchpoint mapping and notes were preserved.`);
 }
 
 async function creatorReview(interaction: ChatInputCommandInteraction): Promise<void> {

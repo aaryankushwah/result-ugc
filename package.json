@@ -7,8 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm --filter @result/web build && pnpm --filter @result/discord-bot build",
-    "check": "pnpm --filter @result/web lint && pnpm --filter @result/discord-bot check",
+    "build": "pnpm --filter @result/domain build && pnpm --filter @result/db build && pnpm --filter @result/web build && pnpm --filter @result/discord-bot build",
+    "check": "pnpm --filter @result/domain check && pnpm --filter @result/db check && pnpm --filter @result/web lint && pnpm --filter @result/discord-bot check",
+    "db:generate": "pnpm --filter @result/db generate",
+    "db:migrate": "pnpm --filter @result/db migrate",
     "dev:web": "pnpm --filter @result/web dev",
     "dev:bot": "pnpm --filter @result/discord-bot dev",
     "test": "pnpm --filter @result/discord-bot test"

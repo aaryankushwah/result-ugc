@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="loading-page"><div className="skeleton skeleton-title" /><div className="metric-grid">{Array.from({ length: 6 }).map((_, index) => <div className="skeleton skeleton-card" key={index} />)}</div><div className="skeleton skeleton-panel" /></div>; }
