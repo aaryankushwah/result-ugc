@@ -34,17 +34,17 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { label: "Tracking stale or failed", count: data.accounts.filter((account) => account.trackingState === "stale" || account.trackingState === "failed").length, href: "/accounts?health=stale", tone: "neutral" as const },
   ];
   const metricCards: OverviewMetric[] = [
-    { id: "active", label: "Active creators", value: formatNumber(totals.active), icon: "creators" },
-    { id: "applicants", label: "Applicants", value: formatNumber(totals.applicants), icon: "applicants" },
-    { id: "accounts", label: "Tracked accounts", value: formatNumber(totals.accounts), icon: "accounts" },
-    { id: "videos", label: "Posted videos", value: formatNumber(totals.videos), icon: "video" },
     { id: "views", label: "Views", value: formatNumber(totals.views), icon: "eye" },
-    { id: "averageViews", label: "Average views", value: formatNumber(totals.views / Math.max(1, totals.videos)), icon: "gauge" },
+    { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), icon: "activity" },
     { id: "likes", label: "Likes", value: formatNumber(totals.likes), icon: "heart" },
     { id: "comments", label: "Comments", value: formatNumber(totals.comments), icon: "comments" },
     { id: "shares", label: "Shares", value: formatNumber(totals.shares), icon: "share" },
+    { id: "videos", label: "Posts", value: formatNumber(totals.videos), icon: "video" },
     { id: "bookmarks", label: "Bookmarks", value: formatNumber(totals.bookmarks), icon: "bookmark" },
-    { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), icon: "activity" },
+    { id: "averageViews", label: "Average views", value: formatNumber(totals.views / Math.max(1, totals.videos)), icon: "gauge" },
+    { id: "active", label: "Active creators", value: formatNumber(totals.active), icon: "creators" },
+    { id: "accounts", label: "Tracked accounts", value: formatNumber(totals.accounts), icon: "accounts" },
+    { id: "applicants", label: "Applicants", value: formatNumber(totals.applicants), icon: "applicants" },
     { id: "attention", label: "Needs attention", value: formatNumber(attention), icon: "alert", attention: true },
   ];
   const topAccounts = [...data.accounts].sort((a, b) => b.views - a.views).slice(0, 5);

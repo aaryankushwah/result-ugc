@@ -15,7 +15,7 @@ export const overviewMetricIds = [
 
 export type OverviewMetricId = (typeof overviewMetricIds)[number];
 
-export const defaultOverviewMetricIds: OverviewMetricId[] = ["active", "accounts", "videos", "views", "engagement", "attention"];
+export const defaultOverviewMetricIds: OverviewMetricId[] = ["views", "engagement", "likes", "comments", "shares", "videos"];
 
 export function readOverviewMetricIds(value: string | null): OverviewMetricId[] {
   if (!value) return defaultOverviewMetricIds;
