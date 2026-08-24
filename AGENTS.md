@@ -1,6 +1,25 @@
 # Result Repository Guide
 
-This file is the operating contract for coding agents working in this repository. Read it before changing code. More specific `AGENTS.md` files apply in their own directories; `apps/web/AGENTS.md` contains the Next.js-version rules and must remain intact.
+This file is the operating contract for coding agents working in this repository. Read it before changing code. It takes precedence over any broader guide inherited from a parent directory. More specific `AGENTS.md` files apply in their own directories; `apps/web/AGENTS.md` contains the Next.js-version rules and must remain intact.
+
+## Stack
+
+This repository does **not** use Result Backend. There is no `@resultdev/sdk`, no `npx @resultdev/cli`, no `BACKEND_ADMIN_KEY`, and no `NEXT_PUBLIC_BACKEND_URL`. A home-level `~/AGENTS.md` describes that platform for other projects; it does not apply here. Ignore it in this repository.
+
+What this repository actually runs on:
+
+- **Database:** Neon Postgres, reached through Drizzle and a pooled connection in `packages/db`. Schema changes go through `packages/db/src/schema.ts` and `pnpm db:generate` — see *Database and migration discipline* below.
+- **Portal:** Next.js in `apps/web`, deployed on Vercel, served locally on **port 3000** by `pnpm dev:web`.
+- **Bot:** the Discord worker in `apps/bot`, deployed on Hetzner, run locally by `pnpm dev:bot`. The user refers to it as **Result Clanker**.
+- **Package manager:** pnpm workspaces, Node 22+.
+
+Verification commands, all from the repository root:
+
+```bash
+pnpm check     # type/lint across domain, db, web, bot
+pnpm test      # vitest across web and bot
+pnpm verify    # check + test + production builds
+```
 
 ## Product goal
 
