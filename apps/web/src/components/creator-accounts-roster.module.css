@@ -1,0 +1,118 @@
+.roster {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.roster :global(.roster-tabs) {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.roster :global(.roster-tabs::-webkit-scrollbar) {
+  display: none;
+}
+
+.roster :global(.creator-tree-wrap) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.roster :global(.nested-account-header-row > td[data-nested-column="displayName"]) {
+  padding-left: 108px;
+}
+
+.roster :global(.nested-account-header-row > td) {
+  height: 30px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 10px !important;
+  line-height: 1;
+}
+
+.roster :global(.nested-account-row > td[data-nested-column="displayName"]) {
+  position: relative;
+  padding-left: 0;
+}
+
+.roster :global(.nested-account-row > td[data-nested-column="displayName"]::before) {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 42px;
+  border-left: 1px solid color-mix(in srgb, var(--foreground) 30%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.roster :global(.nested-account-row[data-last-account="true"] > td[data-nested-column="displayName"]::before) {
+  bottom: 50%;
+}
+
+.roster :global(.nested-account-identity) {
+  position: relative;
+  padding-left: 88px;
+}
+
+.roster :global(.nested-branch) {
+  position: absolute;
+  top: 50%;
+  left: 42px;
+  width: 34px;
+  height: 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 30%, transparent);
+  transform: translateY(-1px);
+  pointer-events: none;
+}
+
+:global(.light) .roster :global(.nested-account-row > td[data-nested-column="displayName"]::before),
+:global(.light) .roster :global(.nested-branch) {
+  border-color: #aab1ba;
+}
+
+@media (max-width: 1180px) {
+  .roster :global(.table-toolbar) {
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .roster :global(.table-search) {
+    width: 100%;
+    max-width: none;
+    flex: 1 0 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .roster :global(.roster-tabs) {
+    gap: 18px;
+  }
+
+  .roster :global(.roster-tabs button) {
+    font-size: 12px;
+  }
+
+  .roster :global(.toolbar-button) {
+    flex: 1 1 auto;
+  }
+
+  .roster :global(.nested-account-header-row > td[data-nested-column="displayName"]) {
+    padding-left: 88px;
+  }
+
+  .roster :global(.nested-account-row > td[data-nested-column="displayName"]::before),
+  .roster :global(.nested-branch) {
+    left: 30px;
+  }
+
+  .roster :global(.nested-branch) {
+    width: 30px;
+  }
+
+  .roster :global(.nested-account-identity) {
+    padding-left: 70px;
+  }
+}

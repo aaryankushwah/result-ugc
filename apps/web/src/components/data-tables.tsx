@@ -1,10 +1,12 @@
 "use client";
 
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, type VisibilityState, useReactTable } from "@tanstack/react-table";
+import { aggregateAccountPerformanceHealth } from "@result/domain";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Filter, Instagram, RotateCcw, Search, VideoOff, X, Youtube } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
+import rosterStyles from "./creator-accounts-roster.module.css";
 import { Button } from "@/components/ui/button";
 import { AccountAssignmentButton } from "@/components/creator-actions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +14,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
 import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
@@ -20,7 +23,26 @@ function SortButton({ label, sorted, toggle }: { label: string; sorted: false | 
 function TableToolbar({ search, setSearch, placeholder, children, columns, toggleColumn }: { search: string; setSearch: (value: string) => void; placeholder: string; children?: React.ReactNode; columns: Array<{ id: string; label: string; visible: boolean }>; toggleColumn: (id: string) => void }) { return <div className="table-toolbar"><div className="table-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} />{search ? <Button variant="ghost" size="icon-xs" onClick={() => setSearch("")} aria-label="Clear search"><X /></Button> : null}</div>{children}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Columns3 /> Columns</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-44">{columns.map((column) => <DropdownMenuCheckboxItem key={column.id} checked={column.visible} onCheckedChange={() => toggleColumn(column.id)}>{column.label}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu></div>; }
 function Pagination({ page, pages, rows, previous, next, canPrevious, canNext }: { page: number; pages: number; rows: number; previous: () => void; next: () => void; canPrevious: boolean; canNext: boolean }) { return <div className="table-pagination"><span>{formatNumber(rows)} rows</span><div><span>Page {page} of {Math.max(1, pages)}</span><Button variant="outline" size="icon-sm" disabled={!canPrevious} onClick={previous}><ChevronLeft /></Button><Button variant="outline" size="icon-sm" disabled={!canNext} onClick={next}><ChevronRight /></Button></div></div>; }
 function Avatar({ src, name }: { src: string | null; name: string }) { return <span className="table-avatar">{src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}</span>; }
-function TikTokIcon() { return <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M448 209.9a210.1 210.1 0 0 1-122.8-39.2v178.7A162.6 162.6 0 1 1 185 188.3v89.9a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 394.3 102a121.4 121.4 0 0 0 53.7 13.6z" /></svg>; }
+function AccountHealthDot({ creator }: { creator: PortalCreator }) {
+  const healthAccounts = creator.source === "viral_candidate"
+    ? creator.accounts
+    : creator.accounts.filter((account) => account.linkState === "confirmed");
+  const state = aggregateAccountPerformanceHealth(healthAccounts.map((account) => account.performanceHealth ?? "unknown"));
+  const accountNeedingAttention = healthAccounts.find((account) => account.performanceHealth === state);
+  const reason = state === "healthy"
+    ? "recent videos performing"
+    : accountNeedingAttention?.performanceHealthReason ?? "waiting for enough posting data";
+  const label = `Account health: ${state.replace("_", " ")} — ${reason}`;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="account-health-dot" data-state={state} role="img" aria-label={label} />
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+function TikTokIcon() { return <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="var(--foreground)" d="M448 209.9a210.1 210.1 0 0 1-122.8-39.2v178.7A162.6 162.6 0 1 1 185 188.3v89.9a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 394.3 102a121.4 121.4 0 0 0 53.7 13.6z" /></svg>; }
 function SocialPlatformIcon({ platform }: { platform: string }) {
   const normalized = platform.toLowerCase();
   if (normalized === "instagram") return <Instagram aria-hidden="true" />;
@@ -43,7 +65,7 @@ export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
   const filtered = useMemo(() => creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[tab] && `${creator.displayName} ${creator.discord.username ?? ""} ${creator.accounts.map((account) => account.username).join(" ")} ${creator.nextStep ?? ""}`.toLowerCase().includes(search.toLowerCase())), [creators, tab, search]);
   const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.displayName}`} />, enableSorting: false },
-    { accessorKey: "displayName", header: "Creator", cell: ({ row }) => <Link className="creator-cell" href={`/creators/${row.original.id}`}><Avatar src={row.original.discord.avatarUrl ?? row.original.accounts[0]?.avatarUrl ?? null} name={row.original.displayName} /><span><strong>{row.original.displayName}</strong><small>{row.original.source === "viral_candidate" ? `@${row.original.accounts[0]?.username ?? "unknown"} · unconfirmed match` : row.original.email ?? row.original.discord.username ?? "No contact"}</small></span></Link> },
+    { accessorKey: "displayName", header: "Creator", cell: ({ row }) => <Link className="creator-cell" href={`/creators/${row.original.id}`}><Avatar src={row.original.discord.avatarUrl ?? row.original.accounts[0]?.avatarUrl ?? null} name={row.original.displayName} /><span><span className="creator-name-health"><strong>{row.original.displayName}</strong><AccountHealthDot creator={row.original} /></span><small>{row.original.source === "viral_candidate" ? `@${row.original.accounts[0]?.username ?? "unknown"} · unconfirmed match` : row.original.email ?? row.original.discord.username ?? "No contact"}</small></span></Link> },
     { accessorKey: "lifecycle", header: "Lifecycle", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone={getValue() === "active" ? "success" : getValue() === "watch" ? "attention" : "neutral"} /> },
     { id: "discord", accessorFn: (row) => row.discord.state, header: "Discord", cell: ({ row }) => <div className="stack-cell"><StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} /><small>{row.original.discord.username ? `@${row.original.discord.username}` : "Not reconciled"}</small></div> },
     { id: "relationships", accessorFn: (row) => row.relationships.length, header: "Signing", cell: ({ row }) => row.original.relationships.length ? <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div> : <span className="muted-cell">No relationship</span> },
@@ -103,7 +125,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
           <Link className="creator-cell" href={`/creators/${row.original.id}`}>
             <Avatar src={row.original.discord.avatarUrl ?? row.original.accounts[0]?.avatarUrl ?? null} name={row.original.displayName} />
             <span>
-              <strong>{row.original.displayName}</strong>
+              <span className="creator-name-health"><strong>{row.original.displayName}</strong><AccountHealthDot creator={row.original} /></span>
               <small>{row.original.discord.username ? `@${row.original.discord.username}` : row.original.email ?? "No Discord identity"}</small>
             </span>
           </Link>
@@ -180,7 +202,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const toggleAll = () => setExpanded(allExpanded ? {} : Object.fromEntries(pageCreators.filter((creator) => creator.accounts.length).map((creator) => [creator.id, true])));
 
   return (
-    <section className="data-panel unified-creator-roster">
+    <section className={`data-panel unified-creator-roster ${rosterStyles.roster}`}>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="roster-tabs">
           {["requests", "active", "watch", "offboarded"].map((item) => <TabsTrigger key={item} value={item}>{item}<span>{creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[item]).length}</span></TabsTrigger>)}
@@ -267,8 +289,8 @@ function CreatorAccountsTable({
                 <TableRow className="nested-account-header-row">
                   {visibleColumns.map((column) => <TableCell data-nested-column={column.id} key={`${row.id}-nested-header-${column.id}`}>{nestedHeaders[column.id] ?? ""}</TableCell>)}
                 </TableRow>
-                {row.original.accounts.length ? row.original.accounts.map((account) => (
-                  <TableRow className="nested-account-row" data-link-state={account.linkState} key={account.id}>
+                {row.original.accounts.length ? row.original.accounts.map((account, accountIndex) => (
+                  <TableRow className="nested-account-row" data-link-state={account.linkState} data-last-account={accountIndex === row.original.accounts.length - 1} key={account.id}>
                     {visibleColumns.map((column) => <TableCell data-nested-column={column.id} key={`${account.id}-${column.id}`}>{nestedCell(column.id, account, row.original)}</TableCell>)}
                   </TableRow>
                 )) : <TableRow className="nested-account-empty-row"><TableCell colSpan={visibleColumns.length}>No posting accounts are connected to this creator.</TableCell></TableRow>}

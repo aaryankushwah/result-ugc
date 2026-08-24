@@ -1,0 +1,86 @@
+/*
+ * Shared interaction states live here so light mode never inherits the
+ * hard-coded charcoal hover treatments used by the dark theme.
+ */
+
+.light :is(
+  .request-list > a,
+  .linked-account-list > a,
+  .rank-list > a,
+  .column-menu button,
+  .command-results button,
+  .mini-modal header button
+):hover {
+  border-color: #cfd4db;
+  background: #f1f3f5;
+  color: #17191d;
+}
+
+.light :is(
+  .request-list > a,
+  .linked-account-list > a,
+  .rank-list > a,
+  .column-menu button,
+  .command-results button
+):focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.light :is(
+  .request-list > a,
+  .linked-account-list > a,
+  .rank-list > a,
+  .column-menu button,
+  .command-results button,
+  .mini-modal header button
+):hover :is(strong, b) {
+  color: #17191d;
+}
+
+.light :is(
+  .request-list > a,
+  .linked-account-list > a,
+  .rank-list > a,
+  .column-menu button,
+  .command-results button
+):hover :is(small, p, time) {
+  color: #59636f;
+}
+
+.light :is(
+  .request-list > a,
+  .linked-account-list > a,
+  .rank-list > a
+):hover > svg {
+  color: #4d5661;
+}
+
+.light .command-trigger:hover {
+  border-color: #aeb5bf;
+  background: #eef0f3;
+  color: #17191d;
+}
+
+.light :is(
+  .writer-back,
+  .transcript-heading button,
+  .category-tabs button,
+  .sort-button
+):hover {
+  color: #17191d;
+}
+
+.light .writer-actions > button:not(.studio-primary):hover {
+  border-color: #aeb5bf;
+  background: #eef0f3;
+  color: #17191d;
+}
+
+.light :is(.visual-direction button, .add-script-section):hover {
+  border-color: color-mix(in srgb, var(--primary) 42%, #cfd4db);
+  background: color-mix(in srgb, var(--primary) 6%, #fff);
+  color: #3b318f;
+}

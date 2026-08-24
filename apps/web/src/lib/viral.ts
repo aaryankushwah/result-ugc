@@ -1,6 +1,6 @@
 import "server-only";
 
-import { deriveTrackingState } from "@result/domain";
+import { deriveAccountPerformanceHealth, deriveTrackingState } from "@result/domain";
 import type { PortalAccount, PortalVideo } from "./portal-types";
 
 const VIRAL_API_URL = "https://viral.app/api/v1";
@@ -17,6 +17,15 @@ type ViralAccount = {
   followerCount?: number | null;
   followingCount?: number | null;
   totalVideosPublished?: number | null;
+  p50Views?: number | null;
+  daysSinceLastPost?: number | null;
+  postActivity?: {
+    dayCount: number;
+    days: Array<{ date: string; postedVideos: number }>;
+  } | null;
+  weeklyViewStats?: {
+    weeks: Array<{ weekStart: string; avgViews: number | null; p50Views: number | null }>;
+  } | null;
   totalViews?: number | null;
   totalLikes?: number | null;
   totalComments?: number | null;
@@ -118,6 +127,13 @@ export async function trackViralAccounts(accounts: Array<{ platform: string; use
 
 function mapAccount(account: ViralAccount): PortalAccount {
   const username = account.username ?? "unknown";
+  const performanceHealth = deriveAccountPerformanceHealth({
+    totalVideosPublished: account.totalVideosPublished,
+    p50Views: account.p50Views,
+    postActivity: account.postActivity?.days,
+    weeklyViewStats: account.weeklyViewStats?.weeks,
+    daysSinceLastPost: account.daysSinceLastPost,
+  });
   return {
     id: account.id,
     creatorId: null,
@@ -137,6 +153,11 @@ function mapAccount(account: ViralAccount): PortalAccount {
     averageViews: account.averageViewsPerVideo ?? 0,
     engagementRate: account.engagementRate ?? 0,
     latestPostAt: account.latestVideoPublishedAt ?? null,
+    performanceHealth: performanceHealth.state,
+    performanceHealthReason: performanceHealth.reason,
+    recentPosts7d: performanceHealth.recentPosts,
+    recentMedianViews: performanceHealth.recentMedianViews,
+    baselineMedianViews: performanceHealth.baselineMedianViews,
     trackingState: deriveTrackingState({ loadAt: account.loadAt, lastErrorAt: account.lastErrorAt, staleAfterMinutes: 2_160 }),
     refreshedAt: account.loadAt ?? null,
     linkState: "unlinked",

@@ -5,6 +5,7 @@ import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 import "./script-pipeline.css";
+import "./interaction-states.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

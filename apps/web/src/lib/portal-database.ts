@@ -14,11 +14,25 @@ import {
   videos as videoTable,
 } from "@result/db";
 import { desc, eq } from "drizzle-orm";
+import { accountPerformanceHealthStates, aggregateTrackingState } from "@result/domain";
+import type { AccountPerformanceHealthState } from "@result/domain";
 import type { PortalAccount, PortalActivity, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
 import { buildPerformance } from "./performance";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
 const PROVIDER_STALE_AFTER_MS = 20 * 60 * 1_000;
+
+function accountPerformanceHealthFromRaw(raw: Record<string, unknown> | null): AccountPerformanceHealthState {
+  const state = raw?.performanceHealth;
+  return typeof state === "string" && accountPerformanceHealthStates.includes(state as AccountPerformanceHealthState)
+    ? state as AccountPerformanceHealthState
+    : "unknown";
+}
+
+function nullableNumberFromRaw(raw: Record<string, unknown> | null, key: string): number | null {
+  const value = raw?.[key];
+  return typeof value === "number" ? value : null;
+}
 
 function accountSourceUrl(platform: string, username: string): string | null {
   const handle = username.replace(/^@/, "");
@@ -62,6 +76,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const accounts: PortalAccount[] = accountRows.map((account) => {
     const resolvedCreatorId = account.creatorId ?? account.suggestedCreatorId ?? null;
     const username = account.username ?? "unknown";
+    const performanceHealth = accountPerformanceHealthFromRaw(account.raw);
     return {
       id: account.viralOrgAccountId,
       creatorId: resolvedCreatorId,
@@ -81,6 +96,11 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       averageViews: account.averageViews ?? 0,
       engagementRate: account.engagementRate ?? 0,
       latestPostAt: account.latestPostAt?.toISOString() ?? null,
+      performanceHealth,
+      performanceHealthReason: typeof account.raw?.performanceHealthReason === "string" ? account.raw.performanceHealthReason : "waiting for the next Viral account snapshot",
+      recentPosts7d: nullableNumberFromRaw(account.raw, "recentPosts7d") ?? undefined,
+      recentMedianViews: nullableNumberFromRaw(account.raw, "recentMedianViews"),
+      baselineMedianViews: nullableNumberFromRaw(account.raw, "baselineMedianViews"),
       trackingState: account.trackingState,
       refreshedAt: account.sourceRefreshedAt?.toISOString() ?? null,
       linkState: account.linkState,
@@ -146,9 +166,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       error: row.lastError,
     }));
     const confirmedAccounts = creatorAccounts.filter((account) => account.linkState === "confirmed");
-    const trackingState = confirmedAccounts.some((account) => account.trackingState === "failed") ? "failed"
-      : confirmedAccounts.some((account) => account.trackingState === "stale") ? "stale"
-        : confirmedAccounts.length ? "healthy" : "untracked";
+    const trackingState = aggregateTrackingState(confirmedAccounts.map((account) => account.trackingState));
     return {
       id: creator.id,
       displayName: creator.displayName,

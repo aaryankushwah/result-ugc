@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Circle, FileVideo2, Link2, Radio } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, Circle, FileVideo2, Link2, Radio } from "lucide-react";
 import Link from "next/link";
 import { OverviewMetricGrid, OverviewMetricPicker, type OverviewMetric } from "@/components/overview-metrics";
 import { PerformanceChart } from "@/components/performance-chart";
@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { formatNumber, formatPercent, PageTitle, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
+import { creatorPostActivity } from "@/lib/table-metrics";
+import styles from "./overview.module.css";
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string; series?: string; stats?: string }> }) {
   await requireUser();
@@ -52,6 +54,9 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   ];
   const topAccounts = [...data.accounts].sort((a, b) => b.views - a.views).slice(0, 5);
   const topVideos = [...includedVideos].sort((a, b) => b.views - a.views).slice(0, 5);
+  const activityByCreator = new Map(creatorPostActivity(data.creators, data.videos).map((row) => [row.creatorId, row]));
+  const creatorActivity = data.creators.map((creator) => ({ creator, activity: activityByCreator.get(creator.id)! }))
+    .sort((a, b) => b.activity.posts7d - a.activity.posts7d || b.activity.posts - a.activity.posts || a.creator.displayName.localeCompare(b.creator.displayName));
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
@@ -67,9 +72,22 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       })}</div></div><PerformanceChart data={performance} /></Card>
       <article className="panel todo-panel"><div className="panel-header"><h2>To do</h2><StateBadge label={`${exceptions.reduce((sum, item) => sum + item.count, 0)} open`} tone="attention" /></div><div className="todo-list">{exceptions.map((item) => <Link key={item.label} href={item.href} data-complete={item.count === 0}><span className="todo-state">{item.count === 0 ? <CheckCircle2 /> : <Circle />}</span><strong>{item.label}</strong><span className={`todo-count ${item.tone}`}>{item.count}</span><ArrowUpRight /></Link>)}</div></article>
     </section>
-    <section className="dashboard-grid split-grid">
-      <article className="panel table-panel"><div className="panel-header"><div><h2>Top accounts</h2><p>Current tracked totals</p></div><Link href="/accounts" className="text-link">View all <ArrowUpRight /></Link></div><div className="rank-list">{topAccounts.map((account, index) => <Link href={`/accounts/${encodeURIComponent(account.id)}`} key={account.id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><span className="account-avatar">{account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.username.slice(0, 1).toUpperCase()}</span><span className="rank-copy"><strong>@{account.username}</strong><small>{account.platform} · {formatNumber(account.followers ?? 0)} followers</small></span><b>{formatNumber(account.views)}</b><TrackingBadge state={account.trackingState} /></Link>)}</div></article>
-      <article className="panel table-panel"><div className="panel-header"><div><h2>Top videos</h2><p>Ranked by tracked views</p></div><Link href="/videos" className="text-link">View all <ArrowUpRight /></Link></div><div className="rank-list video-rank-list">{topVideos.map((video, index) => <Link href={`/videos/${encodeURIComponent(video.id)}`} key={video.id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><span className="video-thumb">{video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <FileVideo2 />}</span><span className="rank-copy"><strong>{video.caption}</strong><small>@{video.accountUsername} · {formatPercent(video.engagementRate)}</small></span><b>{formatNumber(video.views)}</b></Link>)}</div></article>
+    <section className={styles.directoryGrid}>
+      <article className={`panel table-panel ${styles.directoryPanel}`}><div className="panel-header"><h2>Top accounts</h2><Link href="/accounts" className="text-link">View all <ArrowUpRight /></Link></div><div className={`rank-list ${styles.compactRankList}`}>{topAccounts.map((account, index) => <Link href={`/accounts/${encodeURIComponent(account.id)}`} key={account.id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><span className="account-avatar">{account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.username.slice(0, 1).toUpperCase()}</span><span className="rank-copy"><strong>@{account.username}</strong><small>{account.platform} · {formatNumber(account.followers ?? 0)} followers</small></span><b>{formatNumber(account.views)}</b><TrackingBadge state={account.trackingState} /></Link>)}</div></article>
+      <article className={`panel table-panel ${styles.directoryPanel}`}><div className="panel-header"><h2>Top videos</h2><Link href="/videos" className="text-link">View all <ArrowUpRight /></Link></div><div className={`rank-list video-rank-list ${styles.compactRankList} ${styles.videoList}`}>{topVideos.map((video, index) => <Link href={`/videos/${encodeURIComponent(video.id)}`} key={video.id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><span className="video-thumb">{video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <FileVideo2 />}</span><span className="rank-copy"><strong title={video.caption}>{video.caption}</strong><small>@{video.accountUsername} · {formatPercent(video.engagementRate)}</small></span><b>{formatNumber(video.views)}</b></Link>)}</div></article>
+      <article className={`panel table-panel ${styles.directoryPanel} ${styles.creatorPanel}`}><div className="panel-header"><h2>Creators</h2><Link href="/creators" className="text-link">View all <ArrowUpRight /></Link></div><div className={styles.creatorList}>{creatorActivity.map(({ creator, activity }) => {
+        const avatarUrl = creator.discord.avatarUrl ?? creator.accounts.find((account) => account.avatarUrl)?.avatarUrl ?? null;
+        const handle = creator.discord.username ?? creator.accounts[0]?.username ?? "No account linked";
+        const goalRate = activity.goalsTotal ? activity.goalsHit / activity.goalsTotal : 0;
+        const goalState = activity.goalsTotal === 0 ? "untracked" : goalRate >= 1 ? "complete" : goalRate >= .7 ? "close" : "behind";
+        return <Link href={`/creators/${encodeURIComponent(creator.id)}`} key={creator.id}>
+          <span className={styles.creatorAvatar}>{avatarUrl ? <img src={avatarUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}</span>
+          <span className={styles.creatorIdentity}><strong>{creator.displayName}</strong><small>{handle === "No account linked" ? handle : `@${handle}`} · {activity.posts} posts</small></span>
+          <span className={styles.goalProgress} data-state={goalState} title={`${activity.goalsHit} of ${activity.goalsTotal} account-day goals hit · 1 post per connected account per day`}><small>Goal</small><strong>{activity.goalsHit}/{activity.goalsTotal}</strong></span>
+          <span className={styles.postActivity} aria-label={`${activity.posts7d} posts in the last seven days`}>{activity.activity.map((day) => <span key={day.date} title={`${day.date}: ${day.count} posts`}><small>{day.label}</small><b data-active={day.count > 0}>{day.count}</b></span>)}</span>
+          <ChevronRight />
+        </Link>;
+      })}</div></article>
     </section>
     <section className="freshness-strip">{data.freshness.map((source) => <div key={source.source}><span className={`freshness-dot ${source.state}`} /><span><strong>{source.source}</strong><small>{source.message ?? source.state}</small></span><b>{timeAgo(source.lastSuccessAt)}</b></div>)}</section>
   </div>;

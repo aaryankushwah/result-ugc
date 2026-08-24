@@ -9,9 +9,10 @@ import { BarChart } from "@/components/dither-kit/bar-chart";
 import { Bar } from "@/components/dither-kit/bar";
 import { Grid } from "@/components/dither-kit/grid";
 import { Tooltip } from "@/components/dither-kit/tooltip";
+import type { TooltipItem } from "@/components/dither-kit/common-context";
 import { XAxis } from "@/components/dither-kit/x-axis";
 import { YAxis } from "@/components/dither-kit/y-axis";
-import type { DitherColor } from "@/components/dither-kit/palette";
+import { seedOfColor, type DitherColor } from "@/components/dither-kit/palette";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { PerformancePoint } from "@/lib/portal-types";
@@ -68,6 +69,13 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
   const rightIsPercentOnly = rightKeys.length > 0 && rightKeys.every((key) => key === "engagementRate");
   const leftConfig = Object.fromEntries(leftKeys.map((key) => [key, { label: metrics[key].label, color: metrics[key].color }]));
   const rightConfig = Object.fromEntries(rightKeys.map((key) => [key, { label: metrics[key].label, color: metrics[key].color }]));
+  const tooltipItemsAt = (index: number): TooltipItem[] => selected.map((key) => ({
+    name: key,
+    label: metrics[key].label,
+    value: Number(chartData[index]?.[key] ?? 0),
+    seed: seedOfColor(metrics[key].color),
+    dimmed: false,
+  }));
   const leftTop = Math.max(-1, ...leftKeys.map((key) => selected.indexOf(key)));
   const rightTop = Math.max(-1, ...rightKeys.map((key) => selected.indexOf(key)));
   const barsAreFront = rightKeys.length > 0 && (!leftKeys.length || rightTop > leftTop);
@@ -179,7 +187,7 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
           <Grid />
           <XAxis dataKey="date" maxTicks={7} tickFormatter={(value) => shortDate(String(value))} />
           <YAxis orientation="right" tickFormatter={(value) => rightIsPercentOnly ? `${value.toFixed(0)}%` : formatNumber(value)} />
-          {barsAreFront ? <Tooltip labelKey="date" variant="frosted-glass" valueFormatter={(value, name) => metricValue(name as MetricKey, value)} /> : null}
+          {barsAreFront ? <Tooltip labelKey="date" itemsAt={tooltipItemsAt} variant="frosted-glass" valueFormatter={(value, name) => metricValue(name as MetricKey, value)} /> : null}
           {rightKeys.map((key, index) => <Bar key={key} dataKey={key} variant={index % 2 ? "dotted" : "hatched"} />)}
         </BarChart>
       </div> : null}
@@ -187,7 +195,7 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
         <AreaChart data={chartData} config={leftConfig} bloom="aura" interactive={!barsAreFront} margins={{ top: 12, right: 46, bottom: 30, left: 54 }}>
           {!rightKeys.length ? <><Grid /><XAxis dataKey="date" maxTicks={7} tickFormatter={(value) => shortDate(String(value))} /></> : null}
           <YAxis tickFormatter={formatNumber} />
-          {!barsAreFront ? <Tooltip labelKey="date" variant="frosted-glass" valueFormatter={(value, name) => metricValue(name as MetricKey, value)} /> : null}
+          {!barsAreFront ? <Tooltip labelKey="date" itemsAt={tooltipItemsAt} variant="frosted-glass" valueFormatter={(value, name) => metricValue(name as MetricKey, value)} /> : null}
           {leftKeys.map((key, index) => <Area key={key} dataKey={key} variant={index === 0 ? "gradient" : index % 2 ? "dotted" : "hatched"} strokeVariant={metrics[key].dashed ? "dashed" : "solid"} />)}
         </AreaChart>
       </div> : null}

@@ -1,4 +1,4 @@
-import type { CreatorLifecycle, DiscordState, Freshness, RelationshipState, SigningProvider, TrackingState } from "@result/domain";
+import type { AccountPerformanceHealthState, CreatorLifecycle, DiscordState, Freshness, RelationshipState, SigningProvider, TrackingState } from "@result/domain";
 
 export type PortalAccount = {
   id: string;
@@ -19,6 +19,11 @@ export type PortalAccount = {
   averageViews: number;
   engagementRate: number;
   latestPostAt: string | null;
+  performanceHealth?: AccountPerformanceHealthState;
+  performanceHealthReason?: string;
+  recentPosts7d?: number;
+  recentMedianViews?: number | null;
+  baselineMedianViews?: number | null;
   trackingState: TrackingState;
   refreshedAt: string | null;
   linkState: "suggested" | "confirmed" | "unlinked";

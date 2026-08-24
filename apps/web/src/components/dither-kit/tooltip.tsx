@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react"
 import { useState } from "react"
-import { useCommonChart } from "./common-context"
+import { useCommonChart, type TooltipItem } from "./common-context"
 import { cn } from "./lib"
 import { rgb } from "./palette"
 
@@ -20,10 +20,12 @@ const VARIANT: Record<TooltipVariant, string> = {
  */
 export function Tooltip({
   labelKey,
+  itemsAt,
   valueFormatter,
   variant = "default",
 }: {
   labelKey?: string
+  itemsAt?: (index: number) => TooltipItem[]
   valueFormatter?: (value: number, name: string) => string
   variant?: TooltipVariant
 }) {
@@ -39,7 +41,7 @@ export function Tooltip({
   const index = chart.hoverIndex ?? lastIndex
 
   const heading = chart.heading(index, labelKey)
-  const items = chart.itemsAt(index)
+  const items = itemsAt ? itemsAt(index) : chart.itemsAt(index)
 
   return (
     <AnimatePresence>
