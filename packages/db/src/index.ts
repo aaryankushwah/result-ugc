@@ -197,8 +197,9 @@ export async function reconcileLaunchpointDataset(input: {
   for (const providerCreator of input.creators) {
     const existing = existingByExternalId.get(providerCreator.externalId);
     let creatorId: string | null | undefined = existing?.creatorId;
+    const socialIdentities = socialByCreator.get(providerCreator.externalId) ?? [];
     if (!creatorId) {
-      for (const value of [providerCreator.email, providerCreator.username, providerCreator.displayName]) {
+      for (const value of [providerCreator.email, providerCreator.username, providerCreator.displayName, ...socialIdentities.map((identity) => identity.username)]) {
         const key = creatorIdentityKey(value);
         const candidates = key ? identities.get(key) : null;
         if (candidates?.size === 1) { creatorId = [...candidates][0]!; break; }
@@ -227,7 +228,6 @@ export async function reconcileLaunchpointDataset(input: {
     addIdentity(providerCreator.username, creatorId);
     const relationships = (relationshipsByCreator.get(providerCreator.externalId) ?? []).sort((a, b) => relationshipPriority(b.state) - relationshipPriority(a.state));
     const current = relationships[0];
-    const socialIdentities = socialByCreator.get(providerCreator.externalId) ?? [];
     const values = {
       creatorId,
       program: current?.program ?? null,
