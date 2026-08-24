@@ -21,6 +21,7 @@ client.once(Events.ClientReady, (readyClient) => {
   for (const guild of readyClient.guilds.cache.values()) {
     void reconcileGuild(guild).catch((error) => console.error(`Discord reconciliation failed for ${guild.id}`, error));
   }
+  void processDiscordOperationQueue(readyClient).catch((error) => console.error("Initial Discord operation queue failed", error));
   setInterval(() => {
     void runReminderSweep(readyClient).catch((error) => console.error("Reminder sweep failed", error));
   }, 60 * 60 * 1_000).unref();

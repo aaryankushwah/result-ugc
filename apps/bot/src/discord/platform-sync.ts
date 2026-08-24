@@ -22,6 +22,7 @@ import {
 import { and, asc, eq, lte } from "drizzle-orm";
 import { getGuildState } from "../data/store.js";
 import { createCreatorChannel, findCreatorChannel } from "./setup.js";
+import { staleDiscordOperationCutoff } from "./operation-queue.js";
 
 const CREATOR_ROLE = "Verified Creator";
 const MEMBER_ROLE = "Member";
@@ -143,7 +144,15 @@ async function logEvent(orgId: string, creatorId: string | null, type: string, s
 
 export async function processDiscordOperationQueue(client: Client): Promise<void> {
   if (!process.env.DATABASE_URL) return;
-  const [operation] = await getDatabase().select().from(discordOperations).where(and(eq(discordOperations.state, "queued"), lte(discordOperations.availableAt, new Date()))).orderBy(asc(discordOperations.createdAt)).limit(1);
+  const now = new Date();
+  await getDatabase().update(discordOperations).set({
+    state: "queued",
+    lockedAt: null,
+    availableAt: now,
+    lastError: "Previous Discord worker stopped before completing this operation; retrying safely.",
+    updatedAt: now,
+  }).where(and(eq(discordOperations.state, "running"), lte(discordOperations.lockedAt, staleDiscordOperationCutoff(now))));
+  const [operation] = await getDatabase().select().from(discordOperations).where(and(eq(discordOperations.state, "queued"), lte(discordOperations.availableAt, now))).orderBy(asc(discordOperations.createdAt)).limit(1);
   if (!operation) return;
   const claimed = await getDatabase().update(discordOperations).set({ state: "running", lockedAt: new Date(), attempts: operation.attempts + 1, updatedAt: new Date() }).where(and(eq(discordOperations.id, operation.id), eq(discordOperations.state, "queued"))).returning({ id: discordOperations.id });
   if (!claimed.length) return;
