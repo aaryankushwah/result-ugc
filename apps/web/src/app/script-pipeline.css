@@ -1,0 +1,47 @@
+/* Script pipeline layout and light-mode contrast. Kept separate from the shared design sheet. */
+.pipeline-home,
+.pipeline-controls,
+.pipeline-board { min-width: 0; }
+
+.pipeline-controls { overflow: hidden; }
+.pipeline-views { flex: 0 0 auto; }
+.category-tabs { flex: 1 1 auto; }
+
+.pipeline-board {
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  overflow: visible;
+}
+
+.pipeline-column {
+  min-width: 0;
+  min-height: 420px;
+}
+
+.pipeline-card-tags { flex-wrap: wrap; }
+.pipeline-card-tags select { max-width: 100%; }
+
+.light .pipeline-column > header span { color: #343a42; }
+.light .pipeline-column > header strong { color: #59636e; }
+.light .pipeline-add { border-color: #d5d9df; color: #4f5863; }
+.light .pipeline-add:hover { border-color: #a995ff; background: #f3f0ff; color: #493ba8; }
+.light .pipeline-views button,
+.light .category-tabs button { color: #59636e; }
+.light .pipeline-views button:hover,
+.light .category-tabs button:hover { color: #17191d; }
+.light .category-tabs span { background: #dde1e6; color: #3f4751; }
+
+@media (min-width: 1700px) {
+  .pipeline-board { grid-template-columns: repeat(5,minmax(0,1fr)); }
+}
+
+@media (max-width: 1050px) {
+  .pipeline-board { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 640px) {
+  .pipeline-controls { overflow: visible; }
+  .pipeline-board {
+    margin-right: 0;
+    grid-template-columns: 1fr;
+  }
+}

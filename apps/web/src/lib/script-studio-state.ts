@@ -1,4 +1,4 @@
-import type { StudioScript } from "./script-studio-data";
+import type { StudioAsset, StudioScript } from "./script-studio-data";
 
 export type StudioAssignment = StudioScript["assignments"][number];
 
@@ -19,4 +19,11 @@ export function referencePlatformFromUrl(url: string): string {
   if (value.includes("facebook.com") || value.includes("fb.watch")) return "facebook";
   if (value.includes("instagram.com")) return "instagram";
   return "other";
+}
+
+export function partitionScriptAssets(assets: StudioAsset[]): { references: StudioAsset[]; resources: StudioAsset[] } {
+  return {
+    references: assets.filter((asset) => asset.kind === "reference_video"),
+    resources: assets.filter((asset) => asset.kind !== "reference_video"),
+  };
 }
