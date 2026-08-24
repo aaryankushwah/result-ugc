@@ -1,7 +1,7 @@
 "use client";
 
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, type VisibilityState, useReactTable } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Filter, RotateCcw, Search, VideoOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Filter, Instagram, RotateCcw, Search, VideoOff, X, Youtube } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
@@ -19,6 +19,17 @@ function SortButton({ label, sorted, toggle }: { label: string; sorted: false | 
 function TableToolbar({ search, setSearch, placeholder, children, columns, toggleColumn }: { search: string; setSearch: (value: string) => void; placeholder: string; children?: React.ReactNode; columns: Array<{ id: string; label: string; visible: boolean }>; toggleColumn: (id: string) => void }) { return <div className="table-toolbar"><div className="table-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} />{search ? <Button variant="ghost" size="icon-xs" onClick={() => setSearch("")} aria-label="Clear search"><X /></Button> : null}</div>{children}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Columns3 /> Columns</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-44">{columns.map((column) => <DropdownMenuCheckboxItem key={column.id} checked={column.visible} onCheckedChange={() => toggleColumn(column.id)}>{column.label}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu></div>; }
 function Pagination({ page, pages, rows, previous, next, canPrevious, canNext }: { page: number; pages: number; rows: number; previous: () => void; next: () => void; canPrevious: boolean; canNext: boolean }) { return <div className="table-pagination"><span>{formatNumber(rows)} rows</span><div><span>Page {page} of {Math.max(1, pages)}</span><Button variant="outline" size="icon-sm" disabled={!canPrevious} onClick={previous}><ChevronLeft /></Button><Button variant="outline" size="icon-sm" disabled={!canNext} onClick={next}><ChevronRight /></Button></div></div>; }
 function Avatar({ src, name }: { src: string | null; name: string }) { return <span className="table-avatar">{src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}</span>; }
+function TikTokIcon() { return <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M448 209.9a210.1 210.1 0 0 1-122.8-39.2v178.7A162.6 162.6 0 1 1 185 188.3v89.9a74.6 74.6 0 1 0 52.2 71.2V0h88a121.2 121.2 0 0 0 1.9 22.2A122.2 122.2 0 0 0 394.3 102a121.4 121.4 0 0 0 53.7 13.6z" /></svg>; }
+function SocialPlatformIcon({ platform }: { platform: string }) {
+  const normalized = platform.toLowerCase();
+  if (normalized === "instagram") return <Instagram aria-hidden="true" />;
+  if (normalized === "youtube") return <Youtube aria-hidden="true" />;
+  if (normalized === "tiktok") return <TikTokIcon />;
+  return <>{platform.slice(0, 2).toUpperCase()}</>;
+}
+function AccountPlatformIcons({ accounts }: { accounts: PortalAccount[] }) {
+  return <div className="account-platforms"><strong>{accounts.length}</strong>{accounts.slice(0, 4).map((account) => <span key={account.id} data-platform={account.platform.toLowerCase()} title={account.platform} aria-label={account.platform}><SocialPlatformIcon platform={account.platform} /></span>)}</div>;
+}
 
 const creatorTabLifecycle: Record<string, PortalCreator["lifecycle"]> = { requests: "request", active: "active", watch: "watch", offboarded: "offboarded" };
 
@@ -32,7 +43,7 @@ export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
     { accessorKey: "lifecycle", header: "Lifecycle", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone={getValue() === "active" ? "success" : getValue() === "watch" ? "attention" : "neutral"} /> },
     { id: "discord", accessorFn: (row) => row.discord.state, header: "Discord", cell: ({ row }) => <div className="stack-cell"><StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} /><small>{row.original.discord.username ? `@${row.original.discord.username}` : "Not reconciled"}</small></div> },
     { id: "relationships", accessorFn: (row) => row.relationships.length, header: "Signing", cell: ({ row }) => row.original.relationships.length ? <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div> : <span className="muted-cell">No relationship</span> },
-    { id: "accounts", accessorFn: (row) => row.accounts.length, header: "Accounts", cell: ({ row }) => <div className="account-platforms"><strong>{row.original.accounts.length}</strong>{row.original.accounts.map((account) => <span key={account.id}>{account.platform.slice(0, 2).toUpperCase()}</span>)}</div> },
+    { id: "accounts", accessorFn: (row) => row.accounts.length, header: "Accounts", cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} /> },
     { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "views30d", header: "30d views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> },
     { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> }, { accessorKey: "lastActivityAt", header: "Last activity", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
@@ -97,12 +108,7 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
       id: "accounts",
       accessorFn: (row) => row.accounts.length,
       header: "Accounts",
-      cell: ({ row }) => (
-        <div className="account-platforms">
-          <strong>{row.original.accounts.length}</strong>
-          {row.original.accounts.slice(0, 4).map((account) => <span key={account.id}>{account.platform.slice(0, 2).toUpperCase()}</span>)}
-        </div>
-      ),
+      cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} />,
     },
     {
       id: "discord",
