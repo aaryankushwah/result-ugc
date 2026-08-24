@@ -6,8 +6,9 @@ import { deriveRelationshipState, type ProviderCreator } from "@result/domain";
 const API_BASE = "https://dashboard.launchpointhq.com/api/v1";
 
 type LaunchpointCreator = { id?: string; name?: string; email?: string; username?: string; status?: string };
-type LaunchpointContract = { id?: string; creatorId?: string; programId?: string; programName?: string; status?: string; startDate?: string; endDate?: string };
+type LaunchpointContract = { id?: string; contractorId?: string; contractorName?: string; programId?: string; contractName?: string; status?: string; startsAt?: string | number; expiresAt?: string | number };
 type LaunchpointPost = { id?: string; creatorId?: string; contractorName?: string; url?: string; platform?: string };
+type LaunchpointPage<T> = { data?: T[]; page?: number; total?: number; totalPages?: number };
 
 async function launchpointFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const key = process.env.LAUNCHPOINT_API_KEY?.trim();
@@ -21,6 +22,26 @@ async function launchpointFetch<T>(path: string, params: Record<string, string> 
     throw new Error(message);
   }
   return payload as T;
+}
+
+async function launchpointBrowse<T>(path: string, params: Record<string, string> = {}): Promise<T[]> {
+  const rows: T[] = [];
+  const limit = 100;
+  for (let page = 1; page <= 100; page += 1) {
+    const result = await launchpointFetch<LaunchpointPage<T>>(path, { ...params, page: String(page), limit: String(limit) });
+    const batch = result.data ?? [];
+    rows.push(...batch);
+    const totalPages = result.totalPages ?? (typeof result.total === "number" ? Math.ceil(result.total / limit) : null);
+    if (!batch.length || (totalPages !== null && page >= totalPages) || (totalPages === null && batch.length < limit)) break;
+  }
+  return rows;
+}
+
+function timestamp(value: string | number | undefined): string | null {
+  if (value === undefined || value === "") return null;
+  const numeric = typeof value === "number" && value < 1_000_000_000_000 ? value * 1_000 : value;
+  const date = new Date(numeric);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function socialIdentity(post: LaunchpointPost, creatorExternalId: string): LaunchpointSocialIdentityInput | null {
@@ -45,25 +66,42 @@ export async function getLaunchpointDataset(): Promise<{
   socialIdentities: LaunchpointSocialIdentityInput[];
 }> {
   const [creatorResult, contractResult, postResult] = await Promise.all([
-    launchpointFetch<{ data?: LaunchpointCreator[] }>("/creators", { limit: "500" }),
-    launchpointFetch<{ data?: LaunchpointContract[] }>("/contracts", { limit: "500" }),
-    launchpointFetch<{ data?: LaunchpointPost[] }>("/posts", { limit: "500" }),
+    launchpointBrowse<LaunchpointCreator>("/creators"),
+    launchpointBrowse<LaunchpointContract>("/contracts", { scope: "company" }),
+    launchpointBrowse<LaunchpointPost>("/posts"),
   ]);
-  const rawCreators = (creatorResult.data ?? []).filter((creator): creator is LaunchpointCreator & { id: string } => Boolean(creator.id));
+  const creatorById = new Map<string, LaunchpointCreator & { id: string }>();
+  for (const creator of creatorResult) {
+    if (creator.id) creatorById.set(creator.id, { ...creator, id: creator.id });
+  }
+  // The public creators/contracts endpoints can be empty for campaign-only
+  // workspaces even when posts expose stable creator IDs. Posts are therefore
+  // a valid directory fallback, while contract state remains provider-owned.
+  for (const contract of contractResult) {
+    if (!contract.contractorId || creatorById.has(contract.contractorId)) continue;
+    creatorById.set(contract.contractorId, { id: contract.contractorId, name: contract.contractorName });
+  }
+  for (const post of postResult) {
+    if (!post.creatorId || creatorById.has(post.creatorId)) continue;
+    creatorById.set(post.creatorId, { id: post.creatorId, name: post.contractorName });
+  }
+  const rawCreators = [...creatorById.values()];
   const creators: ProviderCreator[] = rawCreators.map((creator) => ({ externalId: creator.id, displayName: creator.name ?? creator.username ?? creator.email ?? creator.id, email: creator.email ?? null, username: creator.username ?? null, sourceUrl: `https://dashboard.launchpointhq.com/creators/${encodeURIComponent(creator.id)}` }));
-  const relationships: LaunchpointRelationshipInput[] = (contractResult.data ?? []).flatMap((contract) => {
-    if (!contract.id || !contract.creatorId) return [];
+  const relationships: LaunchpointRelationshipInput[] = contractResult.flatMap((contract) => {
+    if (!contract.id || !contract.contractorId) return [];
     const status = contract.status?.toLowerCase();
     const active = status ? ["active", "signed", "approved"].includes(status) : null;
+    const startsAt = timestamp(contract.startsAt);
+    const endsAt = timestamp(contract.expiresAt);
     return [{
-      creatorExternalId: contract.creatorId,
+      creatorExternalId: contract.contractorId,
       externalId: contract.id,
       provider: "launchpoint" as const,
-      program: contract.programName ?? contract.programId ?? null,
-      state: deriveRelationshipState({ startsAt: contract.startDate ? new Date(contract.startDate) : null, endsAt: contract.endDate ? new Date(contract.endDate) : null, active }),
-      startsAt: contract.startDate ?? null,
-      endsAt: contract.endDate ?? null,
-      sourceUrl: `https://dashboard.launchpointhq.com/creators/${encodeURIComponent(contract.creatorId)}`,
+      program: contract.contractName ?? contract.programId ?? null,
+      state: deriveRelationshipState({ startsAt: startsAt ? new Date(startsAt) : null, endsAt: endsAt ? new Date(endsAt) : null, active }),
+      startsAt,
+      endsAt,
+      sourceUrl: `https://dashboard.launchpointhq.com/creators/${encodeURIComponent(contract.contractorId)}`,
       lastSyncedAt: new Date().toISOString(),
     }];
   });
@@ -77,7 +115,7 @@ export async function getLaunchpointDataset(): Promise<{
       creatorIdsByName.set(key, ids);
     }
   }
-  const socialIdentities = (postResult.data ?? []).flatMap((post) => {
+  const socialIdentities = postResult.flatMap((post) => {
     let creatorExternalId = post.creatorId ?? null;
     if (!creatorExternalId) {
       const key = creatorIdentityKey(post.contractorName);
