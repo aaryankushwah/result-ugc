@@ -338,6 +338,11 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .nested-account-details { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: #9b9b9b; font-size: 12px; }
 .nested-account-details svg { width: 13px; }
 .nested-account-empty-row > td { height: 78px; padding-left: 85px; background: #0d0d0d !important; color: #777; font-size: 14px; }
+.post-activity { min-width: 210px; display: grid; grid-template-columns: repeat(7,minmax(22px,1fr)); gap: 4px; }
+.post-activity-day { display: grid; gap: 3px; justify-items: center; }
+.post-activity-day small { color: #696969; font-size: 9px; font-weight: 650; line-height: 1; text-transform: uppercase; }
+.post-activity-day strong { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid #292929; background: #181818; color: #777; font-size: 11px; font-weight: 650; }
+.post-activity-day[data-active] strong { border-color: rgba(169,149,255,.5); background: rgba(169,149,255,.14); color: #ddd6ff; }
 .account-assignment-dialog { width: min(620px,calc(100vw - 32px)); }
 .assignment-search { height: 44px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: #111; }
 .assignment-search > svg { width: 16px; color: #777; }
