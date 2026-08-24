@@ -15,6 +15,7 @@ import {
 } from "@result/db";
 import { desc, eq } from "drizzle-orm";
 import type { PortalAccount, PortalActivity, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
+import { buildPerformance } from "./performance";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
 const PROVIDER_STALE_AFTER_MS = 20 * 60 * 1_000;
@@ -240,26 +241,9 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     accounts,
     videos,
     activities,
-    performance: performance(videos),
+    performance: buildPerformance(videos),
     freshness,
     providerErrors: latestFailedBySource,
     sourceMode: "database",
   };
-}
-
-function performance(videos: PortalData["videos"]): PortalData["performance"] {
-  const result = new Map<string, { views: number; posts: number }>();
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  for (let i = 29; i >= 0; i -= 1) {
-    const date = new Date(today);
-    date.setUTCDate(date.getUTCDate() - i);
-    result.set(date.toISOString().slice(0, 10), { views: 0, posts: 0 });
-  }
-  for (const video of videos) {
-    if (!video.included || !video.publishedAt) continue;
-    const point = result.get(video.publishedAt.slice(0, 10));
-    if (point) { point.views += video.views; point.posts += 1; }
-  }
-  return [...result.entries()].map(([date, values]) => ({ date, ...values }));
 }

@@ -3,36 +3,16 @@ import "server-only";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { getLiveViralData } from "./viral";
-import type { PerformancePoint, PortalCreator, PortalData, PortalVideo } from "./portal-types";
+import type { PortalCreator, PortalData, PortalVideo } from "./portal-types";
 import { getDatabasePortalData } from "./portal-database";
 import { PORTAL_DATA_CACHE_TAG } from "./portal-cache";
+import { buildPerformance } from "./performance";
 
 const getCachedDatabasePortalData = unstable_cache(
   getDatabasePortalData,
   ["result-portal-data-v2"],
   { revalidate: 30, tags: [PORTAL_DATA_CACHE_TAG] },
 );
-
-function buildPerformance(videos: PortalVideo[], days = 30): PerformancePoint[] {
-  const byDate = new Map<string, { views: number; posts: number }>();
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(today);
-    date.setUTCDate(date.getUTCDate() - i);
-    byDate.set(date.toISOString().slice(0, 10), { views: 0, posts: 0 });
-  }
-  for (const video of videos) {
-    if (!video.included || !video.publishedAt) continue;
-    const key = video.publishedAt.slice(0, 10);
-    const point = byDate.get(key);
-    if (point) {
-      point.views += video.views;
-      point.posts += 1;
-    }
-  }
-  return [...byDate.entries()].map(([date, metrics]) => ({ date, ...metrics }));
-}
 
 function candidateCreators(accounts: PortalData["accounts"], videos: PortalVideo[]): PortalCreator[] {
   const cutoff = Date.now() - 30 * 86_400_000;
