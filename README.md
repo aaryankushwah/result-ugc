@@ -7,6 +7,7 @@ Result's internal UGC workspace: one dashboard for content tracking, reference-v
 - `apps/web` — Next.js dashboard deployed on Vercel.
 - `apps/bot` — Discord operations bot deployed on the Hetzner VM.
 - `packages` — shared data contracts and utilities as the product grows.
+- `DESIGN.md` — canonical dark-theme design system and implementation rules.
 
 The web app and bot stay independently deployable while sharing one source of truth.
 

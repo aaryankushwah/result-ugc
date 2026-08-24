@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f4ee;
-  --foreground: #18181b;
+  color-scheme: dark;
+  --background: #101010;
+  --foreground: #ffffff;
+  --surface-1: #161616;
+  --surface-2: #191919;
+  --surface-3: #202020;
+  --border: rgba(255, 255, 255, 0.1);
+  --muted: #999999;
+  --accent: #85ed75;
+  --alert: #fc5f2b;
 }
 
 @theme inline {
@@ -19,6 +27,14 @@ body {
 }
 
 ::selection {
-  background: #d9f99d;
-  color: #18181b;
+  background: var(--accent);
+  color: #101010;
+}
+
+.font-result {
+  font-family: var(--font-result), sans-serif;
+  font-style: italic;
+  font-weight: 700;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
 }

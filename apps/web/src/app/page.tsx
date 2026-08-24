@@ -1,86 +1,120 @@
 const workflow = [
-  { number: "01", title: "Track", copy: "Keep every creator, post, deliverable, and performance signal in one place." },
-  { number: "02", title: "Understand", copy: "Turn reference links into transcripts, hooks, scenes, and reusable insights." },
-  { number: "03", title: "Adapt", copy: "Use AI to reshape winning ideas around Result's voice, product, and audience." },
-  { number: "04", title: "Ship", copy: "Create briefs, coordinate creators in Discord, and follow work through delivery." },
+  { number: "01", title: "Track", copy: "Creators, posts, deliverables, and performance in one system.", state: "Foundation" },
+  { number: "02", title: "Understand", copy: "Transcripts, hooks, scenes, and patterns from every reference.", state: "Next" },
+  { number: "03", title: "Adapt", copy: "Winning ideas rewritten around Result's voice and audience.", state: "Planned" },
+  { number: "04", title: "Ship", copy: "Briefs, assignments, approvals, and Discord coordination.", state: "Connected" },
 ];
 
 const modules = [
-  ["Content tracking", "Posts, creators, campaigns, and historical performance"],
-  ["Reference intelligence", "Transcripts, patterns, hooks, and creative analysis"],
-  ["Brief workspace", "Brand-aware concepts that become clear production briefs"],
-  ["Creator operations", "Assignments, approvals, payouts, and Discord workflows"],
+  ["Content tracking", "Capture posts and maintain an accurate performance history."],
+  ["Reference intelligence", "Convert links into transcripts and structured creative analysis."],
+  ["Brief workspace", "Turn useful patterns into brand-aware production briefs."],
+  ["Creator operations", "Move assignments and approvals through Discord without losing context."],
 ];
 
-function StatusRow({ label, detail, status }: { label: string; detail: string; status: string }) {
+function Arrow() {
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-4 border-t border-zinc-200 py-4 first:border-0 first:pt-0 last:pb-0">
-      <div>
-        <p className="text-sm font-medium text-zinc-950">{label}</p>
-        <p className="mt-1 text-sm text-zinc-500">{detail}</p>
-      </div>
-      <span className="mt-0.5 h-fit rounded-full bg-lime-100 px-2.5 py-1 text-xs font-semibold text-lime-800">{status}</span>
-    </div>
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5]">
+      <path d="M3.5 8h9M9 4.5 12.5 8 9 11.5" />
+    </svg>
   );
+}
+
+function StatusDot({ active = false }: { active?: boolean }) {
+  return <span className={`size-1.5 rounded-full ${active ? "bg-[#85ed75] shadow-[0_0_10px_#85ed75]" : "bg-white/30"}`} />;
 }
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#f5f4ee] text-zinc-950">
-      <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-7 lg:px-10">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-zinc-950 text-sm font-bold text-white">S</span>
-          <div>
-            <p className="text-sm font-semibold tracking-tight">Result UGC</p>
-            <p className="text-xs text-zinc-500">Internal workspace</p>
-          </div>
-        </div>
-        <span className="rounded-full border border-zinc-300 bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-600">Foundation online</span>
-      </header>
+    <main className="min-h-screen overflow-hidden bg-[#101010] text-white">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_68%_-15%,rgba(133,237,117,0.12),transparent_48%)]" />
 
-      <section className="mx-auto grid max-w-7xl gap-10 px-6 pb-20 pt-16 lg:grid-cols-[1.35fr_0.65fr] lg:px-10 lg:pt-24">
+      <nav className="relative mx-auto mt-4 flex max-w-7xl items-center justify-between border border-white/10 bg-[#161616]/90 px-4 py-3 backdrop-blur-xl sm:mt-6 sm:rounded-2xl sm:px-5">
+        <a href="#" className="font-result text-lg tracking-[0.04em]">RESULT</a>
+        <div className="hidden items-center gap-7 text-xs text-white/55 md:flex">
+          <a href="#system" className="transition-colors hover:text-white">System</a>
+          <a href="#workflow" className="transition-colors hover:text-white">Workflow</a>
+          <a href="#infrastructure" className="transition-colors hover:text-white">Infrastructure</a>
+        </div>
+        <button className="flex items-center gap-2 rounded-full bg-[#85ed75] px-4 py-2 text-xs font-semibold text-[#101010] transition-transform hover:-translate-y-0.5">
+          Open workspace <Arrow />
+        </button>
+      </nav>
+
+      <section className="relative mx-auto grid max-w-7xl gap-14 px-6 pb-24 pt-24 lg:grid-cols-[1.35fr_0.65fr] lg:px-0 lg:pb-32 lg:pt-32">
         <div>
-          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.24em] text-lime-700">One creative operating system</p>
-          <h1 className="max-w-4xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-7xl">Make every reference video useful to the whole team.</h1>
-          <p className="mt-8 max-w-2xl text-lg leading-8 text-zinc-600">A single home for UGC tracking, creative intelligence, briefs, and creator operations—built around how Result actually works.</p>
+          <div className="mb-7 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[#85ed75]">
+            <StatusDot active /> Internal system online
+          </div>
+          <h1 className="max-w-5xl text-[clamp(3.4rem,7vw,7rem)] font-normal leading-[0.92] tracking-[-0.065em]">
+            Every creative signal. <span className="text-white/35">One operating system.</span>
+          </h1>
+          <p className="mt-8 max-w-xl text-base leading-7 text-white/55 sm:text-lg">
+            Result UGC brings tracking, video intelligence, briefs, and creator operations into one command center for the whole team.
+          </p>
         </div>
 
-        <aside className="self-end rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_70px_rgba(0,0,0,0.06)]">
-          <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Infrastructure</p>
-          <StatusRow label="Web dashboard" detail="Vercel" status="Ready" />
-          <StatusRow label="Discord worker" detail="Hetzner" status="Migrated" />
-          <StatusRow label="Social data" detail="Provider adapter" status="Next" />
+        <aside id="infrastructure" className="self-end border-t border-white/15 pt-5">
+          <div className="mb-6 flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">Infrastructure</p>
+            <span className="text-[10px] text-white/30">24 AUG 2026</span>
+          </div>
+          {[
+            ["Web dashboard", "Vercel", true],
+            ["Discord worker", "Hetzner", true],
+            ["Social data", "Provider adapter", false],
+          ].map(([label, detail, active]) => (
+            <div key={String(label)} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-white/10 py-4">
+              <StatusDot active={Boolean(active)} />
+              <div>
+                <p className="text-sm">{label}</p>
+                <p className="mt-0.5 text-xs text-white/35">{detail}</p>
+              </div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-white/35">{active ? "Ready" : "Next"}</span>
+            </div>
+          ))}
         </aside>
       </section>
 
-      <section className="border-y border-zinc-200 bg-white">
-        <div className="mx-auto grid max-w-7xl divide-y divide-zinc-200 px-6 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4 lg:px-10">
+      <section id="workflow" className="border-y border-white/10 bg-[#0e0e0e]">
+        <div className="mx-auto grid max-w-7xl sm:grid-cols-2 lg:grid-cols-4">
           {workflow.map((item) => (
-            <article key={item.number} className="min-h-64 p-7 first:pl-0 sm:first:pl-7 lg:first:pl-0">
-              <span className="font-mono text-xs text-zinc-400">{item.number}</span>
-              <h2 className="mt-12 text-2xl font-semibold tracking-tight">{item.title}</h2>
-              <p className="mt-3 text-sm leading-6 text-zinc-500">{item.copy}</p>
+            <article key={item.number} className="group min-h-72 border-b border-white/10 p-6 transition-colors hover:bg-[#161616] sm:border-r lg:border-b-0 lg:p-8">
+              <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/30">
+                <span>{item.number}</span>
+                <span>{item.state}</span>
+              </div>
+              <h2 className="mt-20 text-2xl font-normal tracking-[-0.035em]">{item.title}</h2>
+              <p className="mt-3 max-w-xs text-sm leading-6 text-white/40 transition-colors group-hover:text-white/60">{item.copy}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-10 lg:py-28">
-        <div className="grid gap-12 lg:grid-cols-[0.65fr_1.35fr]">
+      <section id="system" className="mx-auto max-w-7xl px-6 py-24 lg:px-0 lg:py-32">
+        <div className="grid gap-16 lg:grid-cols-[0.65fr_1.35fr]">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">Workspace map</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">The system we&apos;re building</h2>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#85ed75]">System map</p>
+            <h2 className="mt-5 max-w-sm text-4xl font-normal leading-[1.05] tracking-[-0.05em] sm:text-5xl">Built to turn inputs into output.</h2>
           </div>
-          <div className="border-t border-zinc-300">
-            {modules.map(([title, copy]) => (
-              <div key={title} className="grid gap-2 border-b border-zinc-300 py-6 sm:grid-cols-[0.7fr_1.3fr]">
-                <h3 className="font-medium">{title}</h3>
-                <p className="text-sm leading-6 text-zinc-500">{copy}</p>
+          <div className="border-t border-white/15">
+            {modules.map(([title, copy], index) => (
+              <div key={title} className="group grid gap-4 border-b border-white/10 py-6 sm:grid-cols-[3rem_0.7fr_1.3fr] sm:items-start">
+                <span className="font-mono text-[10px] text-white/25">0{index + 1}</span>
+                <h3 className="text-sm text-white/90">{title}</h3>
+                <p className="max-w-md text-sm leading-6 text-white/40 transition-colors group-hover:text-white/60">{copy}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      <footer className="border-t border-white/10 bg-[#0e0e0e]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-0">
+          <span className="font-result text-xl tracking-[0.04em] text-white/80">RESULT UGC</span>
+          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/25">Track · Understand · Adapt · Ship</p>
+        </div>
+      </footer>
     </main>
   );
 }
