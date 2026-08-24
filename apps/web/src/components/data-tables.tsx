@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
+import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
 
 function SortButton({ label, sorted, toggle }: { label: string; sorted: false | "asc" | "desc"; toggle: () => void }) { return <Button variant="ghost" size="xs" className="sort-button" onClick={toggle}>{label}{sorted === "asc" ? <ArrowUp /> : sorted === "desc" ? <ArrowDown /> : <ArrowUpDown />}</Button>; }
@@ -29,6 +30,9 @@ function SocialPlatformIcon({ platform }: { platform: string }) {
 }
 function AccountPlatformIcons({ accounts }: { accounts: PortalAccount[] }) {
   return <div className="account-platforms"><strong>{accounts.length}</strong>{accounts.slice(0, 4).map((account) => <span key={account.id} data-platform={account.platform.toLowerCase()} title={account.platform} aria-label={account.platform}><SocialPlatformIcon platform={account.platform} /></span>)}</div>;
+}
+function PostActivity({ days }: { days: PostActivityDay[] }) {
+  return <div className="post-activity" aria-label={`Posts in the last seven days: ${days.map((day) => `${day.date} ${day.count}`).join(", ")}`}>{days.map((day) => <span className="post-activity-day" data-active={day.count > 0 || undefined} key={day.date}><small>{day.label}</small><strong>{day.count}</strong></span>)}</div>;
 }
 
 const creatorTabLifecycle: Record<string, PortalCreator["lifecycle"]> = { requests: "request", active: "active", watch: "watch", offboarded: "offboarded" };
@@ -53,7 +57,7 @@ export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
   return <section className="data-panel"><Tabs value={tab} onValueChange={setTab}><TabsList className="roster-tabs">{["requests", "active", "watch", "offboarded"].map((item) => <TabsTrigger key={item} value={item}>{item}<span>{creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[item]).length}</span></TabsTrigger>)}</TabsList></Tabs><TableToolbar search={search} setSearch={setSearch} placeholder="Search name, Discord, social account, provider, or notes…" columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))} toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}><Button variant="outline" size="sm" className="toolbar-button"><Filter /> Filters</Button>{Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}</TableToolbar><DenseTable table={table} /><Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} /></section>;
 }
 
-export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] }) {
+export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCreator[]; videos: PortalVideo[] }) {
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -64,6 +68,8 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const assignmentCreators = useMemo(() => creators.filter((creator) => creator.source === "result" && creator.lifecycle !== "offboarded").map((creator) => ({ id: creator.id, displayName: creator.displayName, discordUsername: creator.discord.username })), [creators]);
+  const accountActivity = useMemo(() => new Map(creators.flatMap((creator) => creator.accounts.map((account) => [account.id, sevenDayPostActivity(videos, [account.id])] as const))), [creators, videos]);
+  const creatorActivity = useMemo(() => new Map(creators.map((creator) => [creator.id, sevenDayPostActivity(videos, creator.accounts.map((account) => account.id))] as const)), [creators, videos]);
 
   const filtered = useMemo(() => creators.filter((creator) => {
     const relationships = creator.relationships.map((relationship) => `${relationship.provider} ${relationship.program ?? ""}`).join(" ");
@@ -111,6 +117,12 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
       cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} />,
     },
     {
+      id: "activity7d",
+      accessorFn: (row) => creatorActivity.get(row.id)?.reduce((total, day) => total + day.count, 0) ?? 0,
+      header: "Last 7 days",
+      cell: ({ row }) => <PostActivity days={creatorActivity.get(row.original.id) ?? []} />,
+    },
+    {
       id: "discord",
       accessorFn: (row) => row.discord.state,
       header: "Discord",
@@ -140,7 +152,7 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
     { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> },
     { accessorKey: "lastActivityAt", header: "Updated", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
-  ], [expanded]);
+  ], [creatorActivity, expanded]);
 
   const table = useReactTable({
     data: filtered,
@@ -185,7 +197,7 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
         <Button variant="outline" size="sm" className="toolbar-button" onClick={toggleAll}><ChevronsUpDown /> {allExpanded ? "Collapse all" : "Expand all"}</Button>
         {Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}
       </TableToolbar>
-      <CreatorAccountsTable table={table} expanded={expanded} assignmentCreators={assignmentCreators} />
+      <CreatorAccountsTable table={table} expanded={expanded} assignmentCreators={assignmentCreators} accountActivity={accountActivity} />
       <Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} />
     </section>
   );
@@ -195,10 +207,12 @@ function CreatorAccountsTable({
   table,
   expanded,
   assignmentCreators,
+  accountActivity,
 }: {
   table: ReturnType<typeof useReactTable<PortalCreator>>;
   expanded: Record<string, boolean>;
   assignmentCreators: Array<{ id: string; displayName: string; discordUsername: string | null }>;
+  accountActivity: Map<string, PostActivityDay[]>;
 }) {
   const rows = table.getRowModel().rows;
   const visibleColumns = table.getVisibleLeafColumns();
@@ -206,6 +220,7 @@ function CreatorAccountsTable({
     select: "",
     displayName: "Account",
     accounts: "Platform",
+    activity7d: "Post activity",
     discord: "Followers",
     relationships: "Posts",
     posts30d: "Views",
@@ -221,6 +236,7 @@ function CreatorAccountsTable({
     const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span className="nested-account-copy"><span className="nested-account-handle"><strong>@{account.username}</strong><ExternalLink /></span><small>{account.displayName || creator.displayName}</small></span></>;
     if (columnId === "displayName") return account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>;
     if (columnId === "accounts") return <StateBadge label={account.platform} tone="info" />;
+    if (columnId === "activity7d") return <PostActivity days={accountActivity.get(account.id) ?? []} />;
     if (columnId === "discord") return formatNumber(account.followers ?? 0);
     if (columnId === "relationships") return formatNumber(account.posts);
     if (columnId === "posts30d") return <strong>{formatNumber(account.views)}</strong>;
