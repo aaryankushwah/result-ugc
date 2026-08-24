@@ -1,4 +1,4 @@
-import { activityEvents, scriptReferences, scripts, scriptVersions } from "@result/db";
+import { activityEvents, scriptAssets, scriptReferences, scripts, scriptVersions } from "@result/db";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
 import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
@@ -21,6 +21,12 @@ const transcriptSectionSchema = z.object({
   text: z.string().trim().min(1).max(10_000),
 });
 
+const assetSchema = z.object({
+  label: z.string().trim().min(1).max(160),
+  kind: z.enum(["reference_video", "image", "audio", "file"]),
+  sourceUrl: z.url().max(2_000),
+});
+
 const createScriptSchema = z.object({
   title: z.string().trim().min(1).max(240),
   pipelineStage: z.enum(["not_started", "testing", "iterate", "winner", "retired"]).default("not_started"),
@@ -30,6 +36,7 @@ const createScriptSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   targetPlatform: z.string().trim().min(1).max(40).default("instagram"),
   sections: z.array(sectionSchema).min(1).max(24),
+  assets: z.array(assetSchema).max(40).default([]),
   brandSnapshot: z.record(z.string(), z.unknown()).default({}),
   reference: z.object({
     sourcePlatform: z.string().trim().min(1).max(40).default("instagram"),
@@ -79,6 +86,14 @@ export async function POST(request: Request) {
         updatedByUserId: context.internalUser?.id ?? null,
       }).returning({ id: scripts.id });
       if (!script) throw new Error("Script was not created");
+      const createdAssets = parsed.data.assets.length ? await transaction.insert(scriptAssets).values(parsed.data.assets.map((asset) => ({
+        organizationId: context.organization.id,
+        scriptId: script.id,
+        label: asset.label,
+        kind: asset.kind,
+        sourceUrl: asset.sourceUrl,
+        createdByUserId: context.internalUser?.id ?? null,
+      }))).returning({ id: scriptAssets.id, label: scriptAssets.label, kind: scriptAssets.kind, sourceUrl: scriptAssets.sourceUrl, downloadUrl: scriptAssets.downloadUrl }) : [];
       await transaction.insert(scriptVersions).values({
         organizationId: context.organization.id,
         scriptId: script.id,
@@ -93,9 +108,9 @@ export async function POST(request: Request) {
         actorUserId: context.internalUser?.id ?? null,
         type: "script.created",
         summary: `Script “${parsed.data.title}” was created.`,
-        metadata: { scriptId: script.id, referenceId, targetPlatform: parsed.data.targetPlatform },
+        metadata: { scriptId: script.id, referenceId, targetPlatform: parsed.data.targetPlatform, assetCount:createdAssets.length },
       });
-      return { id: script.id, referenceId, durationSeconds };
+      return { id: script.id, referenceId, durationSeconds, assets: createdAssets };
     });
     invalidatePortalData();
     return Response.json({ ok: true, ...result }, { status: 201 });
