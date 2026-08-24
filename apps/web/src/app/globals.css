@@ -815,9 +815,9 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .rank { color: #505050; font-family: var(--font-geist-mono); font-size: 9px; }
 .account-avatar { width: 30px; height: 30px; }
 .rank-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.rank-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: -.012em; }
+.rank-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 480; letter-spacing: -.012em; }
 .rank-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #666; }
-.rank-list > a > b { font-family: var(--font-geist-mono); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rank-list > a > b { font-family: var(--font-geist-mono); font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -.03em; color: var(--text-primary); }
 .video-thumb { width: 34px; height: 38px; overflow: hidden; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 5px; background: #222; color: #555; }
 .video-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .video-thumb svg { width: 14px; }
@@ -1157,7 +1157,7 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .state-badge, .status-badge { min-height: 26px; font-size: 11px; }
 .rank-list > a, .linked-account-list > div, .linked-account-list > a { min-height: 66px; padding-block: 10px; }
 .rank-copy strong, .linked-account-list strong { font-size: 14px; }
-.rank-list > a > b { font-size: 13px; }
+.rank-list > a > b { font-size: 16px; }
 .rank-copy small, .linked-account-list small { font-size: 12px; }
 .freshness-strip > div { min-height: 62px; padding: 12px 14px; }
 .freshness-strip strong { font-size: 13px; }
@@ -1538,6 +1538,42 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light .overview-metric-card.metric-card { background: #fff; }
 .light .overview-metric-card.metric-card p { color: #626b76; }
 
+/* Creator performance charts — one question per frame, one y-axis each. */
+.creator-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.creator-chart-grid > .creator-chart-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.creator-chart-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: var(--card); }
+.creator-chart-card > header { padding: 15px 17px 0; display: flex; flex-direction: column; gap: 3px; }
+.creator-chart-card > header strong { font-size: 15px; font-weight: 620; letter-spacing: -.015em; }
+.creator-chart-card > header small { color: var(--muted-foreground); font-size: 11px; }
+.creator-chart-canvas { height: 250px; padding: 10px 6px 6px; }
+.creator-chart-empty { height: 100%; display: grid; place-items: center; color: var(--muted-foreground); font-size: 12px; }
+
+/* Creator peek — the roster's right-hand preview. */
+[data-slot="sheet-content"].creator-peek { width: min(1120px, 96vw); max-width: min(1120px, 96vw); padding: 0; gap: 0; background: var(--card); }
+.creator-peek-header { padding: 20px 52px 16px 22px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--border); }
+.creator-peek-identity { display: flex; align-items: center; gap: 11px; }
+.creator-peek-avatar { width: 46px; height: 46px; flex: 0 0 46px; font-size: 15px; }
+.creator-peek-identity [data-slot="sheet-title"] { font-size: 19px; font-weight: 650; letter-spacing: -.025em; }
+.creator-peek-identity [data-slot="sheet-description"] { color: var(--muted-foreground); font-size: 12px; }
+.creator-peek-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.creator-peek-body { min-height: 0; flex: 1; overflow-y: auto; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+/* The body is a scrolling flex column: its children must keep their own
+   height rather than being shrunk to fit. */
+.creator-peek-body > * { flex: 0 0 auto; }
+.creator-peek-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin: 0; border: 1px solid var(--border); border-radius: 11px; background: var(--border); }
+.creator-peek-stats > div { padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; background: var(--card); }
+.creator-peek-stats dt { color: var(--muted-foreground); font-size: 12px; }
+.creator-peek-stats dd { margin: 0; font-size: 26px; font-weight: 640; letter-spacing: -.03em; line-height: 1; }
+.creator-peek-footer { padding: 14px 22px; display: flex; justify-content: flex-end; border-top: 1px solid var(--border); }
+.creator-peek-footer a { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; font-weight: 600; }
+.creator-peek-footer svg { width: 14px; }
+.creator-peek-trigger { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+
+@media (max-width: 900px) {
+  .creator-chart-grid { grid-template-columns: 1fr; }
+  .creator-peek-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Remove decorative explanatory copy; keep data, state, identities, and errors. */
 .panel-header p,
 .pipeline-titlebar > div > p:last-child,
@@ -1815,3 +1851,16 @@ body,
 .notification-failures button { flex:none; border:1px solid var(--border); background:var(--surface-1); color:var(--text-primary); font-size:11px; padding:5px 11px; cursor:pointer; }
 .notification-failures button:hover:not(:disabled) { background:var(--surface-2); }
 .notification-failures button:disabled { opacity:.6; cursor:not-allowed; }
+
+/* Theme switch: the incoming theme is revealed by a circle growing from the
+   toggle. Both snapshots are held still so the clip-path is the only motion —
+   the default cross-fade would wash the wipe out. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+}

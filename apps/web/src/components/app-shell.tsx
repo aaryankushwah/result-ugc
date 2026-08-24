@@ -4,6 +4,7 @@ import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, M
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
@@ -26,6 +27,9 @@ const nav = [
 
 type CreatorOption = { id: string; displayName: string; username: string | null };
 
+// startViewTransition is not in every TS DOM lib yet; treat it as optional.
+type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void> } };
+
 export function AppShell({ children, user, creators }: { children: React.ReactNode; user: PortalUser; creators: CreatorOption[] }) {
   const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false); const [theme, setTheme] = useState<Theme>(() => {
     if (typeof document === "undefined") return "light";
@@ -34,7 +38,27 @@ export function AppShell({ children, user, creators }: { children: React.ReactNo
     return isTheme(stored) ? stored : themeFromCookie(document.cookie) ?? (document.documentElement.classList.contains("dark") ? "dark" : "light");
   }); const pathname = usePathname();
   useEffect(() => { const handler = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, []);
-  const toggleTheme = () => { const value = nextTheme(theme); const root = document.documentElement; root.classList.remove("dark", "light"); root.classList.add(value); root.dataset.theme = value; document.cookie = themeCookie(value); try { window.localStorage.setItem("result-theme", value); } catch { /* The cookie is the persistence fallback. */ } setTheme(value); };
+  const applyTheme = (value: Theme) => { const root = document.documentElement; root.classList.remove("dark", "light"); root.classList.add(value); root.dataset.theme = value; document.cookie = themeCookie(value); try { window.localStorage.setItem("result-theme", value); } catch { /* The cookie is the persistence fallback. */ } setTheme(value); };
+  // Reveal the incoming theme as a circle growing from the toggle. Without the
+  // View Transitions API, or when motion is reduced, the switch stays instant.
+  const toggleTheme = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const value = nextTheme(theme);
+    const startViewTransition = (document as ViewTransitionDocument).startViewTransition?.bind(document);
+    if (!startViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { applyTheme(value); return; }
+    const box = event.currentTarget.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    // flushSync so the icon and label are repainted before the snapshot is taken.
+    startViewTransition(() => flushSync(() => applyTheme(value))).ready
+      .then(() => document.documentElement.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        { duration: 460, easing: "cubic-bezier(.4, 0, .2, 1)", pseudoElement: "::view-transition-new(root)" },
+      ))
+      // Chrome aborts transitions in a hidden tab and skips the callback with
+      // it, so re-apply: without this the theme silently fails to change.
+      .catch(() => applyTheme(value));
+  };
   return <div className={`app-frame ${collapsed ? "sidebar-collapsed" : ""}`}>
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="sidebar-controls"><Button variant="ghost" size="icon-sm" className="icon-button desktop-only" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</Button><Button variant="ghost" size="icon-sm" className="icon-button mobile-only" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X /></Button></div>

@@ -3,10 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
 import { invalidatePortalData } from "@/lib/portal-cache";
-import { parseReferenceUrl, ReferenceResolutionError, resolveInstagramReel } from "@/lib/reference-ingest";
+import { parseReferenceUrl, ReferenceResolutionError, resolvePastedUrl } from "@/lib/reference-ingest";
 import { transcribeVideo, TranscriptionError } from "@/lib/transcription";
 
-// Scrape (~3s) + download (~3s) + Whisper (~10-20s) for a sub-90s reel.
+// Short-link expansion (free) + live lookup (~3s) + Whisper (~10-20s) for a short video.
 export const maxDuration = 60;
 
 const ingestSchema = z.object({ url: z.string().trim().min(1).max(2_000) });
@@ -14,54 +14,53 @@ const ingestSchema = z.object({ url: z.string().trim().min(1).max(2_000) });
 export async function POST(request: Request) {
   try {
     const parsed = ingestSchema.safeParse(await request.json());
-    if (!parsed.success) return Response.json({ error: "Paste a reel link to get started." }, { status: 400 });
+    if (!parsed.success) return Response.json({ error: "Paste a reel or TikTok link to get started." }, { status: 400 });
 
-    const reference = parseReferenceUrl(parsed.data.url);
-    if (reference.kind === "coming_soon") {
-      return Response.json({ error: "TikTok support is coming soon. Paste an Instagram reel link, or add the transcript manually." }, { status: 422 });
-    }
-    if (reference.kind === "unsupported") {
-      return Response.json({ error: reference.reason }, { status: 400 });
-    }
+    // Reject junk before writing a row or spending credits.
+    const preflight = parseReferenceUrl(parsed.data.url);
+    if (preflight.kind === "unsupported") return Response.json({ error: preflight.reason }, { status: 400 });
 
     const context = await managerContext();
+    const platform = preflight.platform;
 
     // Claim the row first so a failure is recoverable and visible rather than lost.
     const [row] = await context.db.insert(scriptReferences).values({
       organizationId: context.organization.id,
-      sourcePlatform: "instagram",
-      sourceUrl: reference.canonicalUrl,
+      sourcePlatform: platform,
+      sourceUrl: preflight.kind === "video" ? preflight.canonicalUrl : preflight.url,
       transcriptState: "pending",
       transcript: "",
       transcriptSections: [],
       sourceMetadata: {},
       createdByUserId: context.internalUser?.id ?? null,
     }).returning({ id: scriptReferences.id });
-    if (!row) throw new MutationError(500, "Could not start the reel import");
+    if (!row) throw new MutationError(500, "Could not start the import");
 
     const scopedTo = and(eq(scriptReferences.id, row.id), eq(scriptReferences.organizationId, context.organization.id));
 
     try {
-      const resolved = await resolveInstagramReel(reference.shortcode);
+      const resolved = await resolvePastedUrl(parsed.data.url);
       await context.db.update(scriptReferences).set({
         transcriptState: "transcribing",
+        sourcePlatform: resolved.platform,
+        sourceUrl: resolved.canonicalUrl,
         sourceCreator: resolved.author,
-        sourceMetadata: {
-          author: resolved.author,
-          caption: resolved.caption,
-          durationSeconds: resolved.durationSeconds,
-          thumbnailUrl: resolved.thumbnailUrl,
-          raw: resolved.raw,
-        },
         updatedAt: new Date(),
       }).where(scopedTo);
 
-      const { transcript, sections } = await transcribeVideo(resolved.videoUrl);
+      const { transcript, sections, durationSeconds } = await transcribeVideo(resolved.videoUrl);
 
       await context.db.update(scriptReferences).set({
         transcriptState: "transcribed",
         transcript,
         transcriptSections: sections,
+        sourceMetadata: {
+          author: resolved.author,
+          caption: resolved.caption,
+          durationSeconds: durationSeconds ?? resolved.durationSeconds,
+          thumbnailUrl: resolved.thumbnailUrl,
+          raw: resolved.raw,
+        },
         updatedAt: new Date(),
       }).where(scopedTo);
 
@@ -69,8 +68,8 @@ export async function POST(request: Request) {
         organizationId: context.organization.id,
         actorUserId: context.internalUser?.id ?? null,
         type: "reference.ingested",
-        summary: `Reel from ${resolved.author ? `@${resolved.author}` : "Instagram"} was imported and transcribed.`,
-        metadata: { referenceId: row.id, sourceUrl: reference.canonicalUrl, sections: sections.length },
+        summary: `${resolved.platform === "instagram" ? "Reel" : "TikTok"} from ${resolved.author ? `@${resolved.author}` : resolved.platform} was imported and transcribed.`,
+        metadata: { referenceId: row.id, platform: resolved.platform, sourceUrl: resolved.canonicalUrl, sections: sections.length },
       });
       invalidatePortalData();
 
@@ -78,8 +77,8 @@ export async function POST(request: Request) {
         ok: true,
         reference: {
           id: row.id,
-          sourcePlatform: "instagram",
-          sourceUrl: reference.canonicalUrl,
+          sourcePlatform: resolved.platform,
+          sourceUrl: resolved.canonicalUrl,
           sourceCreator: resolved.author,
           transcriptState: "transcribed",
           transcript,
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
     } catch (error) {
       const message = error instanceof ReferenceResolutionError || error instanceof TranscriptionError
         ? error.message
-        : error instanceof Error ? error.message : "The reel could not be imported.";
+        : error instanceof Error ? error.message : "The link could not be imported.";
       await context.db.update(scriptReferences).set({
         transcriptState: "failed",
         sourceMetadata: { error: message },
@@ -100,8 +99,8 @@ export async function POST(request: Request) {
         organizationId: context.organization.id,
         actorUserId: context.internalUser?.id ?? null,
         type: "reference.ingest_failed",
-        summary: `Reel import failed: ${message}`,
-        metadata: { referenceId: row.id, sourceUrl: reference.canonicalUrl },
+        summary: `Import failed: ${message}`,
+        metadata: { referenceId: row.id, platform, url: parsed.data.url },
       });
       invalidatePortalData();
       return Response.json({ error: message, referenceId: row.id }, { status: 502 });
@@ -114,5 +113,5 @@ export async function POST(request: Request) {
 function suggestTitle(caption: string | null, author: string | null): string {
   const firstLine = caption?.split(/\n+/).map((line) => line.trim()).find(Boolean);
   if (firstLine) return firstLine.slice(0, 120);
-  return author ? `Reel from @${author}` : "Imported reel";
+  return author ? `Video from @${author}` : "Imported video";
 }

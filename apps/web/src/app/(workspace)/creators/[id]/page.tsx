@@ -1,6 +1,7 @@
 import { ArrowLeft, Database, ExternalLink, Hash, Link2, MessageSquareText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CreatorCharts } from "@/components/creator-charts";
 import { VideoTable } from "@/components/data-tables";
 import { CandidateActions, CreatorQuickActions, ManualRelationshipButton, NoteButton, type DiscordConnectionCandidate } from "@/components/creator-actions";
 import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
@@ -119,6 +120,7 @@ export default async function CreatorProfilePage({
 
       {tab === "accounts" ? (
         <div className="page-stack creator-accounts-page">
+          <CreatorCharts creator={creator} videos={data.videos} />
           <section className="panel creator-accounts-panel">
             <div className="panel-header">
               <div><h2>Accounts</h2><p>{confirmedAccounts} confirmed · {creator.accounts.length} total</p></div>

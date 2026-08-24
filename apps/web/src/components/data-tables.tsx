@@ -2,21 +2,23 @@
 
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, type VisibilityState, useReactTable } from "@tanstack/react-table";
 import { aggregateAccountPerformanceHealth } from "@result/domain";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Eye, EyeOff, Filter, Instagram, RotateCcw, Search, VideoOff, X, Youtube } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Eye, EyeOff, Filter, Instagram, Search, X, Youtube } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useMemo, useState } from "react";
+import { createContext, Fragment, useContext, useMemo, useState } from "react";
 import rosterStyles from "./creator-accounts-roster.module.css";
 import { Button } from "@/components/ui/button";
 import { AccountAssignmentButton } from "@/components/creator-actions";
+import { CreatorPeek } from "@/components/creator-peek";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
 import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
+import { buildVideoVisibilityRequests, countVideosChanging, videoVisibilityFailureMessage, videoVisibilityResultMessage } from "@/lib/video-visibility";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
 
 function SortButton({ label, sorted, toggle }: { label: string; sorted: false | "asc" | "desc"; toggle: () => void }) { return <Button variant="ghost" size="xs" className="sort-button" onClick={toggle}>{label}{sorted === "asc" ? <ArrowUp /> : sorted === "desc" ? <ArrowDown /> : <ArrowUpDown />}</Button>; }
@@ -59,6 +61,32 @@ function PostActivity({ days }: { days: PostActivityDay[] }) {
   return <div className="post-activity" aria-label={`Posts in the last seven days: ${days.map((day) => `${day.date} ${day.count}`).join(", ")}`}>{days.map((day) => <span className="post-activity-day" data-active={day.count > 0 || undefined} key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><strong>{day.count}</strong></span>)}</div>;
 }
 
+type VideoVisibilityControl = { apply: (videos: PortalVideo[], included: boolean) => void; pending: boolean };
+const VideoVisibilityContext = createContext<VideoVisibilityControl>({ apply: () => {}, pending: false });
+
+/** Included/excluded picker. Used per row and, with a whole selection, in the toolbar. */
+function VisibilityMenu({ videos, included, label, className }: { videos: PortalVideo[]; included: boolean | null; label?: string; className?: string }) {
+  const { apply, pending } = useContext(VideoVisibilityContext);
+  const value = included === null ? "" : included ? "included" : "excluded";
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="xs" className={`visibility-menu-trigger ${className ?? ""}`} disabled={pending || !videos.length}>
+          {included === false ? <EyeOff /> : <Eye />}
+          {label ?? (included ? "Included" : "Excluded")}
+          <ChevronDown />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="visibility-menu-content min-w-64">
+        <DropdownMenuRadioGroup value={value} onValueChange={(next) => apply(videos, next === "included")}>
+          <DropdownMenuRadioItem value="included">Included — counts toward totals</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="excluded">Excluded — warm-up / unpaid</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 const creatorTabLifecycle: Record<string, PortalCreator["lifecycle"]> = { requests: "request", active: "active", watch: "watch", offboarded: "offboarded" };
 
 export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
@@ -91,6 +119,14 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const peekId = params.get("peek");
+  const setPeekParam = (id: string | null) => {
+    const next = new URLSearchParams(params.toString());
+    if (id) next.set("peek", id); else next.delete("peek");
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+  const openPeek = (id: string) => setPeekParam(id);
+  const peeked = creators.find((candidate) => candidate.id === peekId) ?? null;
   const assignmentCreators = useMemo(() => creators.filter((creator) => creator.source === "result" && creator.lifecycle !== "offboarded").map((creator) => ({ id: creator.id, displayName: creator.displayName, discordUsername: creator.discord.username })), [creators]);
   const accountActivity = useMemo(() => new Map(creators.flatMap((creator) => creator.accounts.map((account) => [account.id, sevenDayPostActivity(videos, [account.id])] as const))), [creators, videos]);
   const creatorActivity = useMemo(() => new Map(creators.map((creator) => [creator.id, sevenDayPostActivity(videos, creator.accounts.map((account) => account.id))] as const)), [creators, videos]);
@@ -124,13 +160,13 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
           >
             {expanded[row.original.id] ? <ChevronDown /> : <ChevronRight />}
           </Button>
-          <Link className="creator-cell" href={`/creators/${row.original.id}`}>
+          <button type="button" className="creator-cell creator-peek-trigger" onClick={() => openPeek(row.original.id)} aria-label={`Peek at ${row.original.displayName}`}>
             <Avatar src={row.original.discord.avatarUrl ?? row.original.accounts[0]?.avatarUrl ?? null} name={row.original.displayName} />
             <span>
               <span className="creator-name-health"><strong>{row.original.displayName}</strong><AccountHealthDot creator={row.original} /></span>
               <small>{row.original.discord.username ? `@${row.original.discord.username}` : row.original.email ?? "No Discord identity"}</small>
             </span>
-          </Link>
+          </button>
         </div>
       ),
     },
@@ -223,6 +259,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       </TableToolbar>
       <CreatorAccountsTable table={table} expanded={expanded} assignmentCreators={assignmentCreators} accountActivity={accountActivity} />
       <Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} />
+      <CreatorPeek creator={peeked} videos={videos} onClose={() => setPeekParam(null)} />
     </section>
   );
 }
@@ -318,6 +355,7 @@ export function AccountTable({ accounts }: { accounts: PortalAccount[] }) {
 }
 
 export function VideoTable({ videos, visibility: initialVisibilityMode = "included" }: { videos: PortalVideo[]; visibility?: "included" | "excluded" }) {
+  const router = useRouter();
   const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "publishedAt", desc: true }]); const [visibility, setVisibility] = useState<VisibilityState>({ bookmarks: false }); const [selection, setSelection] = useState<RowSelectionState>({}); const [pending, setPending] = useState(false); const [message, setMessage] = useState<string | null>(null);
   const [visibilityMode, setVisibilityMode] = useState<"included" | "excluded">(initialVisibilityMode);
   const excludedCount = useMemo(() => videos.filter((video) => !video.included).length, [videos]);
@@ -325,12 +363,22 @@ export function VideoTable({ videos, visibility: initialVisibilityMode = "includ
   const columns = useMemo<ColumnDef<PortalVideo>[]>(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.caption}`} /> },
     { accessorKey: "caption", header: "Video", cell: ({ row }) => <Link href={`/videos/${encodeURIComponent(row.original.id)}`} className="video-cell"><span className="video-thumb">{row.original.thumbnailUrl ? <img src={row.original.thumbnailUrl} alt="" /> : null}</span><span><strong>{row.original.caption}</strong><small>@{row.original.accountUsername} · {row.original.platform}</small></span></Link> }, { accessorKey: "publishedAt", header: "Published", cell: ({ getValue }) => formatDate(getValue() as string | null) }, { accessorKey: "durationSeconds", header: "Duration", cell: ({ getValue }) => getValue() == null ? "—" : `${getValue()}s` },
-    { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "baselineMultiplier", header: "Baseline", cell: ({ getValue }) => `${Number(getValue()).toFixed(1)}×` }, { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "included", header: "Visibility", cell: ({ getValue }) => <StateBadge label={getValue() ? "included" : "excluded"} tone={getValue() ? "success" : "neutral"} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
+    { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "baselineMultiplier", header: "Baseline", cell: ({ getValue }) => `${Number(getValue()).toFixed(1)}×` }, { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "included", header: "Visibility", cell: ({ row }) => <VisibilityMenu videos={[row.original]} included={row.original.included} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
   ], []);
   const table = useReactTable({ data: filtered, columns, state: { sorting, columnVisibility: visibility, rowSelection: selection }, onSortingChange: setSorting, onColumnVisibilityChange: setVisibility, onRowSelectionChange: setSelection, getRowId: (row) => row.id, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(), initialState: { pagination: { pageSize: 20 } } });
-  const exclude = async () => { const selected = table.getSelectedRowModel().rows.map((row) => row.original); if (!selected.length) return; setPending(true); setMessage(null); const response = await fetch("/api/videos/exclude", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ videos: selected.map((video) => ({ accountId: video.accountId, platform: video.platform, platformAccountId: video.platformAccountId, platformVideoId: video.platformVideoId })), reason: "warmup_unpaid" }) }); setPending(false); if (response.ok) { setSelection({}); setMessage(`${selected.length} video${selected.length === 1 ? "" : "s"} excluded in Viral.`); window.location.reload(); } else setMessage("Exclusion failed. Nothing was hidden."); };
-  const restore = async () => { const selected = table.getSelectedRowModel().rows.map((row) => row.original); if (!selected.length) return; setPending(true); setMessage(null); const response = await fetch("/api/videos/restore", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ videos: selected.map((video) => ({ accountId: video.accountId, platform: video.platform, platformVideoId: video.platformVideoId })) }) }); setPending(false); if (response.ok) { setSelection({}); setMessage(`${selected.length} video${selected.length === 1 ? "" : "s"} restored in Viral.`); window.location.reload(); } else setMessage("Restoration failed. The videos remain excluded."); };
-  return <section className="data-panel"><TableToolbar search={search} setSearch={setSearch} placeholder="Search caption, account, or platform…" columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))} toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}><Button variant="outline" size="sm" className="toolbar-button" onClick={() => { setVisibilityMode((current) => current === "included" ? "excluded" : "included"); setSelection({}); setMessage(null); }} title="Switch between counted posts and warm-up / unpaid posts">{visibilityMode === "included" ? <><Eye /> Counted posts</> : <><EyeOff /> Warm-up / unpaid{excludedCount ? ` (${excludedCount})` : ""}</>}</Button>{Object.keys(selection).length ? <><span className="selection-count">{Object.keys(selection).length} selected</span>{visibilityMode === "included" ? <Button variant="destructive" size="sm" className="toolbar-button danger-button" disabled={pending} onClick={exclude}><VideoOff />{pending ? "Excluding…" : "Exclude warmup / unpaid"}</Button> : <Button variant="outline" size="sm" className="toolbar-button" disabled={pending} onClick={restore}><RotateCcw />{pending ? "Restoring…" : "Restore to totals"}</Button>}</> : null}</TableToolbar>{message ? <div className="table-message">{message}</div> : null}<DenseTable table={table} /><Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} /></section>;
+  const selectedVideos = table.getSelectedRowModel().rows.map((row) => row.original);
+  const selectionIncluded = selectedVideos.length && selectedVideos.every((video) => video.included) ? true : selectedVideos.length && selectedVideos.every((video) => !video.included) ? false : null;
+  const applyVisibility = async (targets: PortalVideo[], included: boolean) => {
+    const requests = buildVideoVisibilityRequests(targets, included);
+    const changing = countVideosChanging(targets, included);
+    if (!requests.length) { setMessage(`Already ${included ? "included" : "excluded"}. Nothing changed.`); return; }
+    setPending(true); setMessage(null);
+    const responses = await Promise.all(requests.map((request) => fetch(request.url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(request.body) })));
+    setPending(false);
+    if (responses.every((response) => response.ok)) { setSelection({}); setMessage(videoVisibilityResultMessage(changing, included)); router.refresh(); }
+    else setMessage(videoVisibilityFailureMessage(included));
+  };
+  return <VideoVisibilityContext.Provider value={{ apply: applyVisibility, pending }}><section className="data-panel"><TableToolbar search={search} setSearch={setSearch} placeholder="Search caption, account, or platform…" columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))} toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}><Button variant="outline" size="sm" className="toolbar-button" onClick={() => { setVisibilityMode((current) => current === "included" ? "excluded" : "included"); setSelection({}); setMessage(null); }} title="Switch between counted posts and warm-up / unpaid posts">{visibilityMode === "included" ? <><Eye /> Counted posts</> : <><EyeOff /> Warm-up / unpaid{excludedCount ? ` (${excludedCount})` : ""}</>}</Button>{selectedVideos.length ? <><span className="selection-count">{selectedVideos.length} selected</span><VisibilityMenu videos={selectedVideos} included={selectionIncluded} label={pending ? "Updating…" : "Set visibility"} className="bulk-visibility-trigger" /></> : null}</TableToolbar>{message ? <div className="table-message">{message}</div> : null}<DenseTable table={table} /><Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} /></section></VideoVisibilityContext.Provider>;
 }
 
 function DenseTable<T>({ table }: { table: ReturnType<typeof useReactTable<T>> }) { return <div className="dense-table-wrap"><Table className="dense-table"><TableHeader>{table.getHeaderGroups().map((group) => <TableRow key={group.id}>{group.headers.map((header) => <TableHead key={header.id}>{header.isPlaceholder ? null : header.column.getCanSort() ? <SortButton label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.column.id} sorted={header.column.getIsSorted()} toggle={() => header.column.toggleSorting()} /> : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>)}</TableRow>)}</TableHeader><TableBody>{table.getRowModel().rows.length ? table.getRowModel().rows.map((row) => <TableRow key={row.id} data-state={row.getIsSelected() ? "selected" : undefined}>{row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}</TableRow>) : <TableRow><TableCell className="empty-table" colSpan={table.getVisibleLeafColumns().length}>No rows match this view.</TableCell></TableRow>}</TableBody></Table></div>; }

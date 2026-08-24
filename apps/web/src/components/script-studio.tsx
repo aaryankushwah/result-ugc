@@ -197,7 +197,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
         durationSeconds: estimateScriptDuration(result.sections!),
         updatedAt: new Date().toISOString(),
       }));
-      notify(result.degraded ? "Generated without a model · add ANTHROPIC_API_KEY" : "Adapted for your brand");
+      notify(result.degraded ? "Generated without a model · AI Gateway is not configured" : "Adapted for your brand");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Generation failed");
     } finally {
@@ -516,7 +516,7 @@ function GenerationPanel({ generation, showDiff, setShowDiff, dismiss }:{ genera
         <strong>{generation.degraded ? "Generated without a model" : "Adapted for your brand"}</strong>
         <span>
           {generation.degraded
-            ? "Set ANTHROPIC_API_KEY to use the real model. This is the deterministic fallback."
+            ? "Set AI_GATEWAY_API_KEY to use the real model. This is the deterministic fallback."
             : `${changes.length} substitution${changes.length===1?"":"s"}${preserved===null?"":` · ${preserved}% of the source preserved`}`}
         </span>
       </div>
@@ -541,20 +541,20 @@ function ImportDialog({ open, setOpen, onImport, onCreate, importing }:{ open:bo
   const [body,setBody]=useState("");
   const [creator,setCreator]=useState("");
   const parsed = useMemo(()=>url.trim()?parseReferenceUrl(url):null,[url]);
-  const ready = parsed?.kind==="instagram" && !importing;
+  const ready = Boolean(parsed && parsed.kind!=="unsupported") && !importing;
   const submit = async () => { if(!ready)return; if(await onImport(url)){setUrl("");setManual(false);} };
   const createManually = () => { onCreate({title,body,url,creator}); setTitle(""); setBody(""); setUrl(""); setCreator(""); setManual(false); };
   return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="reference-dialog new-script-dialog sm:max-w-2xl">
-    <DialogHeader><DialogTitle>New script</DialogTitle><DialogDescription>Paste a reel link and it is transcribed straight into the writer.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>New script</DialogTitle><DialogDescription>Paste an Instagram reel or TikTok link and it is transcribed straight into the writer.</DialogDescription></DialogHeader>
     <div className="import-form">
       <label className="import-url">
         <Link2/>
-        <input value={url} autoFocus placeholder="https://instagram.com/reel/…" onChange={(event)=>setUrl(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter")void submit();}} disabled={importing}/>
+        <input value={url} autoFocus placeholder="Paste an Instagram reel or TikTok link…" onChange={(event)=>setUrl(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter")void submit();}} disabled={importing}/>
         <Button className="studio-primary" disabled={!ready} onClick={submit}>{importing?<Clock3/>:<Sparkles/>}{importing?"Transcribing…":"Import"}</Button>
       </label>
-      {parsed?.kind==="coming_soon"?<p className="import-hint import-hint-soon"><Clock3/>TikTok support is coming soon. Paste an Instagram reel, or add the transcript manually.</p>:null}
+      {parsed?.kind==="short_link"?<p className="import-hint">TikTok share link detected — it will be expanded automatically.</p>:null}
       {parsed?.kind==="unsupported"&&url.trim()?<p className="import-hint import-hint-error">{parsed.reason}</p>:null}
-      {importing?<p className="import-hint">Resolving the reel and transcribing the audio. This takes about 20 seconds.</p>:null}
+      {importing?<p className="import-hint">Resolving the video and transcribing the audio. This takes about 20 seconds.</p>:null}
       <button type="button" className="import-manual-toggle" onClick={()=>setManual(!manual)}>{manual?"Hide manual entry":"Or write it manually"}</button>
       {manual?<div className="new-script-form">
         <input value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Title"/>

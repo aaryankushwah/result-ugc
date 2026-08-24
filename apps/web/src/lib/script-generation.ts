@@ -1,10 +1,10 @@
 import "server-only";
 
-import { anthropic } from "@ai-sdk/anthropic";
 import type { ScriptGeneration, ScriptSection } from "@result/db";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { adaptReferenceForResult } from "./script-writing";
+import { hasGatewayCredentials } from "./ai-gateway";
 import {
   buildGenerationPrompt,
   isBrandContextUsable,
@@ -13,7 +13,8 @@ import {
   type BrandContext,
 } from "./script-prompt";
 
-export const SCRIPT_MODEL = "claude-sonnet-5";
+/** Routed through the Vercel AI Gateway — a plain "provider/model" string, no provider key of our own. */
+export const SCRIPT_MODEL = "anthropic/claude-sonnet-5";
 
 export class ScriptGenerationError extends Error {}
 
@@ -52,7 +53,7 @@ export async function generateScript(input: {
     throw new ScriptGenerationError("Add your brand name and product description in Brand settings before generating.");
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!hasGatewayCredentials()) {
     const fallback = adaptReferenceForResult(input.transcript || usableSections.map((section) => section.copy).join(" "));
     return {
       sections: fallback,
@@ -64,7 +65,7 @@ export async function generateScript(input: {
   let object: z.infer<typeof generationSchema>;
   try {
     ({ object } = await generateObject({
-      model: anthropic(SCRIPT_MODEL),
+      model: SCRIPT_MODEL,
       schema: generationSchema,
       system: SCRIPT_SYSTEM_PROMPT,
       prompt: buildGenerationPrompt(input.brand, usableSections.map((section) => ({ id: section.id, label: section.label, copy: section.copy }))),

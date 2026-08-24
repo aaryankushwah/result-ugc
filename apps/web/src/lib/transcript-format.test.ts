@@ -11,8 +11,8 @@ describe("transcript formatting", () => {
 
   it("maps segments onto transcript sections in order", () => {
     const sections = segmentsToTranscriptSections([
-      { start: 0, end: 2.5, text: " Stop scrolling. " },
-      { start: 2.5, end: 6, text: "This changed everything." },
+      { startSecond: 0, endSecond: 2.5, text: " Stop scrolling. " },
+      { startSecond: 2.5, endSecond: 6, text: "This changed everything." },
     ]);
     expect(sections).toEqual([
       { id: "transcript-1", label: "Segment 1", timecode: "0:00–0:02", text: "Stop scrolling." },
@@ -22,9 +22,9 @@ describe("transcript formatting", () => {
 
   it("drops blank segments and renumbers so ids stay contiguous", () => {
     const sections = segmentsToTranscriptSections([
-      { start: 0, end: 1, text: "One." },
-      { start: 1, end: 2, text: "   " },
-      { start: 2, end: 3, text: "Two." },
+      { startSecond: 0, endSecond: 1, text: "One." },
+      { startSecond: 1, endSecond: 2, text: "   " },
+      { startSecond: 2, endSecond: 3, text: "Two." },
     ]);
     expect(sections.map((section) => section.id)).toEqual(["transcript-1", "transcript-2"]);
     expect(sections.map((section) => section.text)).toEqual(["One.", "Two."]);
@@ -37,8 +37,8 @@ describe("transcript formatting", () => {
 
   it("rebuilds a single clean transcript string", () => {
     const sections = segmentsToTranscriptSections([
-      { start: 0, end: 1, text: "Stop scrolling." },
-      { start: 1, end: 2, text: "Here is why." },
+      { startSecond: 0, endSecond: 1, text: "Stop scrolling." },
+      { startSecond: 1, endSecond: 2, text: "Here is why." },
     ]);
     expect(transcriptTextFromSections(sections)).toBe("Stop scrolling. Here is why.");
   });

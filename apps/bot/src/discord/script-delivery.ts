@@ -59,8 +59,9 @@ export async function postToCreatorChannel(
   guild: Guild,
   target: { discordUserId: string; privateChannelId: string | null },
   payload: ScriptAssignmentPayload,
+  deps: ChannelResolverDeps = defaultChannelResolverDeps,
 ): Promise<{ channelId: string; messageId: string }> {
-  const channel = await resolveCreatorChannel(guild, target);
+  const channel = await resolveCreatorChannel(guild, target, deps);
   if (!channel) throw new Error("The creator has no private channel and one could not be created");
 
   const { content, embed } = buildScriptAssignmentMessage({ ...payload, discordUserId: target.discordUserId });
@@ -72,18 +73,32 @@ export async function postToCreatorChannel(
   return { channelId: channel.id, messageId: message.id };
 }
 
-async function resolveCreatorChannel(
+/** Injectable so the resolution order can be unit tested without a Discord client. */
+export type ChannelResolverDeps = {
+  findCreatorChannel: typeof findCreatorChannel;
+  createCreatorChannel: typeof createCreatorChannel;
+};
+
+export const defaultChannelResolverDeps: ChannelResolverDeps = { findCreatorChannel, createCreatorChannel };
+
+/**
+ * Resolves a creator's private channel, most-trusted source first:
+ * the mapped channel id, then Discord's own `Creator ID:` topic marker, and
+ * finally creating the channel so a notification is never silently dropped.
+ */
+export async function resolveCreatorChannel(
   guild: Guild,
   target: { discordUserId: string; privateChannelId: string | null },
+  deps: ChannelResolverDeps = defaultChannelResolverDeps,
 ): Promise<TextChannel | null> {
   if (target.privateChannelId) {
     const mapped = await guild.channels.fetch(target.privateChannelId).catch(() => null);
     if (mapped?.isTextBased() && !mapped.isThread()) return mapped as TextChannel;
   }
-  const byMarker = findCreatorChannel(guild, target.discordUserId);
+  const byMarker = deps.findCreatorChannel(guild, target.discordUserId);
   if (byMarker) return byMarker;
 
   const member = await guild.members.fetch(target.discordUserId).catch(() => null);
   if (!member) return null;
-  return createCreatorChannel(guild, member);
+  return deps.createCreatorChannel(guild, member);
 }
