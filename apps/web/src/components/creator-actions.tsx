@@ -48,17 +48,18 @@ export function AccountAssignmentButton({
   const [search, setSearch] = useState("");
   const [creatorId, setCreatorId] = useState(currentCreatorId ?? "");
   const [pending, setPending] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const filteredCreators = creators.filter((creator) => `${creator.displayName} ${creator.discordUsername ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
-  const assign = async () => {
-    if (!creatorId) return;
+  const assign = async (targetCreatorId = creatorId) => {
+    if (!targetCreatorId) return;
     setPending(true); setError(null);
-    const response = await fetch(`/api/accounts/${accountId}/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creatorId }) });
+    const response = await fetch(`/api/accounts/${accountId}/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creatorId: targetCreatorId }) });
     const result = await response.json(); setPending(false);
     if (!response.ok) { setError(result.error ?? "Could not assign account"); return; }
-    setOpen(false); router.refresh();
+    setConfirmed(true); setOpen(false); router.refresh();
   };
   const unassign = async () => {
     setPending(true); setError(null);
@@ -67,6 +68,22 @@ export function AccountAssignmentButton({
     if (!response.ok) { setError(result.error ?? "Could not remove assignment"); return; }
     setCreatorId(""); setOpen(false); router.refresh();
   };
+
+  if (linkState === "suggested" && currentCreatorId) {
+    return (
+      <Button
+        variant="outline"
+        size="xs"
+        className="account-assign-trigger"
+        disabled={pending || confirmed}
+        title={error ?? undefined}
+        onClick={() => void assign(currentCreatorId)}
+      >
+        {pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}
+        {pending ? "Confirming…" : confirmed ? "Confirmed" : error ? "Retry" : "Confirm"}
+      </Button>
+    );
+  }
 
   const triggerLabel = linkState === "suggested" ? "Confirm" : currentCreatorId ? "Reassign" : "Assign";
   return (
@@ -88,7 +105,7 @@ export function AccountAssignmentButton({
         <DialogFooter className="account-assignment-footer">
           {currentCreatorId ? <Button variant="ghost" className="unassign-button" disabled={pending} onClick={unassign}><UserRoundX /> Unassign</Button> : null}
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button disabled={pending || !creatorId} onClick={assign}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{pending ? "Saving…" : linkState === "suggested" && creatorId === currentCreatorId ? "Confirm match" : "Save assignment"}</Button>
+          <Button disabled={pending || !creatorId} onClick={() => void assign()}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{pending ? "Saving…" : linkState === "suggested" && creatorId === currentCreatorId ? "Confirm match" : "Save assignment"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
