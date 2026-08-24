@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Activity, AlertTriangle, Bookmark, CircleUserRound, Eye, FileVideo2, Gauge, GripVertical, Heart, MessageCircleMore, RotateCcw, Settings2, Share2, UserPlus, UsersRound } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DitherGradient } from "@/components/dither-kit/gradient";
@@ -50,13 +50,54 @@ export function OverviewMetricPicker({ metrics }: { metrics: OverviewMetric[] })
 
 export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
   const { selected, update } = useMetricSelection();
+  const [preview, setPreview] = useState<OverviewMetricId[] | null>(null);
+  const previewRef = useRef<OverviewMetricId[]>(selected);
+  const draggedRef = useRef<OverviewMetricId | null>(null);
+  const ordered = preview ?? selected;
   const [dragged, setDragged] = useState<OverviewMetricId | null>(null);
   const [dropTarget, setDropTarget] = useState<OverviewMetricId | null>(null);
-  const visible = selected.flatMap((id) => {
+  const visible = ordered.flatMap((id) => {
     const metric = metrics.find((item) => item.id === id);
     return metric ? [metric] : [];
   });
-  const move = (item: OverviewMetricId, target: OverviewMetricId) => update(moveItem(selected, item, target));
+  const move = (item: OverviewMetricId, target: OverviewMetricId) => update(moveItem(ordered, item, target));
+  const beginPointerSort = (event: ReactPointerEvent<HTMLButtonElement>, id: OverviewMetricId) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    previewRef.current = ordered;
+    draggedRef.current = id;
+    setPreview(ordered);
+    setDragged(id);
+    setDropTarget(null);
+  };
+  const continuePointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const active = draggedRef.current;
+    if (!active) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-stat-id]")?.dataset.statId as OverviewMetricId | undefined;
+    if (!target || target === active || !previewRef.current.includes(target)) return;
+    setDropTarget(target);
+    const next = moveItem(previewRef.current, active, target);
+    previewRef.current = next;
+    setPreview(next);
+  };
+  const finishPointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggedRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const next = previewRef.current;
+    setPreview(null);
+    draggedRef.current = null;
+    setDragged(null);
+    setDropTarget(null);
+    update(next);
+  };
+  const cancelPointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setPreview(null);
+    draggedRef.current = null;
+    setDragged(null);
+    setDropTarget(null);
+  };
   return <section className="metric-grid overview-metric-grid">
     {visible.map((metric, index) => {
       const Icon = icons[metric.icon];
@@ -65,32 +106,10 @@ export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
         className={`metric-card overview-metric-card ${metric.attention ? "metric-attention" : ""}`}
         data-dragging={dragged === metric.id}
         data-drop-target={dropTarget === metric.id}
-        draggable
+        data-stat-id={metric.id}
         key={metric.id}
         tabIndex={0}
         title="Drag to reorder"
-        onDragStart={(event) => {
-          setDragged(metric.id);
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", metric.id);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-        }}
-        onDragEnter={() => {
-          if (dragged && dragged !== metric.id) setDropTarget(metric.id);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (dragged) move(dragged, metric.id);
-          setDragged(null);
-          setDropTarget(null);
-        }}
-        onDragEnd={() => {
-          setDragged(null);
-          setDropTarget(null);
-        }}
         onKeyDown={(event) => {
           if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
           event.preventDefault();
@@ -105,7 +124,15 @@ export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
           <p>{metric.label}</p>
           <strong>{metric.value}</strong>
         </div>
-        <GripVertical aria-hidden="true" className="overview-metric-grip" />
+        <button
+          type="button"
+          className="overview-metric-grip"
+          aria-label={`Drag ${metric.label}`}
+          onPointerDown={(event) => beginPointerSort(event, metric.id)}
+          onPointerMove={continuePointerSort}
+          onPointerUp={finishPointerSort}
+          onPointerCancel={cancelPointerSort}
+        ><GripVertical /></button>
       </Card>;
     })}
   </section>;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
-import { Check, GripVertical, Plus, X } from "lucide-react";
+import { useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { Check, ChevronLeft, ChevronRight, GripVertical, Plus, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AreaChart } from "@/components/dither-kit/area-chart";
 import { Area } from "@/components/dither-kit/area";
@@ -54,7 +54,11 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
   const params = useSearchParams();
   const seriesParam = params.get("series");
   const [selection, setSelection] = useState(() => ({ source: seriesParam, keys: readMetricKeys(seriesParam) }));
-  const selected = selection.source === seriesParam ? selection.keys : readMetricKeys(seriesParam);
+  const persisted = selection.source === seriesParam ? selection.keys : readMetricKeys(seriesParam);
+  const [preview, setPreview] = useState<MetricKey[] | null>(null);
+  const previewRef = useRef<MetricKey[]>(persisted);
+  const draggedRef = useRef<MetricKey | null>(null);
+  const selected = preview ?? persisted;
   const [dragged, setDragged] = useState<MetricKey | null>(null);
   const [dropTarget, setDropTarget] = useState<MetricKey | null>(null);
   const chartData = useMemo(() => data.map((point) => ({ ...point, engagementRate: point.engagementRate * 100 })), [data]);
@@ -77,6 +81,43 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
   const add = (key: MetricKey) => update(selected.includes(key) ? selected : [...selected, key].slice(-4));
   const remove = (key: MetricKey) => update(selected.length === 1 ? selected : selected.filter((item) => item !== key));
   const move = (item: MetricKey, target: MetricKey) => update(moveItem(selected, item, target));
+  const beginPointerSort = (event: ReactPointerEvent<HTMLButtonElement>, key: MetricKey) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    previewRef.current = selected;
+    draggedRef.current = key;
+    setPreview(selected);
+    setDragged(key);
+    setDropTarget(null);
+  };
+  const continuePointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const active = draggedRef.current;
+    if (!active) return;
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-series-id]")?.dataset.seriesId as MetricKey | undefined;
+    if (!target || target === active || !previewRef.current.includes(target)) return;
+    setDropTarget(target);
+    const next = moveItem(previewRef.current, active, target);
+    previewRef.current = next;
+    setPreview(next);
+  };
+  const finishPointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!draggedRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const next = previewRef.current;
+    setPreview(null);
+    draggedRef.current = null;
+    setDragged(null);
+    setDropTarget(null);
+    update(next);
+  };
+  const cancelPointerSort = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setPreview(null);
+    draggedRef.current = null;
+    setDragged(null);
+    setDropTarget(null);
+  };
 
   return <div className="performance-chart-shell">
     <div className="performance-chart-toolbar">
@@ -85,35 +126,13 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
           className="performance-metric-chip"
           data-dragging={dragged === key}
           data-drop-target={dropTarget === key}
-          draggable
+          data-series-id={key}
           key={key}
           aria-label={`Reorder ${metrics[key].label}`}
           role="group"
           tabIndex={0}
           title="Drag to reorder; the last metric is drawn in front"
           style={{ "--metric-color": metrics[key].cssColor } as CSSProperties}
-          onDragStart={(event) => {
-            setDragged(key);
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("text/plain", key);
-          }}
-          onDragOver={(event) => {
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "move";
-          }}
-          onDragEnter={() => {
-            if (dragged && dragged !== key) setDropTarget(key);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            if (dragged) move(dragged, key);
-            setDragged(null);
-            setDropTarget(null);
-          }}
-          onDragEnd={() => {
-            setDragged(null);
-            setDropTarget(null);
-          }}
           onKeyDown={(event) => {
             if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
             event.preventDefault();
@@ -122,8 +141,20 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
             if (target) move(key, target);
           }}
         >
-          <GripVertical aria-hidden="true" className="performance-chip-grip" />
+          <button
+            type="button"
+            className="performance-chip-grip"
+            aria-label={`Drag ${metrics[key].label}`}
+            onPointerDown={(event) => beginPointerSort(event, key)}
+            onPointerMove={continuePointerSort}
+            onPointerUp={finishPointerSort}
+            onPointerCancel={cancelPointerSort}
+          ><GripVertical /></button>
           <i />{metrics[key].label}
+          <span className="performance-chip-steps">
+            <button type="button" aria-label={`Move ${metrics[key].label} left`} disabled={index === 0} onClick={() => move(key, selected[index - 1])}><ChevronLeft /></button>
+            <button type="button" aria-label={`Move ${metrics[key].label} right`} disabled={index === selected.length - 1} onClick={() => move(key, selected[index + 1])}><ChevronRight /></button>
+          </span>
           <button type="button" draggable={false} aria-label={`Remove ${metrics[key].label}`} disabled={selected.length === 1} onClick={(event) => { event.stopPropagation(); remove(key); }}><X /></button>
         </span>)}
         <DropdownMenu>
