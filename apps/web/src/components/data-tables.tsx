@@ -16,7 +16,7 @@ function Avatar({ src, name }: { src: string | null; name: string }) { return <s
 const creatorTabLifecycle: Record<string, PortalCreator["lifecycle"]> = { requests: "request", active: "active", watch: "watch", offboarded: "offboarded" };
 
 export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
-  const params = useSearchParams(); const pathname = usePathname(); const router = useRouter(); const tab = params.get("tab") ?? "requests";
+  const params = useSearchParams(); const pathname = usePathname(); const router = useRouter(); const tab = params.get("tab") ?? "active";
   const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]); const [visibility, setVisibility] = useState<VisibilityState>({}); const [selection, setSelection] = useState<RowSelectionState>({});
   const filtered = useMemo(() => creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[tab] && `${creator.displayName} ${creator.discord.username ?? ""} ${creator.accounts.map((account) => account.username).join(" ")} ${creator.nextStep ?? ""}`.toLowerCase().includes(search.toLowerCase())), [creators, tab, search]);
   const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
