@@ -1,0 +1,22 @@
+import type { StudioScript } from "./script-studio-data";
+
+export type StudioAssignment = StudioScript["assignments"][number];
+
+export function isPersistedCreatorId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function mergeScriptAssignments(current: StudioAssignment[], incoming: StudioAssignment[]): StudioAssignment[] {
+  const merged = new Map(current.map((assignment) => [assignment.creatorId, assignment]));
+  for (const assignment of incoming) merged.set(assignment.creatorId, assignment);
+  return Array.from(merged.values());
+}
+
+export function referencePlatformFromUrl(url: string): string {
+  const value = url.trim().toLowerCase();
+  if (value.includes("tiktok.com")) return "tiktok";
+  if (value.includes("youtube.com") || value.includes("youtu.be")) return "youtube";
+  if (value.includes("facebook.com") || value.includes("fb.watch")) return "facebook";
+  if (value.includes("instagram.com")) return "instagram";
+  return "other";
+}

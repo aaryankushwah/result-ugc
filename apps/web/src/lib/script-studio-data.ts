@@ -17,6 +17,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getPortalData } from "./portal-data";
 import { adaptReferenceForResult, segmentTranscript } from "./script-writing";
+import { isPersistedCreatorId } from "./script-studio-state";
 
 export type StudioCreator = {
   id: string;
@@ -37,6 +38,7 @@ export type StudioAsset = {
 
 export type StudioScript = {
   id: string;
+  latestVersion: number;
   title: string;
   status: "draft" | "ready" | "assigned" | "in_review" | "approved" | "published" | "archived";
   pipelineStage: "not_started" | "testing" | "iterate" | "winner" | "retired";
@@ -71,7 +73,7 @@ export type ScriptStudioData = {
 
 export async function getScriptStudioData(): Promise<ScriptStudioData> {
   const portalData = await getPortalData();
-  const studioCreators: StudioCreator[] = portalData.creators.map((creator) => ({
+  const studioCreators: StudioCreator[] = portalData.creators.filter((creator) => isPersistedCreatorId(creator.id)).map((creator) => ({
     id: creator.id,
     name: creator.displayName,
     username: creator.discord.username ?? creator.accounts[0]?.username ?? null,
@@ -90,6 +92,7 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
       db.select().from(brandProfiles).where(eq(brandProfiles.organizationId, organization.id)).limit(1),
       db.select({
         id: scripts.id,
+        latestVersion: scripts.latestVersion,
         title: scripts.title,
         status: scripts.status,
         pipelineStage: scripts.pipelineStage,
@@ -142,6 +145,7 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
         const watchTimes = tests.map((test) => test.averageWatchTimeSeconds).filter((value): value is number => value !== null);
         return {
         id: row.id,
+        latestVersion: row.latestVersion,
         title: row.title,
         status: row.status,
         pipelineStage: row.pipelineStage,
@@ -210,6 +214,7 @@ function previewData(liveCreators: StudioCreator[]): ScriptStudioData {
     creators,
     scripts: samples.map(([title, status, pipelineStage, category, format, priority, platform, creatorIds, views, hookRate], index) => ({
       id: `preview-script-${index + 1}`,
+      latestVersion: 1,
       title,
       status,
       pipelineStage,
