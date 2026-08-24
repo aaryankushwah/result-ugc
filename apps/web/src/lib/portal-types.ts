@@ -104,7 +104,17 @@ export type PortalActivity = {
   occurredAt: string;
 };
 
-export type PerformancePoint = { date: string; views: number; posts: number };
+export type PerformancePoint = {
+  date: string;
+  views: number;
+  posts: number;
+  activeAccounts: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  bookmarks: number;
+  engagementRate: number;
+};
 
 export type PortalData = {
   organization: { id: string | null; name: string; slug: string };
