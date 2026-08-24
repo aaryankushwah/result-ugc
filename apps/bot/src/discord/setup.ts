@@ -28,6 +28,7 @@ import {
   type RoleKey,
 } from "../config/blueprint.js";
 import { channelOverwrites, type RoleMap } from "./permissions.js";
+import { discordChannelNameMatches } from "./channel-names.js";
 
 export interface SetupResult {
   rolesCreated: string[];
@@ -108,12 +109,7 @@ async function ensureRoles(guild: Guild, result: SetupResult): Promise<RoleMap> 
 }
 
 function channelMatches(candidate: GuildBasedChannel, name: string, parentId: string): boolean {
-  const comparable = (value: string) => value
-    .toLowerCase()
-    .replace(/^[^a-z0-9]+/, "")
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return comparable(candidate.name) === comparable(name) && candidate.parentId === parentId;
+  return discordChannelNameMatches(candidate.name, name) && candidate.parentId === parentId;
 }
 
 async function ensureChannel(
