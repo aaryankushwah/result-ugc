@@ -95,6 +95,13 @@ export async function reconcileCreatorAccountLinks(organizationId: string): Prom
       addKey(stringValue(record?.displayName), relationship.creatorId);
     }
   }
+  // A confirmed posting handle is also a trusted identity edge. This lets an
+  // exact cross-platform handle (for example YouTube + TikTok @jimibuilds)
+  // become a reviewable suggestion without silently confirming ownership.
+  for (const account of accountRows) {
+    if (!account.creatorId || account.linkState !== "confirmed") continue;
+    addKey(account.username, account.creatorId);
+  }
 
   let changed = 0;
   for (const account of accountRows) {
@@ -114,7 +121,7 @@ export async function reconcileCreatorAccountLinks(organizationId: string): Prom
         organizationId,
         creatorId: suggestedCreatorId,
         type: "account.match_suggested",
-        summary: `@${account.username ?? "account"} exactly matched this creator across Result, Discord, or Launchpoint.`,
+        summary: `@${account.username ?? "account"} exactly matched this creator across Result, Discord, a confirmed social account, or Launchpoint.`,
         metadata: { viralOrgAccountId: account.viralOrgAccountId, platform: account.platform, confidence: 1 },
       });
     }
