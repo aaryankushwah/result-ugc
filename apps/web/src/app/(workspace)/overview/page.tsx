@@ -55,7 +55,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
-    <PageTitle eyebrow="MANAGER COMMAND CENTER" title="Result" titleClassName="font-result result-ugc-title" description="The operating picture across creators, Discord, signing providers, accounts, and performance." actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
+    <PageTitle title="Result" titleClassName="font-result result-ugc-title" actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
     {data.sourceMode === "live_provider" ? <div className="source-banner"><Radio /><div><strong>Live Viral data is connected.</strong><span>Creator candidates need confirmation after the shared database is connected; they are not silently treated as signed creators.</span></div><Link href="/integrations">Review setup <ArrowUpRight /></Link></div> : null}
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
     <OverviewMetricGrid metrics={metricCards} />
