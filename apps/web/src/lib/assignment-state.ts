@@ -18,10 +18,13 @@ export function accountAssignmentLabel({
 export function discordConnectionLabel({
   pending,
   queued,
+  linked = false,
 }: {
   pending: boolean;
   queued: boolean;
+  linked?: boolean;
 }): string {
   if (pending) return "Connecting…";
-  return queued ? "Connection queued" : "Connect Discord";
+  if (queued) return "Connection queued";
+  return linked ? "Change Discord member" : "Connect Discord";
 }

@@ -10,5 +10,7 @@ describe("assignment pending states", () => {
   it("distinguishes Discord submission from durable queue confirmation", () => {
     expect(discordConnectionLabel({ pending: true, queued: false })).toBe("Connecting…");
     expect(discordConnectionLabel({ pending: false, queued: true })).toBe("Connection queued");
+    expect(discordConnectionLabel({ pending: false, queued: false, linked: true })).toBe("Change Discord member");
+    expect(discordConnectionLabel({ pending: false, queued: false, linked: false })).toBe("Connect Discord");
   });
 });

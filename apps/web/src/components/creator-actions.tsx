@@ -100,10 +100,10 @@ export function AccountAssignmentButton({
 
 export type DiscordConnectionCandidate = { creatorId: string; userId: string; username: string | null; displayName: string; state: string };
 
-function DiscordConnectionButton({ creatorId, candidates }: { creatorId: string; candidates: DiscordConnectionCandidate[] }) {
+function DiscordConnectionButton({ creatorId, candidates, existingDiscordUserId = null }: { creatorId: string; candidates: DiscordConnectionCandidate[]; existingDiscordUserId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [discordUserId, setDiscordUserId] = useState("");
+  const [discordUserId, setDiscordUserId] = useState(existingDiscordUserId ?? "");
   const [sourceCreatorId, setSourceCreatorId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [queued, setQueued] = useState(false);
@@ -119,9 +119,9 @@ function DiscordConnectionButton({ creatorId, candidates }: { creatorId: string;
     setQueued(true); startRefresh(() => router.refresh());
   };
   return <Dialog open={open} onOpenChange={setOpen}>
-    <DialogTrigger asChild><Button variant="outline" disabled={pending || queued}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{discordConnectionLabel({ pending, queued })}</Button></DialogTrigger>
+    <DialogTrigger asChild><Button variant="outline" disabled={pending || queued}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{discordConnectionLabel({ pending, queued, linked: Boolean(existingDiscordUserId) })}</Button></DialogTrigger>
     <DialogContent className="account-assignment-dialog">
-      <DialogHeader><DialogTitle>Connect Discord member</DialogTitle><DialogDescription>Link the actual Discord member to this canonical creator, then restore their Result roles and private channel.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>{existingDiscordUserId ? "Change Discord member" : "Connect Discord member"}</DialogTitle><DialogDescription>Select the actual Discord member for this canonical creator. Result will save the identity first, then queue access restoration through the bot.</DialogDescription></DialogHeader>
       {candidates.length ? <>
         <div className="assignment-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search synced Discord members…" /></div>
         <div className="assignment-creator-list discord-candidate-list">
@@ -154,7 +154,7 @@ export function CreatorQuickActions({ creatorId, discordState, discordUserId, ca
   };
   if (!discordUserId) return <DiscordConnectionButton creatorId={creatorId} candidates={candidates} />;
   const missing = discordState !== "connected";
-  return <div className="action-with-error">{missing ? <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("restore_access")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Restore Discord access</Button> : <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("reconcile_creator")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Reconcile Discord</Button>}{error ? <span><ShieldAlert />{error}</span> : null}</div>;
+  return <div className="action-with-error"><div className="discord-quick-actions">{missing ? <DiscordConnectionButton creatorId={creatorId} candidates={candidates} existingDiscordUserId={discordUserId} /> : null}{missing ? <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("restore_access")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Restore Discord access</Button> : <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("reconcile_creator")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Reconcile Discord</Button>}</div>{error ? <span><ShieldAlert />{error}</span> : null}</div>;
 }
 
 export function NoteButton({ creatorId }: { creatorId: string }) {
