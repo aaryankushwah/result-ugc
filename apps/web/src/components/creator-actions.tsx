@@ -1,6 +1,6 @@
 "use client";
 
-import { FilePlus2, LoaderCircle, ShieldAlert, ShieldCheck, UserRoundCheck } from "lucide-react";
+import { FilePlus2, LoaderCircle, Search, ShieldAlert, ShieldCheck, UserRoundCheck, UserRoundX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -26,9 +26,73 @@ export function AccountMatchControl({ accountId, creators, currentCreatorId }: {
     const response = await fetch(`/api/accounts/${accountId}/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creatorId }) });
     const body = await response.json(); setPending(false);
     if (!response.ok) { setError(body.error ?? "Could not link account"); return; }
-    router.push(`/creators/${creatorId}?tab=content`); router.refresh();
+    router.push(`/creators/${creatorId}?tab=accounts`); router.refresh();
   };
   return <div className="account-match-control"><Select value={creatorId} onValueChange={setCreatorId}><SelectTrigger className="w-full"><SelectValue placeholder="Select a creator" /></SelectTrigger><SelectContent>{creators.map((creator) => <SelectItem key={creator.id} value={creator.id}>{creator.displayName}{creator.discordUsername ? ` (@${creator.discordUsername})` : ""}</SelectItem>)}</SelectContent></Select><Button disabled={pending || !creatorId} onClick={submit}><UserRoundCheck />{pending ? "Linking…" : currentCreatorId === creatorId ? "Confirm creator" : "Link to creator"}</Button>{error ? <span className="form-error">{error}</span> : null}</div>;
+}
+
+export function AccountAssignmentButton({
+  accountId,
+  username,
+  creators,
+  currentCreatorId,
+  linkState,
+}: {
+  accountId: string;
+  username: string;
+  creators: Array<{ id: string; displayName: string; discordUsername: string | null }>;
+  currentCreatorId: string | null;
+  linkState: "suggested" | "confirmed" | "unlinked";
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creatorId, setCreatorId] = useState(currentCreatorId ?? "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const filteredCreators = creators.filter((creator) => `${creator.displayName} ${creator.discordUsername ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+
+  const assign = async () => {
+    if (!creatorId) return;
+    setPending(true); setError(null);
+    const response = await fetch(`/api/accounts/${accountId}/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creatorId }) });
+    const result = await response.json(); setPending(false);
+    if (!response.ok) { setError(result.error ?? "Could not assign account"); return; }
+    setOpen(false); router.refresh();
+  };
+  const unassign = async () => {
+    setPending(true); setError(null);
+    const response = await fetch(`/api/accounts/${accountId}/link`, { method: "DELETE" });
+    const result = await response.json(); setPending(false);
+    if (!response.ok) { setError(result.error ?? "Could not remove assignment"); return; }
+    setCreatorId(""); setOpen(false); router.refresh();
+  };
+
+  const triggerLabel = linkState === "suggested" ? "Confirm" : currentCreatorId ? "Reassign" : "Assign";
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild><Button variant="outline" size="xs" className="account-assign-trigger"><UserRoundCheck /> {triggerLabel}</Button></DialogTrigger>
+      <DialogContent className="account-assignment-dialog">
+        <DialogHeader><DialogTitle>Assign @{username}</DialogTitle><DialogDescription>Choose the one canonical Result creator who owns this posting account.</DialogDescription></DialogHeader>
+        <div className="assignment-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search creators or Discord usernames…" /></div>
+        <div className="assignment-creator-list">
+          {filteredCreators.length ? filteredCreators.map((creator) => (
+            <button type="button" className={creatorId === creator.id ? "selected" : ""} onClick={() => setCreatorId(creator.id)} key={creator.id}>
+              <span>{creator.displayName.slice(0, 1).toUpperCase()}</span>
+              <span><strong>{creator.displayName}</strong><small>{creator.discordUsername ? `Discord @${creator.discordUsername}` : "No Discord identity"}</small></span>
+              <i>{creatorId === creator.id ? <UserRoundCheck /> : null}</i>
+            </button>
+          )) : <p>No creators match that search.</p>}
+        </div>
+        {error ? <p className="form-error">{error}</p> : null}
+        <DialogFooter className="account-assignment-footer">
+          {currentCreatorId ? <Button variant="ghost" className="unassign-button" disabled={pending} onClick={unassign}><UserRoundX /> Unassign</Button> : null}
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button disabled={pending || !creatorId} onClick={assign}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{pending ? "Saving…" : linkState === "suggested" && creatorId === currentCreatorId ? "Confirm match" : "Save assignment"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function CreatorQuickActions({ creatorId, discordMissing }: { creatorId: string; discordMissing: boolean }) {

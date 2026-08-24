@@ -297,30 +297,65 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .creator-cell strong, .video-cell strong { max-width: 210px; overflow: hidden; text-overflow: ellipsis; color: #ddd; font-size: 9px; font-weight: 580; }
 .creator-cell small, .video-cell small, .stack-cell small { color: #606060; font-size: 8px; }
 .unified-creator-roster { border: 1px solid var(--border); background: #121212; }
-.creator-tree-table { min-width: 1480px; }
-.creator-parent-row > td { height: 72px; }
-.nested-creator-cell { min-width: 240px; display: flex; align-items: center; gap: 6px; }
-.creator-expand-button { width: 24px; height: 28px; flex: 0 0 24px; color: #787878; }
+.unified-creator-roster .roster-tabs { height: 62px; }
+.unified-creator-roster .roster-tabs button { font-size: 15px; }
+.unified-creator-roster .roster-tabs button span { font-size: 12px; }
+.unified-creator-roster .table-toolbar { min-height: 72px; padding: 14px; }
+.unified-creator-roster .table-search { width: min(520px,42vw); height: 44px; }
+.unified-creator-roster .table-search input { font-size: 15px; }
+.unified-creator-roster .toolbar-button { height: 44px; font-size: 14px; }
+.unified-creator-roster .dense-table th { height: 52px; font-size: 13px; }
+.unified-creator-roster .dense-table td { font-size: 15px; }
+.unified-creator-roster .creator-cell strong { font-size: 16px; }
+.unified-creator-roster .creator-cell small, .unified-creator-roster .stack-cell small { font-size: 13px; }
+.unified-creator-roster .state-badge, .unified-creator-roster .status-badge { min-height: 28px; font-size: 12px; }
+.unified-creator-roster .account-platforms strong { font-size: 14px; }
+.unified-creator-roster .account-platforms span { width: 28px; height: 24px; font-size: 9px; }
+.creator-tree-table { min-width: 1660px; }
+.creator-parent-row > td { height: 84px; }
+.nested-creator-cell { min-width: 270px; display: flex; align-items: center; gap: 8px; }
+.creator-expand-button { width: 30px; height: 34px; flex: 0 0 30px; color: #8a8a8a; }
 .creator-expand-button:disabled { opacity: .25; }
-.creator-expand-button svg { width: 14px; }
-.primary-metric-cell { color: #eeeeee; font-size: 14px; }
+.creator-expand-button svg { width: 16px; }
+.primary-metric-cell { color: #eeeeee; font-size: 16px; }
 .creator-accounts-child-row > td { height: auto; max-width: none; padding: 0; background: #0d0d0d !important; white-space: normal; }
-.nested-account-table { min-width: 1340px; border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: inset 3px 0 0 rgba(169,149,255,.55); }
-.nested-account-header, .nested-account-row { display: grid; grid-template-columns: minmax(280px, 1.5fr) 92px 90px 70px 90px 100px 100px 110px minmax(190px, .9fr) 28px; align-items: center; gap: 14px; }
-.nested-account-header { min-height: 34px; padding: 0 16px 0 52px; border-bottom: 1px solid rgba(255,255,255,.06); background: #101010; color: #626262; font-size: 10px; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
-.nested-account-row { min-height: 66px; padding: 8px 16px 8px 24px; border-bottom: 1px solid rgba(255,255,255,.055); color: #a8a8a8; font-size: 13px; }
+.nested-account-table { min-width: 1580px; border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: inset 2px 0 0 rgba(169,149,255,.5); }
+.nested-account-header, .nested-account-row { display: grid; grid-template-columns: minmax(320px, 1.55fr) 100px 96px 78px 100px 110px 110px 116px minmax(210px, .9fr) 110px 80px; align-items: center; gap: 16px; }
+.nested-account-header { min-height: 42px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.06); background: #101010; color: #777; font-size: 12px; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
+.nested-account-header > span:first-child { padding-left: 42px; }
+.nested-account-row { min-height: 78px; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,.055); color: #b8b8b8; font-size: 15px; }
 .nested-account-row:last-child { border-bottom: 0; }
 .nested-account-row:hover { background: #151515; }
-.nested-account-row > strong { color: #f0f0f0; font-size: 14px; }
+.nested-account-row > strong { color: #f0f0f0; font-size: 16px; }
 .nested-account-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
 .nested-account-identity > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.nested-account-identity strong { overflow: hidden; color: #e8e8e8; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.nested-account-identity small { overflow: hidden; color: #747474; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.nested-account-identity strong { overflow: hidden; color: #f2f2f2; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.nested-account-identity strong svg { width: 13px; margin-left: 6px; color: #777; vertical-align: -2px; }
+.nested-account-identity small { overflow: hidden; color: #858585; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .nested-branch { width: 18px; height: 20px; flex: 0 0 18px; border-bottom: 1px solid #3a3a3a; border-left: 1px solid #3a3a3a; }
 .nested-account-badges { display: flex; align-items: center; gap: 5px; }
-.nested-account-external { color: #696969; }
-.nested-account-external svg { width: 14px; }
-.nested-account-empty { min-height: 66px; padding: 22px 52px; color: #686868; font-size: 13px; }
+.account-assign-trigger { min-width: 96px; height: 34px; font-size: 12px; }
+.account-assign-trigger svg { width: 14px; }
+.nested-account-details { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: #9b9b9b; font-size: 12px; }
+.nested-account-details svg { width: 13px; }
+.nested-account-empty { min-height: 78px; padding: 26px 60px; color: #777; font-size: 14px; }
+.account-assignment-dialog { width: min(620px,calc(100vw - 32px)); }
+.assignment-search { height: 44px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: #111; }
+.assignment-search > svg { width: 16px; color: #777; }
+.assignment-search input { border: 0; background: transparent; font-size: 14px; }
+.assignment-creator-list { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid var(--border); }
+.assignment-creator-list > button { min-height: 64px; padding: 10px 12px; display: grid; grid-template-columns: 36px 1fr 24px; align-items: center; gap: 11px; border: 0; border-bottom: 1px solid var(--border); background: #141414; color: inherit; cursor: pointer; text-align: left; }
+.assignment-creator-list > button:last-child { border-bottom: 0; }
+.assignment-creator-list > button:hover, .assignment-creator-list > button.selected { background: #1b1b1b; }
+.assignment-creator-list > button.selected { box-shadow: inset 2px 0 0 var(--accent); }
+.assignment-creator-list > button > span:first-child { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--border); background: #242424; font-size: 13px; font-weight: 700; }
+.assignment-creator-list > button > span:nth-child(2) { display: flex; flex-direction: column; gap: 3px; }
+.assignment-creator-list strong { color: #ededed; font-size: 14px; }
+.assignment-creator-list small { color: #818181; font-size: 12px; }
+.assignment-creator-list i { width: 22px; height: 22px; display: grid; place-items: center; color: var(--accent); }
+.assignment-creator-list i svg { width: 15px; }
+.assignment-creator-list > p { padding: 30px; color: #777; font-size: 13px; text-align: center; }
+.account-assignment-footer .unassign-button { margin-right: auto; color: var(--alert); }
 .badge-row, .account-platforms { display: flex; align-items: center; gap: 4px; }
 .account-platforms span { width: 21px; height: 18px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; color: #727272; font-size: 7px; }
 .account-platforms strong { margin-right: 2px; color: #bbb; font-size: 9px; }

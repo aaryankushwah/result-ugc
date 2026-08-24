@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AccountAssignmentButton } from "@/components/creator-actions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,7 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const assignmentCreators = useMemo(() => creators.filter((creator) => creator.source === "result" && creator.lifecycle !== "offboarded").map((creator) => ({ id: creator.id, displayName: creator.displayName, discordUsername: creator.discord.username })), [creators]);
 
   const filtered = useMemo(() => creators.filter((creator) => {
     const relationships = creator.relationships.map((relationship) => `${relationship.provider} ${relationship.program ?? ""}`).join(" ");
@@ -177,7 +179,7 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
         <Button variant="outline" size="sm" className="toolbar-button" onClick={toggleAll}><ChevronsUpDown /> {allExpanded ? "Collapse all" : "Expand all"}</Button>
         {Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}
       </TableToolbar>
-      <CreatorAccountsTable table={table} expanded={expanded} toggleExpanded={(creatorId) => setExpanded((current) => ({ ...current, [creatorId]: !current[creatorId] }))} />
+      <CreatorAccountsTable table={table} expanded={expanded} assignmentCreators={assignmentCreators} />
       <Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} />
     </section>
   );
@@ -186,11 +188,11 @@ export function CreatorAccountsRoster({ creators }: { creators: PortalCreator[] 
 function CreatorAccountsTable({
   table,
   expanded,
-  toggleExpanded,
+  assignmentCreators,
 }: {
   table: ReturnType<typeof useReactTable<PortalCreator>>;
   expanded: Record<string, boolean>;
-  toggleExpanded: (creatorId: string) => void;
+  assignmentCreators: Array<{ id: string; displayName: string; discordUsername: string | null }>;
 }) {
   const rows = table.getRowModel().rows;
   return (
@@ -212,15 +214,12 @@ function CreatorAccountsTable({
                   <TableCell colSpan={table.getVisibleLeafColumns().length}>
                     <div className="nested-account-table">
                       <div className="nested-account-header">
-                        <span>Account</span><span>Platform</span><span>Followers</span><span>Posts</span><span>Views</span><span>Avg. views</span><span>Engagement</span><span>Latest post</span><span>Status</span><span aria-hidden="true" />
+                        <span>Account</span><span>Platform</span><span>Followers</span><span>Posts</span><span>Views</span><span>Avg. views</span><span>Engagement</span><span>Latest post</span><span>Status</span><span>Creator</span><span aria-hidden="true" />
                       </div>
-                      {row.original.accounts.length ? row.original.accounts.map((account) => (
-                        <div className="nested-account-row" key={account.id}>
-                          <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">
-                            <span className="nested-branch" aria-hidden="true" />
-                            <Avatar src={account.avatarUrl} name={account.username} />
-                            <span><strong>@{account.username}</strong><small>{account.displayName || row.original.displayName}</small></span>
-                          </Link>
+                      {row.original.accounts.length ? row.original.accounts.map((account) => {
+                        const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span><strong>@{account.username}<ExternalLink /></strong><small>{account.displayName || row.original.displayName}</small></span></>;
+                        return <div className="nested-account-row" key={account.id}>
+                          {account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>}
                           <StateBadge label={account.platform} tone="info" />
                           <span>{formatNumber(account.followers ?? 0)}</span>
                           <span>{formatNumber(account.posts)}</span>
@@ -229,9 +228,10 @@ function CreatorAccountsTable({
                           <span>{formatPercent(account.engagementRate)}</span>
                           <span>{timeAgo(account.latestPostAt)}</span>
                           <span className="nested-account-badges"><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></span>
-                          {account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-external" aria-label={`Open @${account.username} on ${account.platform}`}><ExternalLink /></a> : <Button variant="ghost" size="icon-xs" onClick={() => toggleExpanded(row.original.id)} aria-label={`Collapse ${row.original.displayName} accounts`}><ChevronDown /></Button>}
-                        </div>
-                      )) : <div className="nested-account-empty">No posting accounts are connected to this creator.</div>}
+                          <AccountAssignmentButton accountId={account.id} username={account.username} creators={assignmentCreators} currentCreatorId={row.original.source === "result" ? row.original.id : null} linkState={account.linkState} />
+                          <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-details">Details <ChevronRight /></Link>
+                        </div>;
+                      }) : <div className="nested-account-empty">No posting accounts are connected to this creator.</div>}
                     </div>
                   </TableCell>
                 </TableRow>
