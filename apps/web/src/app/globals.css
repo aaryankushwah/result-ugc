@@ -776,17 +776,14 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .creator-expand-button:disabled { opacity: .25; }
 .creator-expand-button svg { width: 16px; }
 .primary-metric-cell { color: #eeeeee; font-size: 16px; }
-.creator-accounts-child-row > td { height: auto; max-width: none; padding: 0; background: #0d0d0d !important; white-space: normal; }
-.nested-account-table { min-width: 1580px; border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: inset 2px 0 0 rgba(169,149,255,.5); }
-.nested-account-header, .nested-account-row { display: grid; grid-template-columns: minmax(320px, 1.55fr) 100px 96px 78px 100px 110px 110px 116px minmax(210px, .9fr) 110px 80px; align-items: center; gap: 16px; }
-.nested-account-header { min-height: 42px; padding: 0 18px; border-bottom: 1px solid rgba(255,255,255,.06); background: #101010; color: #777; font-size: 12px; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
-.nested-account-header > span:first-child { padding-left: 128px; }
-.nested-account-row { min-height: 70px; padding: 8px 18px; border-bottom: 1px solid rgba(255,255,255,.055); color: #b8b8b8; font-size: 15px; }
-.nested-account-row:last-child { border-bottom: 0; }
-.nested-account-row:hover { background: #151515; }
-.nested-account-row[data-link-state="suggested"] { background: linear-gradient(90deg,rgba(169,149,255,.055),transparent 42%); }
-.nested-account-row > strong { color: #f0f0f0; font-size: 16px; }
-.nested-account-identity { min-width: 0; padding-left: 52px; display: flex; align-items: center; gap: 9px; }
+.nested-account-header-row > td { height: 42px; background: #101010 !important; color: #777; font-size: 12px !important; font-weight: 650; letter-spacing: .03em; text-transform: uppercase; }
+.nested-account-header-row > td:first-child, .nested-account-row > td:first-child { box-shadow: inset 2px 0 0 rgba(169,149,255,.5); }
+.nested-account-header-row > td[data-nested-column="displayName"] { padding-left: 85px; }
+.nested-account-row > td { height: 70px; background: #0d0d0d; color: #b8b8b8; font-size: 15px; white-space: normal; }
+.nested-account-row:hover > td { background: #151515 !important; }
+.nested-account-row[data-link-state="suggested"] > td { background: rgba(169,149,255,.035); }
+.nested-account-row > td[data-nested-column="posts30d"] strong { color: #f0f0f0; font-size: 16px; }
+.nested-account-identity { min-width: 0; padding-left: 10px; display: flex; align-items: center; gap: 9px; }
 .nested-account-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .nested-account-handle { min-width: 0; display: flex; align-items: center; gap: 6px; }
 .nested-account-handle strong { overflow: hidden; color: #f2f2f2; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
@@ -798,7 +795,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .account-assign-trigger svg { width: 14px; }
 .nested-account-details { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; color: #9b9b9b; font-size: 12px; }
 .nested-account-details svg { width: 13px; }
-.nested-account-empty { min-height: 78px; padding: 26px 60px; color: #777; font-size: 14px; }
+.nested-account-empty-row > td { height: 78px; padding-left: 85px; background: #0d0d0d !important; color: #777; font-size: 14px; }
 .account-assignment-dialog { width: min(620px,calc(100vw - 32px)); }
 .assignment-search { height: 44px; padding: 0 11px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: #111; }
 .assignment-search > svg { width: 16px; color: #777; }

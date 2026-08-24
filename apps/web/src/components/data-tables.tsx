@@ -201,6 +201,38 @@ function CreatorAccountsTable({
   assignmentCreators: Array<{ id: string; displayName: string; discordUsername: string | null }>;
 }) {
   const rows = table.getRowModel().rows;
+  const visibleColumns = table.getVisibleLeafColumns();
+  const nestedHeaders: Record<string, string> = {
+    select: "",
+    displayName: "Account",
+    accounts: "Platform",
+    discord: "Followers",
+    relationships: "Posts",
+    posts30d: "Views",
+    views30d: "Avg. views",
+    averageViews: "Engagement",
+    engagementRate: "Latest post",
+    tracking: "Status",
+    nextStep: "Creator",
+    lastActivityAt: "",
+  };
+
+  const nestedCell = (columnId: string, account: PortalAccount, creator: PortalCreator) => {
+    const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span className="nested-account-copy"><span className="nested-account-handle"><strong>@{account.username}</strong><ExternalLink /></span><small>{account.displayName || creator.displayName}</small></span></>;
+    if (columnId === "displayName") return account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>;
+    if (columnId === "accounts") return <StateBadge label={account.platform} tone="info" />;
+    if (columnId === "discord") return formatNumber(account.followers ?? 0);
+    if (columnId === "relationships") return formatNumber(account.posts);
+    if (columnId === "posts30d") return <strong>{formatNumber(account.views)}</strong>;
+    if (columnId === "views30d") return formatNumber(account.averageViews);
+    if (columnId === "averageViews") return formatPercent(account.engagementRate);
+    if (columnId === "engagementRate") return timeAgo(account.latestPostAt);
+    if (columnId === "tracking") return <span className="nested-account-badges"><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></span>;
+    if (columnId === "nextStep") return <AccountAssignmentButton accountId={account.id} username={account.username} creators={assignmentCreators} currentCreatorId={creator.source === "result" ? creator.id : null} linkState={account.linkState} />;
+    if (columnId === "lastActivityAt") return <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-details">Details <ChevronRight /></Link>;
+    return null;
+  };
+
   return (
     <div className="dense-table-wrap creator-tree-wrap">
       <Table className="dense-table creator-tree-table">
@@ -215,33 +247,16 @@ function CreatorAccountsTable({
               <TableRow className="creator-parent-row" data-state={row.getIsSelected() ? "selected" : undefined}>
                 {row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
               </TableRow>
-              {expanded[row.original.id] ? (
-                <TableRow className="creator-accounts-child-row">
-                  <TableCell colSpan={table.getVisibleLeafColumns().length}>
-                    <div className="nested-account-table">
-                      <div className="nested-account-header">
-                        <span>Account</span><span>Platform</span><span>Followers</span><span>Posts</span><span>Views</span><span>Avg. views</span><span>Engagement</span><span>Latest post</span><span>Status</span><span>Creator</span><span aria-hidden="true" />
-                      </div>
-                      {row.original.accounts.length ? row.original.accounts.map((account) => {
-                        const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span className="nested-account-copy"><span className="nested-account-handle"><strong>@{account.username}</strong><ExternalLink /></span><small>{account.displayName || row.original.displayName}</small></span></>;
-                        return <div className="nested-account-row" data-link-state={account.linkState} key={account.id}>
-                          {account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>}
-                          <StateBadge label={account.platform} tone="info" />
-                          <span>{formatNumber(account.followers ?? 0)}</span>
-                          <span>{formatNumber(account.posts)}</span>
-                          <strong>{formatNumber(account.views)}</strong>
-                          <span>{formatNumber(account.averageViews)}</span>
-                          <span>{formatPercent(account.engagementRate)}</span>
-                          <span>{timeAgo(account.latestPostAt)}</span>
-                          <span className="nested-account-badges"><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></span>
-                          <AccountAssignmentButton accountId={account.id} username={account.username} creators={assignmentCreators} currentCreatorId={row.original.source === "result" ? row.original.id : null} linkState={account.linkState} />
-                          <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-details">Details <ChevronRight /></Link>
-                        </div>;
-                      }) : <div className="nested-account-empty">No posting accounts are connected to this creator.</div>}
-                    </div>
-                  </TableCell>
+              {expanded[row.original.id] ? <>
+                <TableRow className="nested-account-header-row">
+                  {visibleColumns.map((column) => <TableCell data-nested-column={column.id} key={`${row.id}-nested-header-${column.id}`}>{nestedHeaders[column.id] ?? ""}</TableCell>)}
                 </TableRow>
-              ) : null}
+                {row.original.accounts.length ? row.original.accounts.map((account) => (
+                  <TableRow className="nested-account-row" data-link-state={account.linkState} key={account.id}>
+                    {visibleColumns.map((column) => <TableCell data-nested-column={column.id} key={`${account.id}-${column.id}`}>{nestedCell(column.id, account, row.original)}</TableCell>)}
+                  </TableRow>
+                )) : <TableRow className="nested-account-empty-row"><TableCell colSpan={visibleColumns.length}>No posting accounts are connected to this creator.</TableCell></TableRow>}
+              </> : null}
             </Fragment>
           )) : <TableRow><TableCell className="empty-table" colSpan={table.getVisibleLeafColumns().length}>No creators match this view.</TableCell></TableRow>}
         </TableBody>
