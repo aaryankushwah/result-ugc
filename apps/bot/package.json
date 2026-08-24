@@ -1,8 +1,8 @@
 {
-  "name": "@sodium/discord-bot",
+  "name": "@result/discord-bot",
   "version": "1.0.0",
   "private": true,
-  "description": "Sodium's Discord worker for UGC creator operations.",
+  "description": "Result's Discord worker for UGC creator operations.",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",

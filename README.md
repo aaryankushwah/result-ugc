@@ -1,6 +1,6 @@
-# Sodium UGC
+# Result UGC
 
-Sodium's internal UGC workspace: one dashboard for content tracking, reference-video intelligence, briefs, and creator operations.
+Result's internal UGC workspace: one dashboard for content tracking, reference-video intelligence, briefs, and creator operations.
 
 ## Repository layout
 

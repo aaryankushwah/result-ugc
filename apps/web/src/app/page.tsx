@@ -1,7 +1,7 @@
 const workflow = [
   { number: "01", title: "Track", copy: "Keep every creator, post, deliverable, and performance signal in one place." },
   { number: "02", title: "Understand", copy: "Turn reference links into transcripts, hooks, scenes, and reusable insights." },
-  { number: "03", title: "Adapt", copy: "Use AI to reshape winning ideas around Sodium's voice, product, and audience." },
+  { number: "03", title: "Adapt", copy: "Use AI to reshape winning ideas around Result's voice, product, and audience." },
   { number: "04", title: "Ship", copy: "Create briefs, coordinate creators in Discord, and follow work through delivery." },
 ];
 
@@ -31,7 +31,7 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-zinc-950 text-sm font-bold text-white">S</span>
           <div>
-            <p className="text-sm font-semibold tracking-tight">Sodium UGC</p>
+            <p className="text-sm font-semibold tracking-tight">Result UGC</p>
             <p className="text-xs text-zinc-500">Internal workspace</p>
           </div>
         </div>
@@ -42,7 +42,7 @@ export default function Home() {
         <div>
           <p className="mb-6 text-xs font-semibold uppercase tracking-[0.24em] text-lime-700">One creative operating system</p>
           <h1 className="max-w-4xl text-5xl font-semibold leading-[0.98] tracking-[-0.055em] sm:text-7xl">Make every reference video useful to the whole team.</h1>
-          <p className="mt-8 max-w-2xl text-lg leading-8 text-zinc-600">A single home for UGC tracking, creative intelligence, briefs, and creator operations—built around how Sodium actually works.</p>
+          <p className="mt-8 max-w-2xl text-lg leading-8 text-zinc-600">A single home for UGC tracking, creative intelligence, briefs, and creator operations—built around how Result actually works.</p>
         </div>
 
         <aside className="self-end rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_70px_rgba(0,0,0,0.06)]">

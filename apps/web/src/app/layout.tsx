@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sodium UGC",
-  description: "Sodium's workspace for UGC tracking, intelligence, and briefs.",
+  title: "Result UGC",
+  description: "Result's workspace for UGC tracking, intelligence, and briefs.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
