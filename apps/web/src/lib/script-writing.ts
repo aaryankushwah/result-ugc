@@ -80,6 +80,14 @@ export function estimateScriptDuration(sections: StudioSection[]): number {
   return Math.max(1, Math.round(words / 2.5));
 }
 
+export function scriptHookFromText(value: string): string | null {
+  return value.split(/\n+/).map((line) => line.trim()).find(Boolean)?.slice(0, 500) ?? null;
+}
+
+export function scriptHookFromSections(sections: Pick<StudioSection, "copy">[]): string | null {
+  return scriptHookFromText(sections.map((section) => section.copy).join("\n"));
+}
+
 export function formatScriptForClipboard(title: string, sections: StudioSection[]): string {
   return [title.trim(), ...sections.flatMap((section) => [
     `${section.label.toUpperCase()} · ${section.timecode}`,

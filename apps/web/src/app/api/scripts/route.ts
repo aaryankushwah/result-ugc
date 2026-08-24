@@ -1,7 +1,7 @@
 import { activityEvents, scriptReferences, scripts, scriptVersions } from "@result/db";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
-import { estimateScriptDuration } from "@/lib/script-writing";
+import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
 import { invalidatePortalData } from "@/lib/portal-cache";
 
 const sectionSchema = z.object({
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         tags: parsed.data.tags,
         targetPlatform: parsed.data.targetPlatform,
         durationSeconds,
-        hook: parsed.data.sections[0]?.copy ?? null,
+        hook: scriptHookFromSections(parsed.data.sections),
         sections: parsed.data.sections,
         brandSnapshot: parsed.data.brandSnapshot,
         createdByUserId: context.internalUser?.id ?? null,

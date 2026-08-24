@@ -7,38 +7,26 @@ import {
   Clipboard,
   Clock3,
   Copy,
-  Download,
   ExternalLink,
-  ImageDown,
   LayoutDashboard,
   Link2,
-  MessageSquareText,
-  MoreHorizontal,
   Plus,
   Search,
   Send,
   Sparkles,
   Table2,
   UserRoundCheck,
-  WandSparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { adaptReferenceForResult, estimateScriptDuration, formatScriptForClipboard, segmentTranscript, type StudioSection } from "@/lib/script-writing";
+import { estimateScriptDuration, scriptHookFromText, segmentTranscript } from "@/lib/script-writing";
 import { mergeScriptAssignments, referencePlatformFromUrl } from "@/lib/script-studio-state";
 import type { ScriptStudioData, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
 type StudioScreen = "bank" | "writer";
-type ImportMode = "full" | "sections";
 
-const blankTranscript = "";
-const previewVisuals = [
-  { id: "visual-workflow", number: "01", label: "MESSY WORKFLOW", note: "Phone close-up · hard daylight", className: "visual-warm" },
-  { id: "visual-tabs", number: "02", label: "TABS EVERYWHERE", note: "Fast screen capture · three cuts", className: "visual-grid" },
-  { id: "visual-result", number: "03", label: "RESULT REVEAL", note: "Script status transition", className: "visual-signal" },
-];
 
 export function ScriptStudio({ initialData, canManage }: { initialData: ScriptStudioData; canManage: boolean }) {
   const [screen, setScreen] = useState<StudioScreen>("bank");
@@ -64,12 +52,13 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
 
   const openWriter = (script: StudioScript) => { setActive(script); setScreen("writer"); };
 
-  const createFromReference = (input: { url: string; creator: string; transcript: string }) => {
-    const sections = adaptReferenceForResult(input.transcript);
+  const createDraft = (input: { title: string; body: string; url: string; creator: string }) => {
+    const body = input.body.trim();
+    const sections = [plainScriptSection(body)];
     const next: StudioScript = {
       id: `session-${crypto.randomUUID()}`,
       latestVersion: 0,
-      title: "New reference · adapted for Result",
+      title: input.title.trim(),
       status: "draft",
       pipelineStage: "not_started",
       priority: "medium",
@@ -78,16 +67,16 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
       tags: [],
       targetPlatform: "instagram",
       durationSeconds: estimateScriptDuration(sections),
-      hook: sections[0]?.copy ?? null,
+      hook: scriptHookFromText(body),
       sections,
-      reference: {
+      reference: input.url.trim() ? {
         id: `session-reference-${crypto.randomUUID()}`,
         sourcePlatform: referencePlatformFromUrl(input.url),
-        sourceUrl: input.url || null,
-        sourceCreator: input.creator || null,
-        transcript: input.transcript,
-        transcriptSections: segmentTranscript(input.transcript),
-      },
+        sourceUrl: input.url.trim(),
+        sourceCreator: input.creator.trim() || null,
+        transcript: body,
+        transcriptSections: segmentTranscript(body),
+      } : null,
       assignments: [],
       assets: [],
       performance: { tests:0, liveTests:0, views:0, hookRate:null, averageWatchTimeSeconds:null },
@@ -97,7 +86,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
     setActive(next);
     setScreen("writer");
     setImportOpen(false);
-    notify("Reference structured and adapted for Result");
+    notify("Draft created");
   };
 
   const updateActive = (updater: (script: StudioScript) => StudioScript) => {
@@ -204,8 +193,8 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} openImport={() => setImportOpen(true)} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} brand={initialData.brand} creators={initialData.creators} updateScript={updateActive} goBack={() => setScreen("bank")} save={save} saving={saving} assigning={assigning} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
-    <ReferenceDialog open={importOpen} setOpen={setImportOpen} onCreate={createFromReference} />
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} openImport={() => setImportOpen(true)} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => setScreen("bank")} save={save} saving={saving} assigning={assigning} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
+    <NewScriptDialog open={importOpen} setOpen={setImportOpen} onCreate={createDraft} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
     {toast ? <div className="studio-toast" role="status"><Check />{toast}</div> : null}
   </div>;
@@ -237,39 +226,59 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
   </div>;
 }
 
-function ScriptWriter({ script, brand, updateScript, goBack, save, saving, assigning, openAssign, notify, canManage }: { script:StudioScript; brand:ScriptStudioData["brand"]; creators:StudioCreator[]; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; assigning:boolean; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
-  const [sideTab, setSideTab] = useState<"brief"|"assets"|"notes">("brief");
+function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; assigning:boolean; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
   const [copied, setCopied] = useState(false);
-  const updateSection = (sectionId:string, field:keyof StudioSection, value:string) => updateScript((current) => ({ ...current, hook: field === "copy" && current.sections[0]?.id === sectionId ? value : current.hook, sections:current.sections.map((section) => section.id === sectionId ? {...section,[field]:value} : section), durationSeconds:estimateScriptDuration(current.sections.map((section) => section.id === sectionId ? {...section,[field]:value} : section)), updatedAt:new Date().toISOString() }));
-  const copyScript = async () => { await navigator.clipboard.writeText(formatScriptForClipboard(script.title, script.sections)); setCopied(true); notify("Creator-formatted script copied"); window.setTimeout(() => setCopied(false), 1800); };
-  const copyTranscript = async () => { if (!script.reference) return; await navigator.clipboard.writeText(script.reference.transcript); notify("Transcript copied"); };
-  const downloadVisual = (label:string) => { downloadReferenceFrame(label); notify("Reference frame downloaded as PNG"); };
+  const scriptText = script.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n");
+  const wordCount = scriptText.split(/\s+/).filter(Boolean).length;
+  const canSave = canManage && Boolean(script.title.trim() && scriptText.trim()) && !saving && !assigning;
+  const updateBody = (body:string) => updateScript((current) => {
+    const sections = [plainScriptSection(body, current.sections[0]?.id)];
+    return { ...current, hook:scriptHookFromText(body), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
+  });
+  const copyScript = async () => { await navigator.clipboard.writeText(scriptText); setCopied(true); notify("Script copied"); window.setTimeout(() => setCopied(false), 1800); };
+  useEffect(() => {
+    const handleSave = (event:KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") return;
+      event.preventDefault();
+      if (canSave) save();
+    };
+    window.addEventListener("keydown",handleSave);
+    return () => window.removeEventListener("keydown",handleSave);
+  },[canSave,save]);
   return <div className="writer-frame">
-    <header className="writer-header"><div><button className="writer-back" onClick={goBack}><ArrowLeft /> Script bank</button><span>/</span><strong>{script.title}</strong></div><div className="writer-actions"><button onClick={copyScript}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy script"}</button>{canManage?<><button onClick={save} disabled={saving || assigning}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving":script.latestVersion ? `Save version ${script.latestVersion + 1}` : "Save draft"}</button><Button className="studio-primary" onClick={openAssign} disabled={saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign & send"}</Button></>:null}</div></header>
-    <div className="writer-grid">
-      <aside className="reference-column"><div className="writer-column-title"><div><p>REFERENCE</p><h2>Source video</h2></div><button aria-label="Reference options"><MoreHorizontal /></button></div>{script.reference ? <><div className="reference-reel"><div className="reference-poster"><span className="poster-source"><Link2 /> {script.reference.sourcePlatform.toUpperCase()}</span><strong>{shortReferenceHook(script.reference.transcript)}</strong>{script.reference.sourceUrl ? <a className="reference-poster-link" href={script.reference.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open source video"><ExternalLink /></a> : null}<small>{script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</small></div><div className="reference-meta"><Link2 /><div><strong>{script.reference.sourceCreator ?? "Saved reference"}</strong><span>{script.reference.sourcePlatform} structure · transcript provided</span></div>{script.reference.sourceUrl ? <a href={script.reference.sourceUrl} target="_blank" rel="noreferrer" aria-label="Open source video"><ArrowUpRight /></a> : null}</div></div><div className="transcript-heading"><div><h3>Transcript</h3><span>{script.reference.transcriptSections.length} beats</span></div><button onClick={copyTranscript}><Copy /> Copy all</button></div><div className="transcript-beats">{script.reference.transcriptSections.map((section,index) => <article className={index === 0 ? "active" : ""} key={section.id}><time>{section.timecode}</time><div><span>{section.label}</span><p>{section.text}</p></div></article>)}</div></> : <div className="reference-empty"><Link2 /><h3>No reference attached</h3><p>This script started from a blank brief.</p></div>}
-      </aside>
-      <main className="script-editor"><div className="script-document-head"><div><StatusLabel status={script.status} /><input aria-label="Script title" value={script.title} onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/><p><span>{brand.name}</span> · {script.durationSeconds ?? estimateScriptDuration(script.sections)} sec · {script.sections.reduce((sum,section)=>sum+section.copy.split(/\s+/).filter(Boolean).length,0)} words</p><div className="writer-taxonomy"><label><span>Stage</span><select value={script.pipelineStage} onChange={(event)=>updateScript((current)=>({...current,pipelineStage:event.target.value as StudioScript["pipelineStage"]}))}><option value="not_started">Not started</option><option value="testing">Testing</option><option value="iterate">Keep testing</option><option value="winner">Double down</option><option value="retired">Retired</option></select></label><label><span>Category</span><input value={script.category} onChange={(event)=>updateScript((current)=>({...current,category:event.target.value}))}/></label><label><span>Format</span><input value={script.format} onChange={(event)=>updateScript((current)=>({...current,format:event.target.value}))}/></label><label><span>Priority</span><select value={script.priority} onChange={(event)=>updateScript((current)=>({...current,priority:event.target.value as StudioScript["priority"]}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label></div></div><div className="adaptation-note"><WandSparkles /><p><strong>Adapted for {brand.name}</strong><span>Source structure is preserved. Product language and claims come from the active brand context.</span></p><button onClick={() => notify("Hook, tension, reveal, and CTA structure preserved")}>View mapping</button></div></div><div className="script-sections">{script.sections.map((section,index) => <article className="script-section" key={section.id}><div className="section-label"><span>{String(index+1).padStart(2,"0")}</span><input value={section.label} onChange={(event)=>updateSection(section.id,"label",event.target.value)}/><small>{section.timecode}</small></div><div className="section-copy"><input className="delivery-input" value={section.delivery} onChange={(event)=>updateSection(section.id,"delivery",event.target.value)} aria-label={`${section.label} delivery`}/><textarea rows={Math.max(2,Math.ceil(section.copy.length/68))} value={section.copy} onChange={(event)=>updateSection(section.id,"copy",event.target.value)} aria-label={`${section.label} copy`}/><div className="visual-direction"><ImageDown /><input value={section.visualDirection} onChange={(event)=>updateSection(section.id,"visualDirection",event.target.value)} aria-label={`${section.label} visual direction`}/><button onClick={()=>downloadVisual(section.visualDirection)}>Get visual</button></div></div></article>)}{canManage?<button className="add-script-section" onClick={()=>updateScript((current)=>({...current,sections:[...current.sections,{id:crypto.randomUUID(),label:"New beat",timecode:"",delivery:"Direct to camera",copy:"Write the next beat…",visualDirection:"Add a clear visual direction.",assetIds:[]}]}))}><Plus /> Add section</button>:null}</div></main>
-      <aside className="writer-context"><div className="context-tabs"><button className={sideTab==="brief"?"active":""} onClick={()=>setSideTab("brief")}>Brief</button><button className={sideTab==="assets"?"active":""} onClick={()=>setSideTab("assets")}>Assets</button><button className={sideTab==="notes"?"active":""} onClick={()=>setSideTab("notes")}>Notes <span>2</span></button></div>{sideTab==="brief"?<BrandBrief brand={brand}/>:sideTab==="assets"?<VisualAssets onDownload={downloadVisual}/>:<StudioNotes/>}</aside>
-    </div>
+    <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
+    <main className="simple-script-writer">
+      <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
+      <div className="simple-script-toolbar">
+        <StatusLabel status={script.status}/>
+        <label>Stage<select value={script.pipelineStage} onChange={(event)=>updateScript((current)=>({...current,pipelineStage:event.target.value as StudioScript["pipelineStage"]}))}><option value="not_started">Not started</option><option value="testing">Testing</option><option value="iterate">Keep testing</option><option value="winner">Double down</option><option value="retired">Retired</option></select></label>
+        <label>Platform<select value={script.targetPlatform} onChange={(event)=>updateScript((current)=>({...current,targetPlatform:event.target.value}))}><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
+        <label>Priority<select value={script.priority} onChange={(event)=>updateScript((current)=>({...current,priority:event.target.value as StudioScript["priority"]}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+        <span>{wordCount} words · {script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</span>
+      </div>
+      <textarea className="simple-script-body" aria-label="Script" spellCheck value={scriptText} onChange={(event)=>updateBody(event.target.value)} placeholder="Write the script here…"/>
+      {script.reference?.sourceUrl ? <a className="simple-script-reference" href={script.reference.sourceUrl} target="_blank" rel="noreferrer"><Link2/>Reference{script.reference.sourceCreator ? ` · ${script.reference.sourceCreator}` : ""}<ExternalLink/></a> : null}
+    </main>
   </div>;
 }
 
-function BrandBrief({ brand }:{ brand:ScriptStudioData["brand"] }) { return <div className="brand-brief"><div className="context-section-head"><h3>Brand context</h3><span>ACTIVE</span></div><div className="brand-identity"><strong className="font-result">RESULT</strong><span>{brand.productDescription}</span></div><dl><div><dt>Audience</dt><dd>{brand.audience}</dd></div><div><dt>Voice</dt><dd className="tag-list">{brand.voice.map((item)=><span key={item}>{item}</span>)}</dd></div><div><dt>Never say</dt><dd>{brand.bannedPhrases.map((phrase)=>`“${phrase}”`).join(", ")}</dd></div><div><dt>Approved proof</dt><dd>{brand.proofPoints[0]}</dd></div></dl><div className="production-checklist"><div className="context-section-head"><h3>Production checklist</h3><span>2/5</span></div>{["Film in natural daylight","Show product before 10 sec","Add a screen recording","Burn in captions","Export 9:16 · 1080p"].map((item,index)=><label key={item}><input type="checkbox" defaultChecked={index<2}/><span>{item}</span></label>)}</div><div className="context-tip"><Sparkles /><p><strong>Make direction filmable</strong><span>Specific visuals make creator output more consistent.</span></p></div></div>; }
-
-function VisualAssets({ onDownload }:{ onDownload:(label:string)=>void }) { return <div className="visual-assets"><div className="context-section-head"><h3>Script visuals</h3><span>{previewVisuals.length}</span></div>{previewVisuals.map((visual)=><article key={visual.id}><div className={`visual-mini ${visual.className}`}><span>{visual.number}</span><strong>{visual.label}</strong></div><div><strong>{visual.label.toLowerCase().replaceAll(" "," ")}</strong><span>{visual.note}</span></div><button onClick={()=>onDownload(visual.label)} aria-label={`Download ${visual.label}`}><Download /></button></article>)}</div>; }
-
-function StudioNotes() { return <div className="studio-notes studio-notes-empty"><MessageSquareText /><strong>No internal notes yet</strong><p>Script-specific comments will appear here once the review workflow is connected.</p></div>; }
-
-function ReferenceDialog({ open, setOpen, onCreate }:{ open:boolean; setOpen:(open:boolean)=>void; onCreate:(input:{url:string;creator:string;transcript:string})=>void }) {
-  const [mode,setMode]=useState<ImportMode>("full"); const [url,setUrl]=useState(""); const [creator,setCreator]=useState(""); const [transcript,setTranscript]=useState(blankTranscript); const [parts,setParts]=useState({Hook:"",Problem:"",Solution:"",Proof:"",CTA:""});
-  const combined = mode === "full" ? transcript : Object.entries(parts).filter(([,value])=>value.trim()).map(([label,value])=>`${label}: ${value.trim()}`).join(" ");
-  const platform = referencePlatformFromUrl(url);
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="reference-dialog sm:max-w-2xl"><DialogHeader><span className="dialog-kicker"><Link2 /> REFERENCE INTAKE</span><DialogTitle>Turn a proven video into a Result script</DialogTitle><DialogDescription>Paste the transcript to preserve its creative structure, then replace the company, claims, and language with the active Result brand context.</DialogDescription></DialogHeader><div className="reference-form"><div className="form-pair"><label><span>Social video URL · optional</span><div><Link2/><input value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="Instagram, TikTok, or YouTube URL"/></div></label><label><span>Source creator</span><input value={creator} onChange={(event)=>setCreator(event.target.value)} placeholder="@creator"/></label></div>{url.trim()?<p className="reference-platform-detected">Detected platform: <strong>{platform}</strong></p>:null}<div className="intake-mode"><button className={mode==="full"?"active":""} onClick={()=>setMode("full")}>Paste full transcript</button><button className={mode==="sections"?"active":""} onClick={()=>setMode("sections")}>Paste by section</button></div>{mode==="full"?<label className="transcript-field"><span>Transcript</span><textarea rows={8} value={transcript} onChange={(event)=>setTranscript(event.target.value)} placeholder="Paste the spoken transcript here…"/><small>Result detects the hook, problem, solution, proof, and CTA. URL-only transcription is not enabled yet, so the transcript is required.</small></label>:<div className="section-intake">{Object.keys(parts).map((label)=><label key={label}><span>{label}</span><textarea rows={2} value={parts[label as keyof typeof parts]} onChange={(event)=>setParts({...parts,[label]:event.target.value})} placeholder={`Paste the ${label.toLowerCase()}…`}/></label>)}</div>}</div><DialogFooter className="reference-dialog-footer"><span><Sparkles/> Uses the active Result brand profile</span><Button className="studio-primary" disabled={!combined.trim()} onClick={()=>onCreate({url,creator,transcript:combined})}>Build script <ArrowUpRight /></Button></DialogFooter></DialogContent></Dialog>;
+function NewScriptDialog({ open, setOpen, onCreate }:{ open:boolean; setOpen:(open:boolean)=>void; onCreate:(input:{title:string;body:string;url:string;creator:string})=>void }) {
+  const [title,setTitle]=useState("");
+  const [body,setBody]=useState("");
+  const [url,setUrl]=useState("");
+  const [creator,setCreator]=useState("");
+  const create = () => {
+    onCreate({title,body,url,creator});
+    setTitle("");
+    setBody("");
+    setUrl("");
+    setCreator("");
+  };
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="reference-dialog new-script-dialog sm:max-w-2xl"><DialogHeader><DialogTitle>New script</DialogTitle></DialogHeader><div className="new-script-form"><input value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Title" autoFocus/><textarea rows={12} value={body} onChange={(event)=>setBody(event.target.value)} placeholder="Write the script…"/><div><input value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="Reference URL · optional"/><input value={creator} onChange={(event)=>setCreator(event.target.value)} placeholder="Source creator · optional"/></div></div><DialogFooter className="reference-dialog-footer"><Button className="studio-primary" disabled={!title.trim()||!body.trim()} onClick={create}>Create draft</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function AssignDialog({ open,setOpen,script,creators,assigning,onAssign }:{ open:boolean;setOpen:(open:boolean)=>void;script:StudioScript|null;creators:StudioCreator[];assigning:boolean;onAssign:(ids:string[],dueAt:string,message:string)=>void }) {
-  const [selected,setSelected]=useState<string[]>(() => script?.assignments.map((assignment) => assignment.creatorId) ?? []); const [search,setSearch]=useState(""); const [dueAt,setDueAt]=useState(""); const [message,setMessage]=useState("Here is your next script. Visual directions and references are attached—leave questions directly on the brief.");
+  const [selected,setSelected]=useState<string[]>(() => script?.assignments.map((assignment) => assignment.creatorId) ?? []); const [search,setSearch]=useState(""); const [dueAt,setDueAt]=useState(""); const [message,setMessage]=useState("Here’s your script. Let me know if you have any questions.");
   const visibleCreators = creators.filter((creator) => `${creator.name} ${creator.username ?? ""}`.toLowerCase().includes(search.trim().toLowerCase()));
   const toggle=(id:string)=>setSelected((current)=>current.includes(id)?current.filter((item)=>item!==id):[...current,id]);
   return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="assign-dialog sm:max-w-xl"><DialogHeader><span className="dialog-kicker"><UserRoundCheck /> CREATOR HANDOFF</span><DialogTitle>Assign and send</DialogTitle><DialogDescription>{script?.title ?? "Choose who should film this script."}</DialogDescription></DialogHeader><label className="creator-picker-search"><Search /><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Search creators or Discord usernames…" /></label><div className="creator-picker">{visibleCreators.length?visibleCreators.map((creator)=><button key={creator.id} className={selected.includes(creator.id)?"selected":""} onClick={()=>toggle(creator.id)}><Avatar><AvatarImage src={creator.avatarUrl ?? undefined} alt=""/><AvatarFallback>{initials(creator.name)}</AvatarFallback></Avatar><div><strong>{creator.name}</strong><span>{creator.username?`@${creator.username}`:"No Discord connected"} · {creator.activeAssignments} active</span></div><i>{selected.includes(creator.id)?<Check/>:null}</i></button>):<p className="creator-picker-empty">No creators match that search.</p>}</div><div className="assignment-fields"><label><span>Due date</span><input type="date" value={dueAt} onChange={(event)=>setDueAt(event.target.value)}/></label><label><span>Delivery</span><select defaultValue="creator-link"><option value="creator-link">Creator link</option><option value="copy">Copyable brief</option><option value="discord" disabled>Discord · coming next</option></select></label></div><label className="assignment-message"><span>Message to creator</span><textarea rows={3} value={message} onChange={(event)=>setMessage(event.target.value)}/></label><DialogFooter className="assign-dialog-footer"><span>{selected.length} creator{selected.length===1?"":"s"} selected</span><Button className="studio-primary" disabled={!selected.length || assigning} onClick={()=>onAssign(selected,dueAt,message)}>{assigning?<Clock3/>:<Send />}{assigning?"Creating…":"Create assignment"}</Button></DialogFooter></DialogContent></Dialog>;
@@ -280,5 +289,4 @@ function initials(name:string):string { return name.split(" ").filter(Boolean).s
 function isUuid(value:string):boolean { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value); }
 function timeAgo(value:string):string { const minutes=Math.floor((Date.now()-new Date(value).getTime())/60_000); if(minutes<1)return"Just now"; if(minutes<60)return`${minutes}m ago`; const hours=Math.floor(minutes/60); if(hours<24)return`${hours}h ago`; return`${Math.floor(hours/24)}d ago`; }
 function compactNumber(value:number):string { return new Intl.NumberFormat("en",{notation:value>=10_000?"compact":"standard",maximumFractionDigits:1}).format(value); }
-function shortReferenceHook(transcript:string):string { const first=transcript.match(/[^.!?]+[.!?]?/)?.[0]?.trim()||"Saved reference"; return first.length>58?`${first.slice(0,55).trim()}…`:first; }
-function downloadReferenceFrame(label:string) { const canvas=document.createElement("canvas"); canvas.width=1080; canvas.height=1350; const context=canvas.getContext("2d"); if(!context)return; context.fillStyle="#101010"; context.fillRect(0,0,1080,1350); context.fillStyle="#85ed75"; context.fillRect(70,70,16,1210); context.fillStyle="#ffffff"; context.font="600 80px Arial"; const words=label.toUpperCase().split(" "); let line=""; let y=300; for(const word of words){const test=`${line}${word} `;if(context.measureText(test).width>820){context.fillText(line,140,y);line=`${word} `;y+=100}else line=test} context.fillText(line,140,y); context.fillStyle="#858585"; context.font="30px Arial"; context.fillText("RESULT · CREATOR REFERENCE FRAME",140,1130); context.fillStyle="#85ed75"; context.fillRect(140,1190,310,7); const anchor=document.createElement("a"); anchor.download=`${label.toLowerCase().replaceAll(" ","-")}.png`; anchor.href=canvas.toDataURL("image/png"); anchor.click(); }
+function plainScriptSection(copy:string,id?:string) { return { id:id??crypto.randomUUID(),label:"Script",timecode:"",delivery:"",copy,visualDirection:"",assetIds:[] as string[] }; }

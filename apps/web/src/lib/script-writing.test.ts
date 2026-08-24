@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adaptReferenceForResult, estimateScriptDuration, formatScriptForClipboard, segmentTranscript } from "./script-writing";
+import { adaptReferenceForResult, estimateScriptDuration, formatScriptForClipboard, scriptHookFromSections, scriptHookFromText, segmentTranscript } from "./script-writing";
 
 describe("script writing helpers", () => {
   it("segments a pasted transcript into timed creative beats", () => {
@@ -21,5 +21,11 @@ describe("script writing helpers", () => {
     const sections = adaptReferenceForResult("This is the hook. This is the problem.");
     expect(estimateScriptDuration(sections)).toBeGreaterThan(10);
     expect(formatScriptForClipboard("Test script", sections)).toContain("VISUAL:");
+  });
+
+  it("uses the first written line as the script preview hook", () => {
+    expect(scriptHookFromText("\n  First line.\nSecond line.")).toBe("First line.");
+    expect(scriptHookFromSections([{ copy: "\nOpening hook\nBody copy" }])).toBe("Opening hook");
+    expect(scriptHookFromText("   ")).toBeNull();
   });
 });
