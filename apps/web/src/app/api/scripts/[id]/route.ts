@@ -2,7 +2,7 @@ import { activityEvents, scripts, scriptVersions } from "@result/db";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
-import { estimateScriptDuration } from "@/lib/script-writing";
+import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
 import { invalidatePortalData } from "@/lib/portal-cache";
 
 const sectionSchema = z.object({ id:z.string().min(1).max(80), label:z.string().min(1).max(80), timecode:z.string().max(40), delivery:z.string().max(200), copy:z.string().min(1).max(10_000), visualDirection:z.string().max(2_000), assetIds:z.array(z.string()).max(40) });
@@ -39,7 +39,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         tags: parsed.data.tags,
         targetPlatform: parsed.data.targetPlatform,
         durationSeconds: estimateScriptDuration(parsed.data.sections),
-        hook: parsed.data.sections[0]?.copy ?? null,
+        hook: scriptHookFromSections(parsed.data.sections),
         sections: parsed.data.sections,
         latestVersion: nextVersion,
         updatedByUserId: context.internalUser?.id ?? null,
