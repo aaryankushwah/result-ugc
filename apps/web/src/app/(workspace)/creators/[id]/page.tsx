@@ -1,4 +1,4 @@
-import { ArrowLeft, Database, ExternalLink, Hash, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Database, ExternalLink, Hash, Link2, MessageSquareText, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { VideoTable } from "@/components/data-tables";
@@ -10,12 +10,14 @@ import type { PortalCreator } from "@/lib/portal-types";
 
 const tabs = [
   { id: "accounts", label: "Accounts" },
+  { id: "attribution", label: "Attribution" },
   { id: "details", label: "Details" },
   { id: "activity", label: "Activity" },
 ] as const;
 
 function normalizeTab(tab?: string) {
   if (tab === "activity") return "activity";
+  if (tab === "attribution") return "attribution";
   if (tab === "details" || tab === "relationships") return "details";
   return "accounts";
 }
@@ -72,6 +74,7 @@ export default async function CreatorProfilePage({
   const tab = normalizeTab(query.tab);
   const videos = data.videos.filter((video) => creator.accounts.some((account) => account.id === video.accountId));
   const creatorActivities = data.activities.filter((event) => event.creatorId === creator.id);
+  const attributionLink = data.attribution.links.find((link) => link.creatorId === creator.id);
   const confirmedAccounts = creator.accounts.filter((account) => account.linkState === "confirmed").length;
   const discordCandidates: DiscordConnectionCandidate[] = data.creators.filter((candidate) => candidate.id !== creator.id && candidate.discord.userId && !candidate.accounts.length && !candidate.relationships.length && !candidate.notes.length).map((candidate) => ({ creatorId: candidate.id, userId: candidate.discord.userId!, username: candidate.discord.username, displayName: candidate.discord.displayName ?? candidate.displayName, state: candidate.discord.state }));
 
@@ -141,6 +144,28 @@ export default async function CreatorProfilePage({
             <VideoTable videos={videos} />
           </section>
         </div>
+      ) : null}
+
+      {tab === "attribution" ? (
+        attributionLink ? (
+          <div className="page-stack creator-attribution-tab">
+            <section className="overview-metric-grid attribution-metrics">
+              {[
+                ["Clicks", formatNumber(attributionLink.clicks)],
+                ["Leads", formatNumber(attributionLink.leads)],
+                ["Conversions", formatNumber(attributionLink.conversions)],
+                ["Sales", formatNumber(attributionLink.sales)],
+                ["Revenue", new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(attributionLink.saleAmount / 100)],
+              ].map(([label, value]) => <article className="metric-card overview-metric-card" key={label}><div className="overview-metric-copy"><p>{label}</p><strong>{value}</strong></div></article>)}
+            </section>
+            <section className="panel creator-attribution-link">
+              <div><Link2 /><span><small>Dub link</small><strong>{attributionLink.shortLink}</strong></span></div>
+              <a href={attributionLink.shortLink} target="_blank" rel="noreferrer">Open link <ExternalLink /></a>
+            </section>
+          </div>
+        ) : (
+          <div className="empty-state creator-account-empty"><Link2 /><strong>No Dub link allocated yet.</strong><p>The bot provisions one automatically after Dub is configured and this creator has an active Discord identity.</p></div>
+        )
       ) : null}
 
       {tab === "details" ? (

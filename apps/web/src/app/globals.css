@@ -1378,6 +1378,35 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light .back-link { color: #626b76; }
 .light .profile-tabs a.active { color: #17191d; }
 
+.source-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted-foreground); font-size: 13px; font-weight: 600; }
+.source-status i { width: 8px; height: 8px; background: #777; }
+.source-status i[data-state="fresh"] { background: var(--success); }
+.source-status i[data-state="stale"], .source-status i[data-state="failed"] { background: var(--alert); }
+.attribution-metrics .overview-metric-card { min-width: 184px; }
+.attribution-chart-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); gap: 14px; }
+.attribution-chart-panel { min-width: 0; overflow: hidden; }
+.attribution-chart-panel .panel-header { min-height: 52px; }
+.attribution-chart-canvas { height: 330px; }
+.attribution-empty { min-height: 220px; padding: 32px; display: flex; align-items: center; justify-content: center; gap: 18px; text-align: left; }
+.attribution-empty > svg { width: 36px; height: 36px; color: var(--muted-foreground); }
+.attribution-empty h2, .attribution-empty p { margin: 0; }
+.attribution-empty p { margin-top: 5px; color: var(--muted-foreground); }
+.attribution-table-panel { overflow: hidden; }
+.attribution-table-wrap { overflow-x: auto; }
+.attribution-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.attribution-table th, .attribution-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.attribution-table th:first-child, .attribution-table td:first-child, .attribution-table th:nth-child(2), .attribution-table td:nth-child(2) { text-align: left; }
+.attribution-table tbody tr:last-child td { border-bottom: 0; }
+.attribution-table tbody tr:hover { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+.attribution-table a { display: inline-flex; align-items: center; gap: 5px; color: inherit; }
+.attribution-table a svg { width: 13px; height: 13px; }
+.creator-attribution-link { padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.creator-attribution-link > div, .creator-attribution-link > div > span, .creator-attribution-link > a { display: flex; align-items: center; gap: 10px; }
+.creator-attribution-link > div > span { align-items: flex-start; flex-direction: column; gap: 3px; }
+.creator-attribution-link small { color: var(--muted-foreground); }
+.creator-attribution-link a svg { width: 15px; }
+@media (max-width: 1050px) { .attribution-chart-grid { grid-template-columns: 1fr; } }
+
 .overview-stats-button { gap: 7px; }
 .overview-stats-button > span { min-width: 20px; padding: 1px 5px; border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); font-size: 11px; line-height: 18px; }
 .overview-metric-grid { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--border); background: var(--border); scrollbar-width: thin; }

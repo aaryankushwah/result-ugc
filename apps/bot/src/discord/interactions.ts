@@ -29,6 +29,7 @@ import { createCreatorChannel, findCreatorChannel, setupGuild, setupSummary } fr
 import { discordChannelNameMatches } from "./channel-names.js";
 import { archiveCreatorChannel } from "./platform-sync.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
+import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
 import { launchpointGet } from "../integrations/launchpoint.js";
 import { runReminderSweep } from "./reminders.js";
 import { CALL_TIMEZONES, type CallTimezone, currentMondayUtc, dateLabel, formatSlot, generateCallSlots, nextMondayUtc, validDate } from "./calls.js";
@@ -541,14 +542,17 @@ async function issueCreatorLink(interaction: ChatInputCommandInteraction): Promi
     return;
   }
   try {
+    const resultCreator = await resolveDubCreator(interaction.guild.id, creator.id);
+    const attributionCreatorId = resultCreator?.creatorId ?? creator.id;
     const link = await issueDubLink({
-      creatorId: creator.id,
-      creatorName: creator.username,
+      creatorId: attributionCreatorId,
+      creatorName: resultCreator?.creatorName ?? creator.username,
       destinationUrl,
       campaign,
       ...(partnerId ? { partnerId } : {}),
       ...(key ? { key } : {}),
     });
+    if (resultCreator) await persistDubLinkSnapshot({ organizationId: resultCreator.organizationId, creatorId: resultCreator.creatorId, snapshot: link });
     await updateGuildState(interaction.guild.id, (state) => {
       state.creatorLinks.unshift({
         id: link.id,

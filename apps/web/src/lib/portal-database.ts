@@ -2,6 +2,8 @@ import "server-only";
 
 import {
   activityEvents,
+  attributionDailySnapshots,
+  creatorAttributionLinks,
   creatorDiscord,
   creatorNotes,
   creators,
@@ -14,7 +16,7 @@ import {
   videos as videoTable,
 } from "@result/db";
 import { desc, eq } from "drizzle-orm";
-import type { PortalAccount, PortalActivity, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
+import type { PortalAccount, PortalActivity, PortalAttributionPoint, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
 import { buildPerformance } from "./performance";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
@@ -47,7 +49,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const organization = (await db.select().from(organizations).where(eq(organizations.slug, "result")).limit(1))[0];
   if (!organization) return null;
 
-  const [creatorRows, discordRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows] = await Promise.all([
+  const [creatorRows, discordRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows, attributionLinkRows, attributionSnapshotRows] = await Promise.all([
     db.select().from(creators).where(eq(creators.organizationId, organization.id)),
     db.select().from(creatorDiscord).where(eq(creatorDiscord.organizationId, organization.id)),
     db.select().from(signingRelationships).where(eq(signingRelationships.organizationId, organization.id)),
@@ -57,6 +59,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     db.select().from(creatorNotes).where(eq(creatorNotes.organizationId, organization.id)).orderBy(desc(creatorNotes.createdAt)),
     db.select().from(activityEvents).where(eq(activityEvents.organizationId, organization.id)).orderBy(desc(activityEvents.occurredAt)).limit(250),
     db.select().from(syncRuns).where(eq(syncRuns.organizationId, organization.id)).orderBy(desc(syncRuns.startedAt)).limit(250),
+    db.select().from(creatorAttributionLinks).where(eq(creatorAttributionLinks.organizationId, organization.id)),
+    db.select().from(attributionDailySnapshots).where(eq(attributionDailySnapshots.organizationId, organization.id)).orderBy(attributionDailySnapshots.bucketAt),
   ]);
 
   const accounts: PortalAccount[] = accountRows.map((account) => {
@@ -215,7 +219,36 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     occurredAt: event.occurredAt.toISOString(),
   }));
 
-  const freshnessFor = (source: "viral" | "discord" | "launchpoint", staleAfter: number): PortalData["freshness"][number] => {
+  const attributionLinks = attributionLinkRows.map((link) => ({
+    id: link.id,
+    creatorId: link.creatorId,
+    creatorName: creatorById.get(link.creatorId)?.displayName ?? "Unknown creator",
+    shortLink: link.shortLink,
+    destinationUrl: link.destinationUrl,
+    state: link.state,
+    clicks: link.clicks,
+    leads: link.leads,
+    conversions: link.conversions,
+    sales: link.sales,
+    saleAmount: link.saleAmount,
+    lastClickedAt: link.lastClickedAt?.toISOString() ?? null,
+    refreshedAt: link.sourceRefreshedAt?.toISOString() ?? null,
+    error: link.lastError,
+  }));
+  const attributionByDate = new Map<string, PortalAttributionPoint>();
+  for (const snapshot of attributionSnapshotRows) {
+    const date = snapshot.bucketAt.toISOString().slice(0, 10);
+    const point = attributionByDate.get(date) ?? { date, clicks: 0, leads: 0, conversions: 0, sales: 0, revenue: 0 };
+    point.clicks += snapshot.clicks;
+    point.leads += snapshot.leads;
+    point.conversions += snapshot.conversions;
+    point.sales += snapshot.sales;
+    point.revenue += snapshot.saleAmount / 100;
+    attributionByDate.set(date, point);
+  }
+  const attribution = { links: attributionLinks, series: [...attributionByDate.values()] };
+
+  const freshnessFor = (source: "viral" | "discord" | "launchpoint" | "dub", staleAfter: number): PortalData["freshness"][number] => {
     const runs = runRows.filter((run) => run.source === source);
     const latestAttempt = runs[0];
     const latestSuccess = runs.find((run) => run.state === "succeeded");
@@ -229,6 +262,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     freshnessFor("viral", VIRAL_STALE_AFTER_MS),
     freshnessFor("discord", PROVIDER_STALE_AFTER_MS),
     freshnessFor("launchpoint", PROVIDER_STALE_AFTER_MS),
+    freshnessFor("dub", PROVIDER_STALE_AFTER_MS),
     { source: "sideshift", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "Manual verification only" },
   ];
   const latestRunBySource = new Map<string, (typeof runRows)[number]>();
@@ -242,6 +276,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     videos,
     activities,
     performance: buildPerformance(videos),
+    attribution,
     freshness,
     providerErrors: latestFailedBySource,
     sourceMode: "database",

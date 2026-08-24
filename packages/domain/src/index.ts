@@ -76,7 +76,7 @@ export interface SigningProviderAdapter {
 }
 
 export type Freshness = {
-  source: "result" | "discord" | "launchpoint" | "viral" | "sideshift";
+  source: "result" | "discord" | "launchpoint" | "viral" | "sideshift" | "dub";
   lastSuccessAt: string | null;
   lastAttemptAt: string | null;
   state: "fresh" | "stale" | "failed" | "not_configured";

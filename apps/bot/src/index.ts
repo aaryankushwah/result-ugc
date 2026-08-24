@@ -4,6 +4,7 @@ import { handleInteraction, launchpointCreatorDirectory } from "./discord/intera
 import { runReminderSweep } from "./discord/reminders.js";
 import { syncLaunchpointApprovedContent } from "./discord/launchpoint-sync.js";
 import { syncLaunchpointRelationships } from "./discord/provider-sync.js";
+import { startDubAttributionSchedule } from "./discord/dub-sync.js";
 import { startViralSnapshotSchedule } from "./integrations/viral-snapshot.js";
 
 const env = loadEnv();
@@ -18,6 +19,7 @@ client.once(Events.ClientReady, (readyClient) => {
   void launchpointCreatorDirectory().catch((error) => console.error("Launchpoint creator directory preload failed", error));
   void syncLaunchpointRelationships(readyClient).catch((error) => console.error("Launchpoint relationship sync failed", error));
   startViralSnapshotSchedule((error) => console.error("Viral snapshot sync failed", error));
+  startDubAttributionSchedule(readyClient, (error) => console.error("Dub attribution sync failed", error));
   for (const guild of readyClient.guilds.cache.values()) {
     void reconcileGuild(guild).catch((error) => console.error(`Discord reconciliation failed for ${guild.id}`, error));
   }
