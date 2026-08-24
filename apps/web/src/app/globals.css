@@ -1299,6 +1299,27 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light .back-link { color: #626b76; }
 .light .profile-tabs a.active { color: #17191d; }
 
+.overview-stats-button { gap: 7px; }
+.overview-stats-button > span { min-width: 20px; padding: 1px 5px; border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); font-size: 11px; line-height: 18px; }
+.overview-metric-grid { grid-template-columns: repeat(6,minmax(150px,1fr)); gap: 8px; }
+.overview-metric-card.metric-card { min-height: 72px; padding: 10px 12px; display: grid; grid-template-columns: 30px minmax(0,1fr) auto; align-items: center; gap: 10px; }
+.overview-metric-card .metric-icon { width: 30px; height: 30px; }
+.overview-metric-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.overview-metric-card.metric-card p { overflow: hidden; font-size: 13px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.overview-metric-card.metric-card span { overflow: hidden; margin: 0; font-size: 10px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.overview-metric-card.metric-card > strong { margin: 0; font-size: 23px; line-height: 1; letter-spacing: -.04em; }
+
+@media (max-width: 1500px) {
+  .overview-metric-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+
+@media (max-width: 780px) {
+  .overview-metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .overview-metric-card.metric-card { grid-template-columns: 28px minmax(0,1fr); }
+  .overview-metric-card.metric-card > strong { grid-column: 2; grid-row: 1; justify-self: end; }
+  .overview-metric-copy { grid-column: 2; }
+}
+
 /* Keep dense manager screens legible at a glance in both themes. */
 body { font-weight: 500; }
 .breadcrumb strong,

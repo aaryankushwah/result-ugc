@@ -1,5 +1,6 @@
-import { AlertTriangle, ArrowUpRight, CircleUserRound, Eye, FileVideo2, Link2, MessageCircleMore, Radio, UsersRound } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, FileVideo2, Link2, Radio } from "lucide-react";
 import Link from "next/link";
+import { OverviewMetricGrid, OverviewMetricPicker, type OverviewMetric } from "@/components/overview-metrics";
 import { PerformanceChart } from "@/components/performance-chart";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,6 +20,10 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     accounts: data.accounts.length,
     videos: includedVideos.length,
     views: includedVideos.reduce((sum, video) => sum + video.views, 0),
+    likes: includedVideos.reduce((sum, video) => sum + video.likes, 0),
+    comments: includedVideos.reduce((sum, video) => sum + video.comments, 0),
+    shares: includedVideos.reduce((sum, video) => sum + video.shares, 0),
+    bookmarks: includedVideos.reduce((sum, video) => sum + video.bookmarks, 0),
     engagement: includedVideos.reduce((sum, video) => sum + video.likes + video.comments + video.shares + video.bookmarks, 0) / Math.max(1, includedVideos.reduce((sum, video) => sum + video.views, 0)),
   };
   const attention = data.creators.filter((creator) => creator.attentionState || creator.discord.state !== "connected" || creator.relationships.length === 0).length;
@@ -28,23 +33,29 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { label: "No signing relationship", count: data.creators.filter((creator) => creator.relationships.length === 0).length, href: "/creators?provider=unlinked", tone: "neutral" as const },
     { label: "Tracking stale or failed", count: data.accounts.filter((account) => account.trackingState === "stale" || account.trackingState === "failed").length, href: "/accounts?health=stale", tone: "neutral" as const },
   ];
-  const metricCards = [
-    { label: "Active creators", value: totals.active, helper: `${totals.applicants} requests`, icon: UsersRound },
-    { label: "Tracked accounts", value: totals.accounts, helper: "live from Viral", icon: CircleUserRound },
-    { label: "Posted videos", value: totals.videos, helper: "included in totals", icon: FileVideo2 },
-    { label: "Views", value: totals.views, helper: `${range}-day selection`, icon: Eye },
-    { label: "Engagement", value: formatPercent(totals.engagement), helper: "all interactions / views", icon: MessageCircleMore },
-    { label: "Needs attention", value: attention, helper: "open exceptions", icon: AlertTriangle, attention: true },
+  const metricCards: OverviewMetric[] = [
+    { id: "active", label: "Active creators", value: formatNumber(totals.active), helper: "Result roster", icon: "creators" },
+    { id: "applicants", label: "Applicants", value: formatNumber(totals.applicants), helper: "Awaiting review", icon: "applicants" },
+    { id: "accounts", label: "Tracked accounts", value: formatNumber(totals.accounts), helper: "Live from Viral", icon: "accounts" },
+    { id: "videos", label: "Posted videos", value: formatNumber(totals.videos), helper: "Included in totals", icon: "video" },
+    { id: "views", label: "Views", value: formatNumber(totals.views), helper: `${range}-day selection`, icon: "eye" },
+    { id: "averageViews", label: "Average views", value: formatNumber(totals.views / Math.max(1, totals.videos)), helper: "Per included video", icon: "gauge" },
+    { id: "likes", label: "Likes", value: formatNumber(totals.likes), helper: "Included videos", icon: "heart" },
+    { id: "comments", label: "Comments", value: formatNumber(totals.comments), helper: "Included videos", icon: "comments" },
+    { id: "shares", label: "Shares", value: formatNumber(totals.shares), helper: "Included videos", icon: "share" },
+    { id: "bookmarks", label: "Bookmarks", value: formatNumber(totals.bookmarks), helper: "Included videos", icon: "bookmark" },
+    { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), helper: "Interactions / views", icon: "activity" },
+    { id: "attention", label: "Needs attention", value: formatNumber(attention), helper: "Open exceptions", icon: "alert", attention: true },
   ];
   const topAccounts = [...data.accounts].sort((a, b) => b.views - a.views).slice(0, 5);
   const topVideos = [...includedVideos].sort((a, b) => b.views - a.views).slice(0, 5);
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
-    <PageTitle eyebrow="MANAGER COMMAND CENTER" title="Result" titleClassName="font-result result-ugc-title" description="The operating picture across creators, Discord, signing providers, accounts, and performance." actions={<Button variant="outline"><Link2 /> Copy this view</Button>} />
+    <PageTitle eyebrow="MANAGER COMMAND CENTER" title="Result" titleClassName="font-result result-ugc-title" description="The operating picture across creators, Discord, signing providers, accounts, and performance." actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
     {data.sourceMode === "live_provider" ? <div className="source-banner"><Radio /><div><strong>Live Viral data is connected.</strong><span>Creator candidates need confirmation after the shared database is connected; they are not silently treated as signed creators.</span></div><Link href="/integrations">Review setup <ArrowUpRight /></Link></div> : null}
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
-    <section className="metric-grid">{metricCards.map((metric) => <Card className={`metric-card ${metric.attention ? "metric-attention" : ""}`} key={metric.label}><div className="metric-icon"><metric.icon /></div><div><p>{metric.label}</p><strong>{typeof metric.value === "number" ? formatNumber(metric.value) : metric.value}</strong><span>{metric.helper}</span></div></Card>)}</section>
+    <OverviewMetricGrid metrics={metricCards} />
     <section className="dashboard-grid dashboard-main-grid">
       <Card className="panel chart-panel"><div className="panel-header"><div><h2>Performance</h2><p>Dithered included-video views by publish date</p></div><div className="range-tabs">{[7, 14, 30].map((days) => <Link key={days} href={`/overview?range=${days}`} className={range === days ? "active" : ""}>{days}d</Link>)}</div></div><PerformanceChart data={performance} /><div className="chart-legend"><span><i className="legend-views" />Views</span></div></Card>
       <article className="panel exceptions-panel"><div className="panel-header"><div><h2>Exceptions</h2><p>Work that needs a manager</p></div><StateBadge label={`${exceptions.reduce((sum, item) => sum + item.count, 0)} open`} tone="attention" /></div><div className="exception-list">{exceptions.map((item) => <Link key={item.label} href={item.href}><span className={`exception-count ${item.tone}`}>{item.count}</span><strong>{item.label}</strong><ArrowUpRight /></Link>)}</div></article>
