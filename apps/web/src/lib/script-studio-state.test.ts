@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPersistedCreatorId, mergeScriptAssignments, referencePlatformFromUrl } from "./script-studio-state";
+import { isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl } from "./script-studio-state";
 
 describe("script studio state", () => {
   it("keeps existing creator assignments when another creator is added", () => {
@@ -24,5 +24,14 @@ describe("script studio state", () => {
   it("keeps preview and unmatched social candidates out of assignment targets", () => {
     expect(isPersistedCreatorId("afbb8360-0b8c-4b04-95e8-d6533191b6ac")).toBe(true);
     expect(isPersistedCreatorId("viral-orgacc_123")).toBe(false);
+  });
+
+  it("separates reference videos from editing resources", () => {
+    const assets = [
+      { id: "ref", label: "Winning hook", kind: "reference_video", sourceUrl: "https://example.com/ref", downloadUrl: null },
+      { id: "audio", label: "Voiceover", kind: "audio", sourceUrl: "https://example.com/audio", downloadUrl: null },
+      { id: "image", label: "Product shot", kind: "image", sourceUrl: "https://example.com/image", downloadUrl: null },
+    ];
+    expect(partitionScriptAssets(assets)).toEqual({ references: [assets[0]], resources: [assets[1], assets[2]] });
   });
 });
