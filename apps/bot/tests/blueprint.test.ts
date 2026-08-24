@@ -71,6 +71,7 @@ describe("UGC server blueprint", () => {
       "health",
       "creator-progress",
       "help",
+      "scripts",
       "setup",
     ]);
     expect(names.some((name) => name.startsWith("edit") || name.startsWith("fomo"))).toBe(false);

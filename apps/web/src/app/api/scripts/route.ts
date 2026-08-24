@@ -1,4 +1,5 @@
 import { activityEvents, scriptAssets, scriptReferences, scripts, scriptVersions } from "@result/db";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
 import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
@@ -38,6 +39,7 @@ const createScriptSchema = z.object({
   sections: z.array(sectionSchema).min(1).max(24),
   assets: z.array(assetSchema).max(40).default([]),
   brandSnapshot: z.record(z.string(), z.unknown()).default({}),
+  referenceId: z.uuid().nullable().optional(),
   reference: z.object({
     sourcePlatform: z.string().trim().min(1).max(40).default("instagram"),
     sourceUrl: z.url().max(2_000).nullable().optional(),
@@ -54,7 +56,13 @@ export async function POST(request: Request) {
     const context = await managerContext();
     const result = await context.db.transaction(async (transaction) => {
       let referenceId: string | null = null;
-      if (parsed.data.reference) {
+      if (parsed.data.referenceId) {
+        // Already created by /api/references/ingest — reuse it rather than duplicating the transcript.
+        const existing = (await transaction.select({ id: scriptReferences.id }).from(scriptReferences)
+          .where(and(eq(scriptReferences.id, parsed.data.referenceId), eq(scriptReferences.organizationId, context.organization.id))).limit(1))[0];
+        referenceId = existing?.id ?? null;
+      }
+      if (!referenceId && parsed.data.reference) {
         const [reference] = await transaction.insert(scriptReferences).values({
           organizationId: context.organization.id,
           sourcePlatform: parsed.data.reference.sourcePlatform,

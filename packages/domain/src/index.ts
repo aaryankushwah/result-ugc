@@ -37,8 +37,30 @@ export const discordOperationTypes = [
   "open_private_channel",
   "offboard_creator",
   "reconcile_creator",
+  "send_script_assignment",
 ] as const;
 export type DiscordOperationType = (typeof discordOperationTypes)[number];
+
+/**
+ * Operation types that change Discord identity, roles, or channel membership and
+ * therefore require a guild reconciliation pass once they succeed. Notification-only
+ * operations are deliberately excluded: they mutate no identity state.
+ */
+export const identityChangingDiscordOperationTypes = [
+  "approve_applicant",
+  "reject_applicant",
+  "restore_access",
+  "open_private_channel",
+  "offboard_creator",
+  "reconcile_creator",
+] as const;
+
+export function requiresGuildReconciliation(type: string): boolean {
+  return (identityChangingDiscordOperationTypes as readonly string[]).includes(type);
+}
+
+export const transcriptStates = ["provided", "pending", "transcribing", "transcribed", "failed"] as const;
+export type TranscriptState = (typeof transcriptStates)[number];
 
 export type ProviderCreator = {
   externalId: string;
@@ -154,13 +176,13 @@ export function deriveAccountPerformanceHealth(input: {
 } {
   const now = input.now ?? new Date();
   const nowTime = now.getTime();
-  const all = (input.videos ?? []).map((video) => ({
-    included: video.included,
+  const all = input.videos ?? [];
+  // Excluded posts can reach us without a publish date; they still count as warm-up.
+  const warmupPosts = all.filter((video) => !video.included).length;
+  const tracked = all.filter((video) => video.included).map((video) => ({
     views: video.views ?? 0,
     time: video.publishedAt ? new Date(video.publishedAt).getTime() : Number.NaN,
   })).filter((video) => !Number.isNaN(video.time));
-  const tracked = all.filter((video) => video.included);
-  const warmupPosts = all.length - tracked.length;
   const trackedPosts = tracked.length;
 
   const latestPostTime = tracked.reduce((latest, video) => Math.max(latest, video.time), 0);

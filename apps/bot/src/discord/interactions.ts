@@ -17,6 +17,8 @@ import {
   type Interaction,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
+import { creatorDiscord, getDatabase, scriptAssignments, scripts } from "@result/db";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { blueprintChannels, categories, roles } from "../config/blueprint.js";
 import {
   getGuildState,
@@ -28,6 +30,7 @@ import {
 import { createCreatorChannel, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
 import { discordChannelNameMatches } from "./channel-names.js";
 import { archiveCreatorChannel } from "./platform-sync.js";
+import { scriptShareUrl } from "./script-delivery.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
 import { launchpointGet } from "../integrations/launchpoint.js";
@@ -76,7 +79,7 @@ async function logVerification(guild: Guild, userId: string, result: string): Pr
   }).catch(() => undefined);
 }
 
-function isStaff(interaction: ButtonInteraction): boolean {
+function isStaff(interaction: ButtonInteraction | ChatInputCommandInteraction): boolean {
   return Boolean(
     interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ||
     interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages) ||
@@ -1115,6 +1118,10 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
     await showHelp(interaction);
     return;
   }
+  if (interaction.commandName === "scripts") {
+    await showAssignedScripts(interaction);
+    return;
+  }
   if (interaction.commandName === "leaderboard") {
     await showLeaderboard(interaction);
     return;
@@ -1276,4 +1283,83 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       }
     }
   }
+}
+
+/** Discord embed field limits: 256 for name, 1024 for value. */
+function clipField(value: string, limit: number): string {
+  return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
+}
+
+/**
+ * Lists the scripts assigned to a creator, with links to the creator-facing view.
+ * Available to every creator, not just staff; the optional `creator` option is
+ * staff-only so a manager can look someone else up.
+ */
+async function showAssignedScripts(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (!interaction.guild) return;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  if (!process.env.DATABASE_URL) {
+    await interaction.editReply("Script Studio is not connected yet. Ask an admin to run `/health`.");
+    return;
+  }
+
+  const requested = interaction.options.getUser("creator");
+  if (requested && !isStaff(interaction)) {
+    await interaction.editReply("Only the moderation team can look up another creator's scripts.");
+    return;
+  }
+  const targetUserId = requested?.id ?? interaction.user.id;
+
+  const connection = (await getDatabase()
+    .select({ creatorId: creatorDiscord.creatorId })
+    .from(creatorDiscord)
+    .where(and(eq(creatorDiscord.guildId, interaction.guild.id), eq(creatorDiscord.discordUserId, targetUserId)))
+    .limit(1))[0];
+
+  if (!connection) {
+    await interaction.editReply(requested
+      ? `${requested.username} is not linked to a Result creator yet.`
+      : "You are not linked to a Result creator yet. Ask your manager to connect you.");
+    return;
+  }
+
+  const rows = await getDatabase()
+    .select({
+      title: scripts.title,
+      hook: scripts.hook,
+      state: scriptAssignments.state,
+      dueAt: scriptAssignments.dueAt,
+      shareToken: scriptAssignments.shareToken,
+      updatedAt: scriptAssignments.updatedAt,
+    })
+    .from(scriptAssignments)
+    .innerJoin(scripts, eq(scripts.id, scriptAssignments.scriptId))
+    .where(and(eq(scriptAssignments.creatorId, connection.creatorId), ne(scriptAssignments.state, "cancelled")))
+    .orderBy(desc(scriptAssignments.updatedAt))
+    .limit(10);
+
+  if (!rows.length) {
+    await interaction.editReply(requested
+      ? `${requested.username} has no scripts assigned right now.`
+      : "You have no scripts assigned right now. You will get a message here when one lands.");
+    return;
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(requested ? `Scripts for ${requested.username}` : "Your scripts")
+    .setColor(Colors.Blurple)
+    .setFooter({ text: rows.length === 10 ? "Showing the 10 most recent." : `${rows.length} script${rows.length === 1 ? "" : "s"}.` });
+
+  for (const row of rows) {
+    const url = scriptShareUrl(row.shareToken);
+    const details = [
+      `Status: ${row.state.replaceAll("_", " ")}`,
+      row.dueAt ? `Due <t:${Math.floor(new Date(row.dueAt).getTime() / 1_000)}:D>` : null,
+      url ? `[Open the script](${url})` : "Link not available yet — ask your manager.",
+    ].filter(Boolean).join(" · ");
+    embed.addFields({ name: clipField(row.title, 240), value: clipField(details, 1_000) });
+  }
+
+  await interaction.editReply({ embeds: [embed] });
 }

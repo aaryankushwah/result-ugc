@@ -19,10 +19,12 @@ import {
   signingRelationships,
   syncRuns,
 } from "@result/db";
-import { and, asc, eq, lte } from "drizzle-orm";
+import { requiresGuildReconciliation } from "@result/domain";
+import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { getGuildState } from "../data/store.js";
 import { createCreatorChannel, findCreatorChannel } from "./setup.js";
 import { staleDiscordOperationCutoff } from "./operation-queue.js";
+import { postToCreatorChannel } from "./script-delivery.js";
 
 const CREATOR_ROLE = "Verified Creator";
 const MEMBER_ROLE = "Member";
@@ -152,13 +154,17 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
     lastError: "Previous Discord worker stopped before completing this operation; retrying safely.",
     updatedAt: now,
   }).where(and(eq(discordOperations.state, "running"), lte(discordOperations.lockedAt, staleDiscordOperationCutoff(now))));
-  const [operation] = await getDatabase().select().from(discordOperations).where(and(eq(discordOperations.state, "queued"), lte(discordOperations.availableAt, now))).orderBy(asc(discordOperations.createdAt)).limit(1);
+  // Scope the claim to guilds this worker actually serves. Without the guild filter a
+  // second worker would claim another guild's operations and fail to fetch the guild.
+  const servedGuildIds = [...client.guilds.cache.keys()];
+  if (!servedGuildIds.length) return;
+  const [operation] = await getDatabase().select().from(discordOperations).where(and(eq(discordOperations.state, "queued"), lte(discordOperations.availableAt, now), inArray(discordOperations.guildId, servedGuildIds))).orderBy(asc(discordOperations.createdAt)).limit(1);
   if (!operation) return;
   const claimed = await getDatabase().update(discordOperations).set({ state: "running", lockedAt: new Date(), attempts: operation.attempts + 1, updatedAt: new Date() }).where(and(eq(discordOperations.id, operation.id), eq(discordOperations.state, "queued"))).returning({ id: discordOperations.id });
   if (!claimed.length) return;
   try {
     const guild = await client.guilds.fetch(operation.guildId);
-    const connection = operation.creatorId ? (await getDatabase().select().from(creatorDiscord).where(eq(creatorDiscord.creatorId, operation.creatorId)).limit(1))[0] : null;
+    const connection = operation.creatorId ? (await getDatabase().select().from(creatorDiscord).where(and(eq(creatorDiscord.creatorId, operation.creatorId), eq(creatorDiscord.organizationId, operation.organizationId))).limit(1))[0] : null;
     const userId = connection?.discordUserId ?? (typeof operation.payload.discordUserId === "string" ? operation.payload.discordUserId : null);
     if (!userId) throw new Error("Discord operation has no mapped user");
     const member = await guild.members.fetch(userId).catch(() => null);
@@ -166,6 +172,7 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
     const memberRole = guild.roles.cache.find((role) => role.name === MEMBER_ROLE);
     const applicantRole = guild.roles.cache.find((role) => role.name === APPLICANT_ROLE);
     let channelId = connection?.privateChannelId ?? null;
+    let deliveredMessageId: string | null = null;
     if (["approve_applicant", "restore_access", "open_private_channel"].includes(operation.type)) {
       if (!member) throw new Error("Discord member is not in the guild");
       if (operation.type !== "open_private_channel") {
@@ -187,10 +194,21 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
       if (operation.creatorId) await getDatabase().update(creators).set({ lifecycle: "offboarded", offboardReason: typeof operation.payload.reason === "string" ? operation.payload.reason : null, offboardedAt: new Date(), updatedAt: new Date() }).where(eq(creators.id, operation.creatorId));
     } else if (operation.type === "reconcile_creator") {
       await reconcileGuild(guild);
+    } else if (operation.type === "send_script_assignment") {
+      const delivery = await postToCreatorChannel(guild, { discordUserId: userId, privateChannelId: channelId }, {
+        scriptTitle: typeof operation.payload.scriptTitle === "string" ? operation.payload.scriptTitle : "Your next script",
+        scriptHook: typeof operation.payload.scriptHook === "string" ? operation.payload.scriptHook : null,
+        shareToken: typeof operation.payload.shareToken === "string" ? operation.payload.shareToken : null,
+        dueAt: typeof operation.payload.dueAt === "string" ? operation.payload.dueAt : null,
+        message: typeof operation.payload.message === "string" ? operation.payload.message : null,
+      });
+      channelId = delivery.channelId;
+      deliveredMessageId = delivery.messageId;
     } else throw new Error(`Unsupported operation type: ${operation.type}`);
-    await getDatabase().update(discordOperations).set({ state: "succeeded", finishedAt: new Date(), result: { channelId, discordUserId: userId }, lastError: null, updatedAt: new Date() }).where(eq(discordOperations.id, operation.id));
+    await getDatabase().update(discordOperations).set({ state: "succeeded", finishedAt: new Date(), result: { channelId, discordUserId: userId, ...(deliveredMessageId ? { messageId: deliveredMessageId } : {}) }, lastError: null, updatedAt: new Date() }).where(eq(discordOperations.id, operation.id));
     await logEvent(operation.organizationId, operation.creatorId, `discord.operation.${operation.type}.succeeded`, `Discord operation ${operation.type.replaceAll("_", " ")} succeeded.`, { operationId: operation.id, channelId });
-    await reconcileGuild(guild);
+    // Notification-only operations change no identity state, so skip the guild sweep.
+    if (requiresGuildReconciliation(operation.type)) await reconcileGuild(guild);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const retry = operation.attempts + 1 < 3;

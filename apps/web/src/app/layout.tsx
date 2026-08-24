@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,15 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Companion face for the "UGC" mark in the Result lockup. There is no
+// "Archivo Expanded" family in next/font; Archivo is variable with a width axis,
+// so pull in `wdth` and dial it to the expanded end in .result-ugc-mark.
+const archivoExpanded = Archivo({
+  variable: "--font-archivo-expanded",
+  subsets: ["latin"],
+  axes: ["wdth"],
 });
 
 const resultFont = localFont({
@@ -34,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`light ${geistSans.variable} ${geistMono.variable} ${resultFont.variable} h-full antialiased`}
+      className={`light ${geistSans.variable} ${geistMono.variable} ${archivoExpanded.variable} ${resultFont.variable} h-full antialiased`}
       data-theme="light"
       suppressHydrationWarning
     >

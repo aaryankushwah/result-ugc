@@ -60,7 +60,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
-    <PageTitle title="Result" titleClassName="font-result result-ugc-title" actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
+    <PageTitle title="Result" titleClassName="font-result result-ugc-title" titleSuffix={<span className="result-ugc-mark">UGC</span>} actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
     {data.sourceMode === "live_provider" ? <div className="source-banner"><Radio /><div><strong>Live Viral data is connected.</strong><span>Creator candidates need confirmation after the shared database is connected; they are not silently treated as signed creators.</span></div><Link href="/integrations">Review setup <ArrowUpRight /></Link></div> : null}
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
     <OverviewMetricGrid metrics={metricCards} />
@@ -80,11 +80,19 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         const handle = creator.discord.username ?? creator.accounts[0]?.username ?? "No account linked";
         const goalRate = activity.goalsTotal ? activity.goalsHit / activity.goalsTotal : 0;
         const goalState = activity.goalsTotal === 0 ? "untracked" : goalRate >= 1 ? "complete" : goalRate >= .7 ? "close" : "behind";
+        const goalTitle = activity.goalsTotal
+          ? `${activity.goalsHit} of ${activity.goalsTotal} account-day goals hit · 1 post per connected account per day`
+          : "No connected account yet, so there is no daily goal to hit";
         return <Link href={`/creators/${encodeURIComponent(creator.id)}`} key={creator.id}>
           <span className={styles.creatorAvatar}>{avatarUrl ? <img src={avatarUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}</span>
-          <span className={styles.creatorIdentity}><strong>{creator.displayName}</strong><small>{handle === "No account linked" ? handle : `@${handle}`} · {activity.posts} posts</small></span>
-          <span className={styles.goalProgress} data-state={goalState} title={`${activity.goalsHit} of ${activity.goalsTotal} account-day goals hit · 1 post per connected account per day`}><small>Goal</small><strong>{activity.goalsHit}/{activity.goalsTotal}</strong></span>
-          <span className={styles.postActivity} aria-label={`${activity.posts7d} posts in the last seven days`}>{activity.activity.map((day) => <span key={day.date} title={`${day.date}: ${day.count} posts`}><small>{day.label}</small><b data-active={day.count > 0}>{day.count}</b></span>)}</span>
+          <span className={styles.creatorIdentity}>
+            <span className={styles.creatorNameRow}>
+              <strong>{creator.displayName}</strong>
+              <span className={styles.goalTag} data-state={goalState} title={goalTitle}>{activity.goalsTotal ? `${activity.goalsHit}/${activity.goalsTotal}` : "no goal"}</span>
+            </span>
+            <small>{handle === "No account linked" ? handle : `@${handle}`} · {activity.posts} posts</small>
+          </span>
+          <span className={styles.postActivity} aria-label={`${activity.posts7d} posts in the last seven days`}>{activity.activity.map((day) => <span key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><b data-active={day.count > 0}>{day.count}</b></span>)}</span>
           <ChevronRight />
         </Link>;
       })}</div></article>

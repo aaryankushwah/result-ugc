@@ -256,6 +256,19 @@ export type TranscriptSection = {
   text: string;
 };
 
+export type ScriptSubstitution = {
+  sectionId: string;
+  from: string;
+  to: string;
+};
+
+export type ScriptGeneration = {
+  model: string;
+  promptVersion: string;
+  referenceId: string | null;
+  substitutions: ScriptSubstitution[];
+};
+
 export const brandProfiles = pgTable("brand_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
@@ -318,6 +331,7 @@ export const scriptVersions = pgTable("script_versions", {
   title: text("title").notNull(),
   sections: jsonb("sections").$type<ScriptSection[]>().notNull().default([]),
   changeSummary: text("change_summary"),
+  generation: jsonb("generation").$type<ScriptGeneration>(),
   createdByUserId: uuid("created_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -335,11 +349,13 @@ export const scriptAssignments = pgTable("script_assignments", {
   message: text("message"),
   assignedByUserId: uuid("assigned_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
   discordOperationId: uuid("discord_operation_id"),
+  shareToken: text("share_token"),
   ...timestamps,
 }, (table) => [
   uniqueIndex("script_assignments_script_creator_unique").on(table.scriptId, table.creatorId),
   index("script_assignments_org_state_due_idx").on(table.organizationId, table.state, table.dueAt),
   index("script_assignments_creator_idx").on(table.creatorId, table.updatedAt),
+  uniqueIndex("script_assignments_share_token_unique").on(table.shareToken),
 ]);
 
 export const scriptAssets = pgTable("script_assets", {

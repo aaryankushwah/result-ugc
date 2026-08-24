@@ -138,6 +138,11 @@ export const commandBuilders = [
     .setDescription("Show Result Clanker's command guide")
     .setDMPermission(false),
   new SlashCommandBuilder()
+    .setName("scripts")
+    .setDescription("See the scripts assigned to you")
+    .addUserOption((option) => option.setName("creator").setDescription("Staff only: look up another creator's scripts"))
+    .setDMPermission(false),
+  new SlashCommandBuilder()
     .setName("leaderboard")
     .setDescription("Show creators ranked by approved and posted work")
     .setDMPermission(false),

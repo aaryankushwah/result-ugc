@@ -3,6 +3,7 @@ import "server-only";
 import {
   brandProfiles,
   creators,
+  discordOperations,
   getDatabase,
   hasDatabase,
   organizations,
@@ -15,6 +16,8 @@ import {
   type TranscriptSection,
 } from "@result/db";
 import { and, desc, eq, inArray } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
+import { PORTAL_DATA_CACHE_TAG } from "./portal-cache";
 import { getPortalData } from "./portal-data";
 import { adaptReferenceForResult, segmentTranscript } from "./script-writing";
 import { isPersistedCreatorId } from "./script-studio-state";
@@ -64,30 +67,38 @@ export type StudioScript = {
   updatedAt: string;
 };
 
+export type FailedNotification = {
+  operationId: string;
+  creatorName: string | null;
+  scriptTitle: string;
+  lastError: string | null;
+};
+
 export type ScriptStudioData = {
   sourceMode: "database" | "preview";
+  failedNotifications: FailedNotification[];
   brand: { name: string; productDescription: string; audience: string; voice: string[]; bannedPhrases: string[]; proofPoints: string[] };
   scripts: StudioScript[];
   creators: StudioCreator[];
 };
 
-export async function getScriptStudioData(): Promise<ScriptStudioData> {
-  const portalData = await getPortalData();
-  const studioCreators: StudioCreator[] = portalData.creators.filter((creator) => isPersistedCreatorId(creator.id)).map((creator) => ({
-    id: creator.id,
-    name: creator.displayName,
-    username: creator.discord.username ?? creator.accounts[0]?.username ?? null,
-    avatarUrl: creator.discord.avatarUrl ?? creator.accounts[0]?.avatarUrl ?? null,
-    specialties: creator.accounts.map((account) => account.platform).slice(0, 3),
-    activeAssignments: 0,
-  }));
+type StudioRecords = {
+  brand: ScriptStudioData["brand"];
+  scripts: StudioScript[];
+  activeByCreator: Array<[string, number]>;
+  failedNotifications: FailedNotification[];
+};
 
-  if (!hasDatabase()) return previewData(studioCreators);
-
+/**
+ * Reads every Script Studio record for the org. Returns plain JSON-safe values
+ * (timestamps already stringified) because unstable_cache serialises the result.
+ */
+async function loadStudioRecords(): Promise<StudioRecords | null> {
+  if (!hasDatabase()) return null;
   try {
     const db = getDatabase();
     const organization = (await db.select().from(organizations).where(eq(organizations.slug, "result")).limit(1))[0];
-    if (!organization) return previewData(studioCreators);
+    if (!organization) return null;
     const [brand, rows] = await Promise.all([
       db.select().from(brandProfiles).where(eq(brandProfiles.organizationId, organization.id)).limit(1),
       db.select({
@@ -123,13 +134,26 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
       db.select().from(scriptTests).where(and(eq(scriptTests.organizationId, organization.id), inArray(scriptTests.scriptId, scriptIds))),
     ]) : [[], [], []];
 
+    // Surface Discord notifications that failed after the portal reported "queued",
+    // otherwise a broken handoff is invisible to the manager who caused it.
+    const failedOperations = await db
+      .select({ id: discordOperations.id, payload: discordOperations.payload, lastError: discordOperations.lastError, creatorName: creators.displayName })
+      .from(discordOperations)
+      .leftJoin(creators, eq(creators.id, discordOperations.creatorId))
+      .where(and(
+        eq(discordOperations.organizationId, organization.id),
+        eq(discordOperations.type, "send_script_assignment"),
+        eq(discordOperations.state, "failed"),
+      ))
+      .orderBy(desc(discordOperations.updatedAt))
+      .limit(10);
+
     const activeByCreator = new Map<string, number>();
     for (const assignment of assignmentRows) {
       if (!["approved", "cancelled"].includes(assignment.state)) activeByCreator.set(assignment.creatorId, (activeByCreator.get(assignment.creatorId) ?? 0) + 1);
     }
 
     return {
-      sourceMode: "database",
       brand: brand[0] ? {
         name: brand[0].name,
         productDescription: brand[0].productDescription,
@@ -138,48 +162,85 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
         bannedPhrases: brand[0].bannedPhrases,
         proofPoints: brand[0].proofPoints,
       } : defaultBrand,
-      creators: studioCreators.map((creator) => ({ ...creator, activeAssignments: activeByCreator.get(creator.id) ?? 0 })),
+      activeByCreator: [...activeByCreator.entries()],
+      failedNotifications: failedOperations.map((operation) => ({
+        operationId: operation.id,
+        creatorName: operation.creatorName,
+        scriptTitle: typeof operation.payload.scriptTitle === "string" ? operation.payload.scriptTitle : "a script",
+        lastError: operation.lastError,
+      })),
       scripts: rows.map((row) => {
         const tests = testRows.filter((test) => test.scriptId === row.id);
         const hookRates = tests.map((test) => test.hookRate).filter((value): value is number => value !== null);
         const watchTimes = tests.map((test) => test.averageWatchTimeSeconds).filter((value): value is number => value !== null);
         return {
-        id: row.id,
-        latestVersion: row.latestVersion,
-        title: row.title,
-        status: row.status,
-        pipelineStage: row.pipelineStage,
-        priority: row.priority,
-        category: row.category,
-        format: row.format,
-        tags: row.tags,
-        targetPlatform: row.targetPlatform,
-        durationSeconds: row.durationSeconds,
-        hook: row.hook,
-        sections: row.sections,
-        reference: row.referenceId && row.transcript ? {
-          id: row.referenceId,
-          sourcePlatform: row.sourcePlatform ?? "instagram",
-          sourceUrl: row.sourceUrl,
-          sourceCreator: row.sourceCreator,
-          transcript: row.transcript,
-          transcriptSections: row.transcriptSections ?? [],
-        } : null,
-        assignments: assignmentRows.filter((assignment) => assignment.scriptId === row.id).map((assignment) => ({ ...assignment, dueAt: assignment.dueAt?.toISOString() ?? null })),
-        assets: assetRows.filter((asset) => asset.scriptId === row.id).map((asset) => ({ id: asset.id, label: asset.label, kind: asset.kind, sourceUrl: asset.sourceUrl, downloadUrl: asset.downloadUrl })),
-        performance: {
-          tests: tests.length,
-          liveTests: tests.filter((test) => test.state === "live").length,
-          views: tests.reduce((total, test) => total + test.views, 0),
-          hookRate: hookRates.length ? hookRates.reduce((total, value) => total + value, 0) / hookRates.length : null,
-          averageWatchTimeSeconds: watchTimes.length ? watchTimes.reduce((total, value) => total + value, 0) / watchTimes.length : null,
-        },
-        updatedAt: row.updatedAt.toISOString(),
-      }; }),
+          id: row.id,
+          latestVersion: row.latestVersion,
+          title: row.title,
+          status: row.status,
+          pipelineStage: row.pipelineStage,
+          priority: row.priority,
+          category: row.category,
+          format: row.format,
+          tags: row.tags,
+          targetPlatform: row.targetPlatform,
+          durationSeconds: row.durationSeconds,
+          hook: row.hook,
+          sections: row.sections,
+          reference: row.referenceId && row.transcript ? {
+            id: row.referenceId,
+            sourcePlatform: row.sourcePlatform ?? "instagram",
+            sourceUrl: row.sourceUrl,
+            sourceCreator: row.sourceCreator,
+            transcript: row.transcript,
+            transcriptSections: row.transcriptSections ?? [],
+          } : null,
+          assignments: assignmentRows.filter((assignment) => assignment.scriptId === row.id).map((assignment) => ({ ...assignment, dueAt: assignment.dueAt?.toISOString() ?? null })),
+          assets: assetRows.filter((asset) => asset.scriptId === row.id).map((asset) => ({ id: asset.id, label: asset.label, kind: asset.kind, sourceUrl: asset.sourceUrl, downloadUrl: asset.downloadUrl })),
+          performance: {
+            tests: tests.length,
+            liveTests: tests.filter((test) => test.state === "live").length,
+            views: tests.reduce((total, test) => total + test.views, 0),
+            hookRate: hookRates.length ? hookRates.reduce((total, value) => total + value, 0) / hookRates.length : null,
+            averageWatchTimeSeconds: watchTimes.length ? watchTimes.reduce((total, value) => total + value, 0) / watchTimes.length : null,
+          },
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      }),
     };
   } catch {
-    return previewData(studioCreators);
+    return null;
   }
+}
+
+const getCachedStudioRecords = unstable_cache(
+  loadStudioRecords,
+  ["result-script-studio-v1"],
+  { revalidate: 30, tags: [PORTAL_DATA_CACHE_TAG] },
+);
+
+export async function getScriptStudioData(): Promise<ScriptStudioData> {
+  const portalData = await getPortalData();
+  const studioCreators: StudioCreator[] = portalData.creators.filter((creator) => isPersistedCreatorId(creator.id)).map((creator) => ({
+    id: creator.id,
+    name: creator.displayName,
+    username: creator.discord.username ?? creator.accounts[0]?.username ?? null,
+    avatarUrl: creator.discord.avatarUrl ?? creator.accounts[0]?.avatarUrl ?? null,
+    specialties: creator.accounts.map((account) => account.platform).slice(0, 3),
+    activeAssignments: 0,
+  }));
+
+  const records = await getCachedStudioRecords();
+  if (!records) return previewData(studioCreators);
+
+  const activeByCreator = new Map(records.activeByCreator);
+  return {
+    sourceMode: "database",
+    failedNotifications: records.failedNotifications,
+    brand: records.brand,
+    creators: studioCreators.map((creator) => ({ ...creator, activeAssignments: activeByCreator.get(creator.id) ?? 0 })),
+    scripts: records.scripts,
+  };
 }
 
 const defaultBrand = {
@@ -210,6 +271,7 @@ function previewData(liveCreators: StudioCreator[]): ScriptStudioData {
   ] as const;
   return {
     sourceMode: "preview",
+    failedNotifications: [],
     brand: defaultBrand,
     creators,
     scripts: samples.map(([title, status, pipelineStage, category, format, priority, platform, creatorIds, views, hookRate], index) => ({

@@ -1,5 +1,6 @@
 import { activityEvents, creatorDiscord, creators, discordOperations, scriptAssignments, scripts } from "@result/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
 import { invalidatePortalData } from "@/lib/portal-cache";
@@ -18,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const parsed = assignmentSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "Choose at least one valid Result creator.", details: parsed.error.flatten() }, { status: 400 });
     const context = await managerContext();
-    const script = (await context.db.select({ id: scripts.id, title: scripts.title }).from(scripts).where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id))).limit(1))[0];
+    const script = (await context.db.select({ id: scripts.id, title: scripts.title, hook: scripts.hook }).from(scripts).where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id))).limit(1))[0];
     if (!script) throw new MutationError(404, "Script not found");
     const creatorRows = await context.db.select({ id: creators.id, name: creators.displayName }).from(creators).where(and(eq(creators.organizationId, context.organization.id), inArray(creators.id, parsed.data.creatorIds)));
     if (creatorRows.length !== new Set(parsed.data.creatorIds).size) throw new MutationError(400, "One or more creators do not belong to this Result workspace");
@@ -35,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const assignmentResults: Array<{ creatorId: string; creatorName: string; assignmentId: string; discordOperationId: string | null }> = [];
     await context.db.transaction(async (transaction) => {
       for (const creator of creatorRows) {
+        const freshToken = shareToken();
         const [assignment] = await transaction.insert(scriptAssignments).values({
           organizationId: context.organization.id,
           scriptId: id,
@@ -43,10 +45,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           dueAt,
           message: parsed.data.message ?? null,
           assignedByUserId: context.internalUser?.id ?? null,
+          shareToken: freshToken,
         }).onConflictDoUpdate({
           target: [scriptAssignments.scriptId, scriptAssignments.creatorId],
-          set: { state: "assigned", dueAt, message: parsed.data.message ?? null, assignedByUserId: context.internalUser?.id ?? null, updatedAt: new Date() },
-        }).returning({ id: scriptAssignments.id });
+          set: {
+            state: "assigned",
+            dueAt,
+            message: parsed.data.message ?? null,
+            assignedByUserId: context.internalUser?.id ?? null,
+            // Keep the link already sent to the creator; backfill rows predating share tokens.
+            shareToken: sql`coalesce(${scriptAssignments.shareToken}, ${freshToken})`,
+            updatedAt: new Date(),
+          },
+        }).returning({ id: scriptAssignments.id, shareToken: scriptAssignments.shareToken });
         if (!assignment) throw new MutationError(500, `Could not assign “${script.title}” to ${creator.name}`);
 
         let discordOperationId: string | null = null;
@@ -64,6 +75,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               assignmentId: assignment.id,
               scriptId: id,
               scriptTitle: script.title,
+              scriptHook: script.hook,
+              shareToken: assignment.shareToken,
+              dueAt: dueAt?.toISOString() ?? null,
               message: parsed.data.message ?? null,
               discordUserId: connection?.discordUserId ?? null,
             },
@@ -88,4 +102,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return mutationErrorResponse(error);
   }
+}
+
+/** Capability token for the creator-facing /s/<token> view. Unguessable, one per assignment. */
+function shareToken(): string {
+  return randomBytes(32).toString("base64url");
 }

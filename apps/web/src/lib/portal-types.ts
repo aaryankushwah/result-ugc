@@ -21,6 +21,12 @@ export type PortalAccount = {
   latestPostAt: string | null;
   performanceHealth?: AccountPerformanceHealthState;
   performanceHealthReason?: string;
+  /** True once the account has enough counted (non warm-up) posts to judge. */
+  warmedUp?: boolean;
+  /** Posts that count toward performance — warm-up / unpaid posts excluded. */
+  trackedPosts?: number;
+  /** Posts a manager has excluded as warm-up or unpaid content. */
+  warmupPosts?: number;
   recentPosts7d?: number;
   recentMedianViews?: number | null;
   baselineMedianViews?: number | null;

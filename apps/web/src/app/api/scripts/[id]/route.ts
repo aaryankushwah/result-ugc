@@ -25,10 +25,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const parsed = updateScriptSchema.safeParse(await request.json());
     if (!parsed.success) return Response.json({ error: "The script update is incomplete.", details: parsed.error.flatten() }, { status: 400 });
     const context = await managerContext();
-    const current = (await context.db.select().from(scripts).where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id))).limit(1))[0];
-    if (!current) throw new MutationError(404, "Script not found");
-    const nextVersion = current.latestVersion + 1;
+    const exists = (await context.db.select({ id: scripts.id }).from(scripts).where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id))).limit(1))[0];
+    if (!exists) throw new MutationError(404, "Script not found");
+    let nextVersion = 0;
     await context.db.transaction(async (transaction) => {
+      // Lock the script row so concurrent saves cannot pick the same version
+      // number and collide on script_versions_script_version_unique.
+      const current = (await transaction.select().from(scripts).where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id))).limit(1).for("update"))[0];
+      if (!current) throw new MutationError(404, "Script not found");
+      nextVersion = current.latestVersion + 1;
       await transaction.update(scripts).set({
         title: parsed.data.title,
         status: parsed.data.status ?? current.status,

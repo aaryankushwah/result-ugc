@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   ArrowUpRight,
+  Building2,
   Check,
   Clipboard,
   Clock3,
@@ -11,13 +12,17 @@ import {
   File,
   Image as ImageIcon,
   LayoutDashboard,
+  Link2,
+  ListTree,
   Music2,
   Plus,
+  Rows3 as Rows,
   Search,
   Send,
   Sparkles,
   Table2,
   Trash2,
+  TriangleAlert,
   UserRoundCheck,
   Video,
 } from "lucide-react";
@@ -27,11 +32,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { estimateScriptDuration, scriptHookFromText, segmentTranscript } from "@/lib/script-writing";
+import { estimateScriptDuration, scriptHookFromSections, scriptHookFromText, segmentTranscript } from "@/lib/script-writing";
+import { diffWords, preservedRatio } from "@/lib/script-diff";
+import { parseReferenceUrl } from "@/lib/reference-url";
 import { mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl } from "@/lib/script-studio-state";
 import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
 type StudioScreen = "bank" | "writer";
+
+type GenerationOutcome = {
+  generation: { model: string; promptVersion: string; referenceId: string | null; substitutions: Array<{ sectionId: string; from: string; to: string }> };
+  degraded: boolean;
+  before: string;
+  after: string;
+};
 
 
 export function ScriptStudio({ initialData, canManage }: { initialData: ScriptStudioData; canManage: boolean }) {
@@ -45,6 +59,11 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [brand, setBrand] = useState(initialData.brand);
+  const [lastGeneration, setLastGeneration] = useState<GenerationOutcome | null>(null);
 
   const filtered = useMemo(() => scripts.filter((script) => {
     const haystack = `${script.title} ${script.hook ?? ""} ${script.assignments.map((assignment) => assignment.creatorName).join(" ")}`.toLowerCase();
@@ -95,6 +114,97 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
     notify("Draft created");
   };
 
+  /** Paste a reel link, get a transcribed draft. The whole point of the studio. */
+  const importReel = async (url: string): Promise<boolean> => {
+    setImporting(true);
+    try {
+      const response = await fetch("/api/references/ingest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const result = await response.json() as { reference?: StudioScript["reference"] & { transcriptState?: string }; suggestedTitle?: string; error?: string };
+      if (!response.ok || !result.reference) throw new Error(result.error ?? "The reel could not be imported");
+
+      const transcript = result.reference.transcript;
+      const sections = [plainScriptSection(transcript)];
+      const next: StudioScript = {
+        id: `session-${crypto.randomUUID()}`,
+        latestVersion: 0,
+        title: (result.suggestedTitle ?? "Imported reel").slice(0, 120),
+        status: "draft",
+        pipelineStage: "not_started",
+        priority: "medium",
+        category: "Uncategorized",
+        format: "Talking head",
+        tags: [],
+        targetPlatform: "instagram",
+        durationSeconds: estimateScriptDuration(sections),
+        hook: scriptHookFromText(transcript),
+        sections,
+        reference: result.reference,
+        assignments: [],
+        assets: [],
+        performance: { tests: 0, liveTests: 0, views: 0, hookRate: null, averageWatchTimeSeconds: null },
+        updatedAt: new Date().toISOString(),
+      };
+      setScripts((current) => [next, ...current]);
+      setActive(next);
+      setLastGeneration(null);
+      setScreen("writer");
+      setImportOpen(false);
+      notify(`Transcribed ${result.reference.transcriptSections.length} segment${result.reference.transcriptSections.length === 1 ? "" : "s"}`);
+      return true;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "The reel could not be imported");
+      return false;
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /** Swap the business, keep every other word. Persists first so the script has an id. */
+  const generate = async () => {
+    if (!active || !canManage) return;
+    setGenerating(true);
+    try {
+      const saved = isUuid(active.id) ? { id: active.id, version: active.latestVersion, assets: undefined } : await persistScript(active, "Saved before generation");
+      const response = await fetch(`/api/scripts/${saved.id}/generate`, { method: "POST" });
+      const result = await response.json() as {
+        version?: number;
+        sections?: StudioScript["sections"];
+        generation?: GenerationOutcome["generation"];
+        degraded?: boolean;
+        sourceTranscript?: string | null;
+        error?: string;
+      };
+      if (!response.ok || !result.sections) throw new Error(result.error ?? "Generation failed");
+
+      const before = active.reference?.transcript ?? result.sourceTranscript ?? "";
+      const afterText = result.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n");
+      setLastGeneration({
+        generation: result.generation ?? { model: "unknown", promptVersion: "unknown", referenceId: null, substitutions: [] },
+        degraded: Boolean(result.degraded),
+        before,
+        after: afterText,
+      });
+      updateActive((script) => ({
+        ...script,
+        id: saved.id,
+        latestVersion: result.version ?? saved.version,
+        sections: result.sections!,
+        hook: scriptHookFromSections(result.sections!),
+        durationSeconds: estimateScriptDuration(result.sections!),
+        updatedAt: new Date().toISOString(),
+      }));
+      notify(result.degraded ? "Generated without a model · add ANTHROPIC_API_KEY" : "Adapted for your brand");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Generation failed");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const updateActive = (updater: (script: StudioScript) => StudioScript) => {
     setActive((current) => {
       if (!current) return current;
@@ -128,7 +238,9 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
       sections: script.sections,
       brandSnapshot: initialData.brand,
       assets: script.assets.filter((asset) => asset.sourceUrl).map((asset) => ({ label: asset.label, kind: asset.kind, sourceUrl: asset.sourceUrl! })),
-      reference: script.reference ? {
+      // An ingested reference is already a row; send its id so the transcript is not duplicated.
+      referenceId: script.reference && isUuid(script.reference.id) ? script.reference.id : null,
+      reference: script.reference && !isUuid(script.reference.id) ? {
         sourcePlatform: script.reference.sourcePlatform,
         sourceUrl: script.reference.sourceUrl,
         sourceCreator: script.reference.sourceCreator,
@@ -200,14 +312,15 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} openImport={() => setImportOpen(true)} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => setScreen("bank")} save={save} saving={saving} assigning={assigning} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
-    <NewScriptDialog open={importOpen} setOpen={setImportOpen} onCreate={createDraft} />
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={initialData.failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
+    <ImportDialog open={importOpen} setOpen={setImportOpen} onImport={importReel} onCreate={createDraft} importing={importing} />
+    <BrandDialog key={brandOpen ? "brand-open" : "brand-closed"} open={brandOpen} setOpen={setBrandOpen} brand={brand} setBrand={setBrand} notify={notify} canManage={canManage} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
     {toast ? <div className="studio-toast" role="status"><Check />{toast}</div> : null}
   </div>;
 }
 
-function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, openWriter, openImport, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; status:string; setStatus:(value:string)=>void; openWriter:(script:StudioScript)=>void; openImport:()=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
+function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, openWriter, openImport, openBrand, failedNotifications, notify, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; status:string; setStatus:(value:string)=>void; openWriter:(script:StudioScript)=>void; openImport:()=>void; openBrand:()=>void; failedNotifications:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
   const [view,setView]=useState<"pipeline"|"table">("pipeline");
   const [dragged,setDragged]=useState<string|null>(null);
   const [dropStage,setDropStage]=useState<StudioScript["pipelineStage"]|null>(null);
@@ -226,8 +339,9 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
   const winners=allScripts.filter((script)=>script.pipelineStage==="winner").length;
   const move=(stage:StudioScript["pipelineStage"])=>{const script=allScripts.find((item)=>item.id===dragged);if(script&&script.pipelineStage!==stage)updateMetadata(script,{pipelineStage:stage});setDragged(null);setDropStage(null);};
   return <div className="script-bank pipeline-home">
-    <div className="pipeline-titlebar"><div><p className="eyebrow">CREATIVE TESTING SYSTEM</p><h1>Script pipeline</h1><p>Every concept moves from reference to test, iteration, and a measurable winner.</p></div><div className="pipeline-title-actions">{sourceMode==="database"?<span className="neon-live"><i/>Neon live</span>:null}{canManage?<Button className="studio-primary" onClick={openImport}><Plus/>New script</Button>:null}</div></div>
+    <div className="pipeline-titlebar"><div><p className="eyebrow">CREATIVE TESTING SYSTEM</p><h1>Script pipeline</h1><p>Every concept moves from reference to test, iteration, and a measurable winner.</p></div><div className="pipeline-title-actions">{sourceMode==="database"?<span className="neon-live"><i/>Neon live</span>:null}{canManage?<><button className="studio-secondary" onClick={openBrand}><Building2/>Brand</button><Button className="studio-primary" onClick={openImport}><Plus/>New script</Button></>:null}</div></div>
     {sourceMode==="preview"?<div className="studio-preview-banner"><Sparkles/><div><strong>Preview data</strong><span>Neon is connected. Create the first real script to replace these example cards.</span></div></div>:null}
+    {failedNotifications.length?<FailedNotificationStrip items={failedNotifications} notify={notify}/>:null}
     <div className="pipeline-overview"><article><span>ACTIVE TESTS</span><strong>{activeTests}</strong><small>{allScripts.reduce((sum,script)=>sum+script.performance.liveTests,0)} variants live</small></article><article><span>TESTED VIEWS</span><strong>{compactNumber(totalViews)}</strong><small>Across tracked variants</small></article><article><span>WINNING CONCEPTS</span><strong>{winners}</strong><small>{allScripts.length?Math.round(winners/allScripts.length*100):0}% winner rate</small></article><article><span>AVG. HOOK RATE</span><strong>{hookRates.length?`${Math.round(hookRates.reduce((sum,value)=>sum+value,0)/hookRates.length*100)}%`:"—"}</strong><small>Across measured tests</small></article></div>
     <div className="pipeline-controls"><div className="pipeline-views"><button className={view==="pipeline"?"active":""} onClick={()=>setView("pipeline")}><LayoutDashboard/>Pipeline</button><button className={view==="table"?"active":""} onClick={()=>setView("table")}><Table2/>Table</button></div><div className="category-tabs">{categories.slice(0,7).map((category)=><button key={category} className={status===category?"active":""} onClick={()=>setStatus(category)}>{category==="all"?"All categories":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</div><label className="pipeline-search"><Search/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search scripts"/></label></div>
     {view==="pipeline"?<div className="pipeline-board">{stages.map((stage)=>{
@@ -252,17 +366,40 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
   </div>;
 }
 
-function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; assigning:boolean; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
+function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, generating, generate, generation, dismissGeneration, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; assigning:boolean; generating:boolean; generate:()=>void; generation:GenerationOutcome|null; dismissGeneration:()=>void; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
   const [copied, setCopied] = useState(false);
+  const [showDiff, setShowDiff] = useState(true);
   const [assetDialog, setAssetDialog] = useState<"reference_video"|"resource"|null>(null);
   const [assetPending, setAssetPending] = useState(false);
   const scriptText = script.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n");
   const wordCount = scriptText.split(/\s+/).filter(Boolean).length;
   const { references, resources } = partitionScriptAssets(script.assets);
   const canSave = canManage && Boolean(script.title.trim() && scriptText.trim()) && !saving && !assigning;
+  const structured = script.sections.length > 1 || Boolean(script.sections[0]?.label && script.sections[0].label !== "Script");
+  const canGenerate = canManage && Boolean(scriptText.trim()) && !generating && !saving && !assigning;
+  /** Promote the freeform block into labelled beats. Freeform stays the default. */
+  const splitIntoBeats = () => updateScript((current) => {
+    const beats = segmentTranscript(scriptText);
+    if (!beats.length) return current;
+    const sections = beats.map((beat) => ({ id: beat.id, label: beat.label, timecode: beat.timecode, delivery: "", copy: beat.text, visualDirection: "", assetIds: [] as string[] }));
+    return { ...current, sections, durationSeconds: estimateScriptDuration(sections), updatedAt: new Date().toISOString() };
+  });
+  const mergeToFreeform = () => updateScript((current) => {
+    const merged = [plainScriptSection(current.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n"))];
+    return { ...current, sections: merged, durationSeconds: estimateScriptDuration(merged), updatedAt: new Date().toISOString() };
+  });
   const updateBody = (body:string) => updateScript((current) => {
     const sections = [plainScriptSection(body, current.sections[0]?.id)];
     return { ...current, hook:scriptHookFromText(body), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
+  });
+  const updateSection = (index:number, patch:Partial<StudioScript["sections"][number]>) => updateScript((current) => {
+    const sections = current.sections.map((section,position) => position===index ? { ...section, ...patch } : section);
+    return { ...current, hook:scriptHookFromSections(sections), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
+  });
+  const removeSection = (index:number) => updateScript((current) => {
+    const sections = current.sections.filter((_,position) => position!==index);
+    if (!sections.length) return current;
+    return { ...current, hook:scriptHookFromSections(sections), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
   });
   const copyScript = async () => { await navigator.clipboard.writeText(scriptText); setCopied(true); notify("Script copied"); window.setTimeout(() => setCopied(false), 1800); };
   const addAsset = async (input:{label:string;kind:"reference_video"|"image"|"audio"|"file";sourceUrl:string}) => {
@@ -312,7 +449,7 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, o
     return () => window.removeEventListener("keydown",handleSave);
   },[canSave,save]);
   return <div className="writer-frame">
-    <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
+    <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button className="writer-generate" onClick={generate} disabled={!canGenerate} title="Swap the business, keep every other word">{generating?<Clock3/>:<Sparkles/>}{generating?"Generating…":"Generate"}</button><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
     <main className="simple-script-writer">
       <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
       <div className="simple-script-toolbar">
@@ -321,8 +458,20 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, o
         <label>Platform<select value={script.targetPlatform} onChange={(event)=>updateScript((current)=>({...current,targetPlatform:event.target.value}))}><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
         <label>Priority<select value={script.priority} onChange={(event)=>updateScript((current)=>({...current,priority:event.target.value as StudioScript["priority"]}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
         <span>{wordCount} words · {script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</span>
+        {canManage?<button type="button" className="beats-toggle" onClick={structured?mergeToFreeform:splitIntoBeats} disabled={!scriptText.trim()}>{structured?<><Rows/>Merge to freeform</>:<><ListTree/>Split into beats</>}</button>:null}
       </div>
-      <textarea className="simple-script-body" aria-label="Script" spellCheck value={scriptText} onChange={(event)=>updateBody(event.target.value)} placeholder="Write the script here…"/>
+      {generation?<GenerationPanel generation={generation} showDiff={showDiff} setShowDiff={setShowDiff} dismiss={dismissGeneration}/>:null}
+      {structured
+        ? <div className="beat-editor">{script.sections.map((section,index)=><article className="beat-row" key={section.id}>
+            <div className="beat-meta">
+              <input aria-label={`Beat ${index+1} label`} value={section.label} onChange={(event)=>updateSection(index,{label:event.target.value})} placeholder="Label"/>
+              <input aria-label={`Beat ${index+1} timecode`} value={section.timecode} onChange={(event)=>updateSection(index,{timecode:event.target.value})} placeholder="0:00"/>
+              {canManage&&script.sections.length>1?<button type="button" aria-label={`Remove beat ${index+1}`} onClick={()=>removeSection(index)}><Trash2/></button>:null}
+            </div>
+            <textarea aria-label={`Beat ${index+1} copy`} spellCheck rows={3} value={section.copy} onChange={(event)=>updateSection(index,{copy:event.target.value})} placeholder="What they say…"/>
+            <input className="beat-visual" aria-label={`Beat ${index+1} visual direction`} value={section.visualDirection} onChange={(event)=>updateSection(index,{visualDirection:event.target.value})} placeholder="Visual direction · optional"/>
+          </article>)}</div>
+        : <textarea className="simple-script-body" aria-label="Script" spellCheck value={scriptText} onChange={(event)=>updateBody(event.target.value)} placeholder="Write the script here…"/>}
       <div className="script-support-grid">
         <ScriptAssetPanel title="Reference videos" icon={<Video/>} items={references} primaryReference={script.reference?.sourceUrl ? { url:script.reference.sourceUrl,label:script.reference.sourceCreator ?? "Original reference" } : null} empty="No reference videos" addLabel="Add reference" onAdd={canManage?()=>setAssetDialog("reference_video"):undefined} onRemove={canManage?removeAsset:undefined} pending={assetPending}/>
         <ScriptAssetPanel title="Editing resources" icon={<ImageIcon/>} items={resources} empty="No images or audio" addLabel="Add resource" onAdd={canManage?()=>setAssetDialog("resource"):undefined} onRemove={canManage?removeAsset:undefined} pending={assetPending}/>
@@ -330,6 +479,125 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, o
     </main>
     <AssetDialog mode={assetDialog} open={assetDialog!==null} setOpen={(open)=>{if(!open)setAssetDialog(null);}} pending={assetPending} onAdd={addAsset}/>
   </div>;
+}
+
+function FailedNotificationStrip({ items, notify }:{ items:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void }) {
+  const [retrying,setRetrying]=useState<string|null>(null);
+  const [dismissed,setDismissed]=useState<string[]>([]);
+  const visible = items.filter((item)=>!dismissed.includes(item.operationId));
+  if (!visible.length) return null;
+  const retry = async (operationId:string) => {
+    setRetrying(operationId);
+    try {
+      const response = await fetch(`/api/discord-operations/${operationId}/retry`,{method:"POST"});
+      if(!response.ok) throw new Error("Retry could not be queued");
+      setDismissed((current)=>[...current,operationId]);
+      notify("Discord notification queued again");
+    } catch(error) {
+      notify(error instanceof Error?error.message:"Retry could not be queued");
+    } finally { setRetrying(null); }
+  };
+  return <div className="notification-failures" role="alert">
+    <header><TriangleAlert/><strong>{visible.length} Discord notification{visible.length===1?"":"s"} did not reach {visible.length===1?"its":"their"} creator</strong></header>
+    <ul>{visible.map((item)=><li key={item.operationId}>
+      <span><strong>{item.creatorName ?? "A creator"}</strong> was never told about “{item.scriptTitle}”.{item.lastError?<em> {item.lastError}</em>:null}</span>
+      <button type="button" disabled={retrying===item.operationId} onClick={()=>retry(item.operationId)}>{retrying===item.operationId?"Queueing…":"Retry"}</button>
+    </li>)}</ul>
+  </div>;
+}
+
+function GenerationPanel({ generation, showDiff, setShowDiff, dismiss }:{ generation:GenerationOutcome; showDiff:boolean; setShowDiff:(value:boolean)=>void; dismiss:()=>void }) {
+  const tokens = useMemo(() => generation.before.trim() ? diffWords(generation.before, generation.after) : [], [generation]);
+  const preserved = tokens.length ? Math.round(preservedRatio(tokens) * 100) : null;
+  const changes = generation.generation.substitutions;
+  return <section className="generation-panel" aria-label="Generation result">
+    <header>
+      <div>
+        <strong>{generation.degraded ? "Generated without a model" : "Adapted for your brand"}</strong>
+        <span>
+          {generation.degraded
+            ? "Set ANTHROPIC_API_KEY to use the real model. This is the deterministic fallback."
+            : `${changes.length} substitution${changes.length===1?"":"s"}${preserved===null?"":` · ${preserved}% of the source preserved`}`}
+        </span>
+      </div>
+      <div className="generation-actions">
+        {tokens.length?<button type="button" onClick={()=>setShowDiff(!showDiff)}>{showDiff?"Hide diff":"Show diff"}</button>:null}
+        <button type="button" onClick={dismiss} aria-label="Dismiss generation summary">Dismiss</button>
+      </div>
+    </header>
+    {changes.length?<ul className="generation-substitutions">{changes.slice(0,12).map((change,index)=><li key={`${change.sectionId}-${index}`}><del>{change.from}</del><span>→</span><ins>{change.to}</ins></li>)}</ul>:null}
+    {showDiff&&tokens.length?<p className="generation-diff">{tokens.map((token,index)=>token.state==="same"
+      ? <span key={index}>{token.text} </span>
+      : token.state==="added"
+        ? <ins key={index}>{token.text} </ins>
+        : <del key={index}>{token.text} </del>)}</p>:null}
+  </section>;
+}
+
+function ImportDialog({ open, setOpen, onImport, onCreate, importing }:{ open:boolean; setOpen:(open:boolean)=>void; onImport:(url:string)=>Promise<boolean>; onCreate:(input:{title:string;body:string;url:string;creator:string})=>void; importing:boolean }) {
+  const [url,setUrl]=useState("");
+  const [manual,setManual]=useState(false);
+  const [title,setTitle]=useState("");
+  const [body,setBody]=useState("");
+  const [creator,setCreator]=useState("");
+  const parsed = useMemo(()=>url.trim()?parseReferenceUrl(url):null,[url]);
+  const ready = parsed?.kind==="instagram" && !importing;
+  const submit = async () => { if(!ready)return; if(await onImport(url)){setUrl("");setManual(false);} };
+  const createManually = () => { onCreate({title,body,url,creator}); setTitle(""); setBody(""); setUrl(""); setCreator(""); setManual(false); };
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="reference-dialog new-script-dialog sm:max-w-2xl">
+    <DialogHeader><DialogTitle>New script</DialogTitle><DialogDescription>Paste a reel link and it is transcribed straight into the writer.</DialogDescription></DialogHeader>
+    <div className="import-form">
+      <label className="import-url">
+        <Link2/>
+        <input value={url} autoFocus placeholder="https://instagram.com/reel/…" onChange={(event)=>setUrl(event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter")void submit();}} disabled={importing}/>
+        <Button className="studio-primary" disabled={!ready} onClick={submit}>{importing?<Clock3/>:<Sparkles/>}{importing?"Transcribing…":"Import"}</Button>
+      </label>
+      {parsed?.kind==="coming_soon"?<p className="import-hint import-hint-soon"><Clock3/>TikTok support is coming soon. Paste an Instagram reel, or add the transcript manually.</p>:null}
+      {parsed?.kind==="unsupported"&&url.trim()?<p className="import-hint import-hint-error">{parsed.reason}</p>:null}
+      {importing?<p className="import-hint">Resolving the reel and transcribing the audio. This takes about 20 seconds.</p>:null}
+      <button type="button" className="import-manual-toggle" onClick={()=>setManual(!manual)}>{manual?"Hide manual entry":"Or write it manually"}</button>
+      {manual?<div className="new-script-form">
+        <input value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Title"/>
+        <textarea rows={10} value={body} onChange={(event)=>setBody(event.target.value)} placeholder="Paste or write the transcript…"/>
+        <div><input value={creator} onChange={(event)=>setCreator(event.target.value)} placeholder="Source creator · optional"/></div>
+        <DialogFooter className="reference-dialog-footer"><Button className="studio-primary" disabled={!title.trim()||!body.trim()} onClick={createManually}>Create draft</Button></DialogFooter>
+      </div>:null}
+    </div>
+  </DialogContent></Dialog>;
+}
+
+function BrandDialog({ open, setOpen, brand, setBrand, notify, canManage }:{ open:boolean; setOpen:(open:boolean)=>void; brand:ScriptStudioData["brand"]; setBrand:(brand:ScriptStudioData["brand"])=>void; notify:(message:string)=>void; canManage:boolean }) {
+  const [draft,setDraft]=useState(brand);
+  const [saving,setSaving]=useState(false);
+  const submit = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/brand",{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(draft)});
+      const result = await response.json() as { error?:string };
+      if(!response.ok) throw new Error(result.error ?? "Brand could not be saved");
+      setBrand(draft);
+      notify("Brand context saved");
+      setOpen(false);
+    } catch(error) {
+      notify(error instanceof Error?error.message:"Brand could not be saved");
+    } finally { setSaving(false); }
+  };
+  const listField = (label:string,key:"voice"|"bannedPhrases"|"proofPoints",placeholder:string) => <label key={key}>
+    <span>{label}</span>
+    <textarea rows={2} value={draft[key].join("\n")} placeholder={placeholder} onChange={(event)=>setDraft({...draft,[key]:event.target.value.split(/\n+/).map((line)=>line.trim()).filter(Boolean)})}/>
+  </label>;
+  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="brand-dialog sm:max-w-xl">
+    <DialogHeader><DialogTitle>Brand context</DialogTitle><DialogDescription>Generation swaps the business to this. The more precise this is, the better the output.</DialogDescription></DialogHeader>
+    <div className="brand-form">
+      <label><span>Business name</span><input value={draft.name} onChange={(event)=>setDraft({...draft,name:event.target.value})} placeholder="Result"/></label>
+      <label><span>What it is</span><textarea rows={2} value={draft.productDescription} onChange={(event)=>setDraft({...draft,productDescription:event.target.value})} placeholder="One clear sentence about the product."/></label>
+      <label><span>Who it is for</span><input value={draft.audience} onChange={(event)=>setDraft({...draft,audience:event.target.value})} placeholder="UGC managers running creator programs"/></label>
+      {listField("Voice · one per line","voice","direct\nplain-spoken")}
+      {listField("Proof points · one per line","proofPoints","Used by 40 creator programs")}
+      {listField("Never say · one per line","bannedPhrases","revolutionary\ngame-changing")}
+    </div>
+    <DialogFooter><Button className="studio-primary" disabled={!canManage||!draft.name.trim()||!draft.productDescription.trim()||saving} onClick={submit}>{saving?"Saving…":"Save brand"}</Button></DialogFooter>
+  </DialogContent></Dialog>;
 }
 
 function ScriptAssetPanel({ title, icon, items, primaryReference, empty, addLabel, onAdd, onRemove, pending }:{ title:string; icon:ReactNode; items:StudioAsset[]; primaryReference?:{url:string;label:string}|null; empty:string; addLabel:string; onAdd?:()=>void; onRemove?:(asset:StudioAsset)=>void; pending:boolean }) {
@@ -344,21 +612,6 @@ function AssetDialog({ mode, open, setOpen, pending, onAdd }:{ mode:"reference_v
   const selectedKind = mode === "reference_video" ? "reference_video" : kind;
   const submit = async () => { if(await onAdd({label:label.trim(),kind:selectedKind,sourceUrl:url.trim()})){setLabel("");setUrl("");setKind("image");} };
   return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="asset-dialog sm:max-w-lg"><DialogHeader><DialogTitle>{mode==="reference_video"?"Add reference video":"Add editing resource"}</DialogTitle></DialogHeader><div className="asset-dialog-form">{mode==="resource"?<label><span>Type</span><select value={kind} onChange={(event)=>setKind(event.target.value as typeof kind)}><option value="image">Image</option><option value="audio">Audio</option><option value="file">File</option></select></label>:null}<label><span>Name</span><input value={label} onChange={(event)=>setLabel(event.target.value)} placeholder={mode==="reference_video"?"Reference name":"Resource name"} autoFocus/></label><label><span>URL</span><input type="url" value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="https://…"/></label></div><DialogFooter><Button className="studio-primary" disabled={!label.trim()||!validHttpUrl(url)||pending} onClick={submit}>{pending?"Adding…":"Add"}</Button></DialogFooter></DialogContent></Dialog>;
-}
-
-function NewScriptDialog({ open, setOpen, onCreate }:{ open:boolean; setOpen:(open:boolean)=>void; onCreate:(input:{title:string;body:string;url:string;creator:string})=>void }) {
-  const [title,setTitle]=useState("");
-  const [body,setBody]=useState("");
-  const [url,setUrl]=useState("");
-  const [creator,setCreator]=useState("");
-  const create = () => {
-    onCreate({title,body,url,creator});
-    setTitle("");
-    setBody("");
-    setUrl("");
-    setCreator("");
-  };
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="reference-dialog new-script-dialog sm:max-w-2xl"><DialogHeader><DialogTitle>New script</DialogTitle></DialogHeader><div className="new-script-form"><input value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Title" autoFocus/><textarea rows={12} value={body} onChange={(event)=>setBody(event.target.value)} placeholder="Write the script…"/><div><input value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="Reference URL · optional"/><input value={creator} onChange={(event)=>setCreator(event.target.value)} placeholder="Source creator · optional"/></div></div><DialogFooter className="reference-dialog-footer"><Button className="studio-primary" disabled={!title.trim()||!body.trim()} onClick={create}>Create draft</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 function AssignDialog({ open,setOpen,script,creators,assigning,onAssign }:{ open:boolean;setOpen:(open:boolean)=>void;script:StudioScript|null;creators:StudioCreator[];assigning:boolean;onAssign:(ids:string[],dueAt:string,message:string,notifyCreator:boolean)=>void }) {
