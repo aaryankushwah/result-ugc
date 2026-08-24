@@ -56,8 +56,10 @@ export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
       return <Card className={`metric-card overview-metric-card ${metric.attention ? "metric-attention" : ""}`} key={metric.id}>
         <DitherGradient from={ditherColor} direction="right" cell={2} opacity={metric.attention ? 0.34 : 0.28} className="overview-metric-dither" />
         <div className="metric-icon"><Icon /></div>
-        <div className="overview-metric-copy"><p>{metric.label}</p></div>
-        <strong>{metric.value}</strong>
+        <div className="overview-metric-copy">
+          <p>{metric.label}</p>
+          <strong>{metric.value}</strong>
+        </div>
       </Card>;
     })}
   </section>;
