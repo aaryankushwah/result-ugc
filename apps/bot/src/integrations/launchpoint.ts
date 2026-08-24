@@ -32,14 +32,33 @@ export async function launchpointGet<T = unknown>(path: string, params: Record<s
   return payload as T;
 }
 
-type LaunchpointCreator = { id?: string; name?: string; email?: string; username?: string; status?: string };
-type LaunchpointContract = { id?: string; creatorId?: string; programId?: string; programName?: string; status?: string; startDate?: string; endDate?: string; createdAt?: string; updatedAt?: string };
+export type LaunchpointCreator = { id?: string; name?: string; email?: string; username?: string; status?: string };
+export type LaunchpointContract = { id?: string; creatorId?: string; programId?: string; programName?: string; status?: string; startDate?: string; endDate?: string; createdAt?: string; updatedAt?: string };
 type LaunchpointProgram = { id?: string; name?: string; status?: string };
-type LaunchpointPost = { id?: string; creatorId?: string; title?: string; status?: string; uploadedAt?: number; createdAt?: string };
+export type LaunchpointPost = { id?: string; creatorId?: string; contractorName?: string; title?: string; status?: string; uploadedAt?: number; createdAt?: string; url?: string; platform?: string };
+export type LaunchpointRelationshipRecord = ProviderRelationship & { creatorExternalId: string };
 
 export class LaunchpointAdapter implements SigningProviderAdapter {
   readonly provider = "launchpoint" as const;
   readonly syncMode = "api" as const;
+
+  async listCreators(): Promise<ProviderCreator[]> {
+    const result = await launchpointGet<{ data?: LaunchpointCreator[] }>("/creators", { limit: "500" });
+    return (result.data ?? []).flatMap((creator) => creator.id ? [this.mapCreator(creator)] : []);
+  }
+
+  async listRelationshipRecords(): Promise<LaunchpointRelationshipRecord[]> {
+    const result = await launchpointGet<{ data?: LaunchpointContract[] }>("/contracts", { limit: "500" });
+    return (result.data ?? []).flatMap((contract) => {
+      if (!contract.id || !contract.creatorId) return [];
+      return [{ ...this.mapRelationship(contract), creatorExternalId: contract.creatorId }];
+    });
+  }
+
+  async listPosts(): Promise<LaunchpointPost[]> {
+    const result = await launchpointGet<{ data?: LaunchpointPost[] }>("/posts", { limit: "500" });
+    return result.data ?? [];
+  }
 
   async searchCreators(query: string): Promise<ProviderCreator[]> {
     const result = await launchpointGet<{ data?: LaunchpointCreator[] }>("/creators", { limit: "100", search: query });
@@ -58,12 +77,7 @@ export class LaunchpointAdapter implements SigningProviderAdapter {
 
   async getRelationships(externalId: string): Promise<ProviderRelationship[]> {
     const result = await launchpointGet<{ data?: LaunchpointContract[] }>("/contracts", { limit: "100", creatorId: externalId });
-    return (result.data ?? []).flatMap((contract) => {
-      if (!contract.id) return [];
-      const status = contract.status?.toLowerCase();
-      const active = status ? ["active", "signed", "approved"].includes(status) : null;
-      return [{ externalId: contract.id, provider: "launchpoint", program: contract.programName ?? contract.programId ?? null, state: deriveRelationshipState({ startsAt: contract.startDate ? new Date(contract.startDate) : null, endsAt: contract.endDate ? new Date(contract.endDate) : null, active }), startsAt: contract.startDate ?? null, endsAt: contract.endDate ?? null, sourceUrl: this.getDeepLink(externalId), lastSyncedAt: new Date().toISOString() }];
-    });
+    return (result.data ?? []).flatMap((contract) => contract.id ? [this.mapRelationship(contract)] : []);
   }
 
   async getPrograms(): Promise<ProviderProgram[]> {
@@ -72,8 +86,8 @@ export class LaunchpointAdapter implements SigningProviderAdapter {
   }
 
   async getRecentActivity(since?: Date): Promise<ProviderActivity[]> {
-    const result = await launchpointGet<{ data?: LaunchpointPost[] }>("/posts", { limit: "100" });
-    return (result.data ?? []).flatMap((post) => {
+    const posts = await this.listPosts();
+    return posts.flatMap((post) => {
       if (!post.id) return [];
       const occurredAt = post.createdAt ?? (post.uploadedAt ? new Date(post.uploadedAt).toISOString() : new Date().toISOString());
       if (since && new Date(occurredAt) < since) return [];
@@ -85,5 +99,20 @@ export class LaunchpointAdapter implements SigningProviderAdapter {
 
   private mapCreator(creator: LaunchpointCreator): ProviderCreator {
     return { externalId: creator.id!, displayName: creator.name ?? creator.username ?? creator.email ?? creator.id!, email: creator.email ?? null, username: creator.username ?? null, sourceUrl: this.getDeepLink(creator.id!) };
+  }
+
+  private mapRelationship(contract: LaunchpointContract): ProviderRelationship {
+    const status = contract.status?.toLowerCase();
+    const active = status ? ["active", "signed", "approved"].includes(status) : null;
+    return {
+      externalId: contract.id!,
+      provider: "launchpoint",
+      program: contract.programName ?? contract.programId ?? null,
+      state: deriveRelationshipState({ startsAt: contract.startDate ? new Date(contract.startDate) : null, endsAt: contract.endDate ? new Date(contract.endDate) : null, active }),
+      startsAt: contract.startDate ?? null,
+      endsAt: contract.endDate ?? null,
+      sourceUrl: contract.creatorId ? this.getDeepLink(contract.creatorId) : null,
+      lastSyncedAt: new Date().toISOString(),
+    };
   }
 }

@@ -63,7 +63,7 @@ The project root is `apps/web`. Configure the variables listed in `apps/web/.env
 https://result-ugc-orcin.vercel.app/api/auth/discord/callback
 ```
 
-The protected `/api/cron/viral-sync` endpoint refreshes Viral account and video snapshots. Because Vercel Hobby only permits daily native cron schedules, the always-on Hetzner bot calls it every 15 minutes using `RESULT_PORTAL_URL` and `RESULT_PORTAL_CRON_SECRET`. Failed synchronizations retain the last successful values and surface a stale or failed state; they are never converted into zeroes.
+The protected `/api/cron/viral-sync` endpoint runs the provider pipeline: it imports the complete Launchpoint creator/signing directory when `LAUNCHPOINT_API_KEY` is configured, adds Launchpoint-discovered social identities to Viral tracking, refreshes Viral account/video snapshots, and rebuilds canonical creator suggestions. Because Vercel Hobby only permits daily native cron schedules, the always-on Hetzner bot calls it every 15 minutes using `RESULT_PORTAL_URL` and `RESULT_PORTAL_CRON_SECRET`. Failed synchronizations retain the last successful values and surface a stale or failed state; they are never converted into zeroes.
 
 ### Hetzner bot
 

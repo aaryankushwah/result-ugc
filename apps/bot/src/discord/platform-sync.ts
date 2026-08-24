@@ -10,11 +10,13 @@ import {
 import {
   activityEvents,
   creatorDiscord,
+  creatorIdentityKey,
   creators,
   discordOperations,
   getDatabase,
   organizations,
-  socialAccounts,
+  reconcileCreatorAccountLinks,
+  signingRelationships,
   syncRuns,
 } from "@result/db";
 import { and, asc, eq, lte } from "drizzle-orm";
@@ -64,25 +66,56 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
   const run = await getDatabase().insert(syncRuns).values({ organizationId: orgId, source: "discord", state: "running", recordsSeen: userIds.size }).returning({ id: syncRuns.id });
   let changed = 0;
   try {
+    const [connectionRows, creatorRows, relationshipRows] = await Promise.all([
+      getDatabase().select().from(creatorDiscord).where(and(eq(creatorDiscord.organizationId, orgId), eq(creatorDiscord.guildId, guild.id))),
+      getDatabase().select({ id: creators.id, displayName: creators.displayName, email: creators.email }).from(creators).where(eq(creators.organizationId, orgId)),
+      getDatabase().select({ creatorId: signingRelationships.creatorId, raw: signingRelationships.raw }).from(signingRelationships).where(eq(signingRelationships.organizationId, orgId)),
+    ]);
+    const connectionByUserId = new Map(connectionRows.filter((row) => row.discordUserId).map((row) => [row.discordUserId!, row]));
+    const connectedCreatorIds = new Set(connectionRows.map((row) => row.creatorId));
+    const creatorIdsByIdentity = new Map<string, Set<string>>();
+    const addIdentity = (value: string | null | undefined, creatorId: string) => {
+      const key = creatorIdentityKey(value); if (!key) return;
+      const ids = creatorIdsByIdentity.get(key) ?? new Set<string>(); ids.add(creatorId); creatorIdsByIdentity.set(key, ids);
+    };
+    for (const creator of creatorRows) { addIdentity(creator.displayName, creator.id); addIdentity(creator.email, creator.id); }
+    for (const relationship of relationshipRows) {
+      const raw = relationship.raw && typeof relationship.raw === "object" && !Array.isArray(relationship.raw) ? relationship.raw : null;
+      const providerCreator = raw?.creator && typeof raw.creator === "object" && !Array.isArray(raw.creator) ? raw.creator as Record<string, unknown> : null;
+      for (const value of [providerCreator?.displayName, providerCreator?.name, providerCreator?.username, providerCreator?.email]) if (typeof value === "string") addIdentity(value, relationship.creatorId);
+    }
     for (const userId of userIds) {
       const member = members.get(userId);
       const channel = channelByUser.get(userId);
       const hasCreatorRole = Boolean(member && creatorRole && member.roles.cache.has(creatorRole.id));
       const hasApplicantRole = Boolean(member && applicantRole && member.roles.cache.has(applicantRole.id));
       const state = !member ? "left" : hasCreatorRole ? "connected" : hasApplicantRole ? "applicant" : channel ? "missing_access" : "unknown";
-      const existing = await getDatabase().select({ creatorId: creatorDiscord.creatorId, state: creatorDiscord.state, channelId: creatorDiscord.privateChannelId }).from(creatorDiscord).where(and(eq(creatorDiscord.organizationId, orgId), eq(creatorDiscord.guildId, guild.id), eq(creatorDiscord.discordUserId, userId))).limit(1);
-      const current = existing[0];
+      const current = connectionByUserId.get(userId);
       let creatorId = current?.creatorId;
       if (!creatorId) {
-        const [created] = await getDatabase().insert(creators).values({ organizationId: orgId, displayName: member?.displayName ?? member?.user.username ?? `Discord ${userId}`, lifecycle: hasCreatorRole || channel ? "active" : "request", lastActivityAt: new Date() }).returning({ id: creators.id });
-        if (!created) continue;
-        creatorId = created.id;
-        await getDatabase().insert(creatorDiscord).values({ organizationId: orgId, creatorId, guildId: guild.id, discordUserId: userId, username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date() });
-        await logEvent(orgId, creatorId, "discord.creator_discovered", `Discord creator ${member?.displayName ?? userId} was reconciled into Result.`, { state, channelId: channel?.id ?? null });
+        const candidates = new Set<string>();
+        for (const value of [member?.user.username, member?.displayName]) {
+          const key = creatorIdentityKey(value); if (!key) continue;
+          for (const id of creatorIdsByIdentity.get(key) ?? []) if (!connectedCreatorIds.has(id)) candidates.add(id);
+        }
+        creatorId = candidates.size === 1 ? [...candidates][0] : undefined;
+        const matchedCanonical = Boolean(creatorId);
+        if (!creatorId) {
+          const [created] = await getDatabase().insert(creators).values({ organizationId: orgId, displayName: member?.displayName ?? member?.user.username ?? `Discord ${userId}`, lifecycle: hasCreatorRole || channel ? "active" : "request", lastActivityAt: new Date() }).returning({ id: creators.id });
+          if (!created) continue;
+          creatorId = created.id;
+          addIdentity(member?.user.username, creatorId);
+          addIdentity(member?.displayName, creatorId);
+        } else if (hasCreatorRole || channel) {
+          await getDatabase().update(creators).set({ lifecycle: "active", lastActivityAt: new Date(), updatedAt: new Date() }).where(eq(creators.id, creatorId));
+        }
+        const [insertedConnection] = await getDatabase().insert(creatorDiscord).values({ organizationId: orgId, creatorId, guildId: guild.id, discordUserId: userId, username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date() }).returning();
+        if (insertedConnection) connectionByUserId.set(userId, insertedConnection);
+        connectedCreatorIds.add(creatorId);
+        await logEvent(orgId, creatorId, matchedCanonical ? "discord.identity_matched" : "discord.creator_discovered", matchedCanonical ? `Discord @${member?.user.username ?? userId} was matched to the existing Result creator.` : `Discord creator ${member?.displayName ?? userId} was reconciled into Result.`, { state, channelId: channel?.id ?? null, verificationMethod: matchedCanonical ? "automatic_exact_identity" : "discord_seeded_creator" });
         changed += 1;
-      } else {
-        if (!current) continue;
-        const didChange = current.state !== state || current.channelId !== (channel?.id ?? null);
+      } else if (current) {
+        const didChange = current.state !== state || current.privateChannelId !== (channel?.id ?? null);
         await getDatabase().update(creatorDiscord).set({ username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date(), updatedAt: new Date() }).where(eq(creatorDiscord.creatorId, creatorId));
         if (didChange) {
           await logEvent(orgId, creatorId, "discord.state_changed", `Discord access changed to ${state}.`, { previousState: current.state, state, channelId: channel?.id ?? null });
@@ -90,7 +123,7 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
         }
       }
     }
-    changed += await suggestExactAccountLinks(orgId);
+    changed += await reconcileCreatorAccountLinks(orgId);
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsChanged: changed }).where(eq(syncRuns.id, run[0].id));
   } catch (error) {
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "failed", finishedAt: new Date(), recordsChanged: changed, error: error instanceof Error ? error.message : String(error) }).where(eq(syncRuns.id, run[0].id));
@@ -98,40 +131,7 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
   }
 }
 
-function identityKey(value: string | null | undefined): string | null {
-  const normalized = value?.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
-  return normalized.length >= 3 ? normalized : null;
-}
-
-export async function suggestExactAccountLinks(organizationId: string): Promise<number> {
-  const [creatorRows, discordRows, accountRows] = await Promise.all([
-    getDatabase().select({ id: creators.id, displayName: creators.displayName }).from(creators).where(eq(creators.organizationId, organizationId)),
-    getDatabase().select({ creatorId: creatorDiscord.creatorId, username: creatorDiscord.username, displayName: creatorDiscord.displayName }).from(creatorDiscord).where(eq(creatorDiscord.organizationId, organizationId)),
-    getDatabase().select().from(socialAccounts).where(eq(socialAccounts.organizationId, organizationId)),
-  ]);
-  const creatorIdsByKey = new Map<string, Set<string>>();
-  const addKey = (value: string | null | undefined, creatorId: string) => {
-    const key = identityKey(value); if (!key) return;
-    const ids = creatorIdsByKey.get(key) ?? new Set<string>(); ids.add(creatorId); creatorIdsByKey.set(key, ids);
-  };
-  for (const creator of creatorRows) addKey(creator.displayName, creator.id);
-  for (const connection of discordRows) { addKey(connection.username, connection.creatorId); addKey(connection.displayName, connection.creatorId); }
-  let changed = 0;
-  for (const account of accountRows) {
-    if (account.linkState === "confirmed" || account.creatorId) continue;
-    const candidates = new Set<string>();
-    for (const value of [account.username, account.displayName]) {
-      const key = identityKey(value); if (!key) continue;
-      for (const creatorId of creatorIdsByKey.get(key) ?? []) candidates.add(creatorId);
-    }
-    const suggestedCreatorId = candidates.size === 1 ? [...candidates][0]! : null;
-    if (account.suggestedCreatorId === suggestedCreatorId && account.linkState === (suggestedCreatorId ? "suggested" : "unlinked")) continue;
-    await getDatabase().update(socialAccounts).set({ suggestedCreatorId, linkState: suggestedCreatorId ? "suggested" : "unlinked", linkConfidence: suggestedCreatorId ? 1 : null, updatedAt: new Date() }).where(eq(socialAccounts.id, account.id));
-    if (suggestedCreatorId) await logEvent(organizationId, suggestedCreatorId, "account.match_suggested", `@${account.username ?? "account"} exactly matched this creator and is awaiting manager confirmation.`, { viralOrgAccountId: account.viralOrgAccountId, platform: account.platform, confidence: 1 });
-    changed += 1;
-  }
-  return changed;
-}
+export const suggestExactAccountLinks = reconcileCreatorAccountLinks;
 
 export async function reconcileMember(member: GuildMember): Promise<void> {
   await reconcileGuild(member.guild);

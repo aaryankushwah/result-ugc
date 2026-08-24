@@ -3,6 +3,7 @@ import { activityEvents, socialAccounts, videos as storedVideos } from "@result/
 import { and, eq } from "drizzle-orm";
 import { excludeViralVideos } from "@/lib/viral";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
+import { invalidatePortalData } from "@/lib/portal-cache";
 
 const schema = z.object({ reason: z.enum(["warmup_unpaid"]), videos: z.array(z.object({ accountId: z.string().startsWith("orgacc_"), platform: z.enum(["facebook", "instagram", "tiktok", "youtube", "snapchat"]), platformAccountId: z.string().min(1), platformVideoId: z.string().min(1) })).min(1).max(100) });
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       if (account) await context.db.update(storedVideos).set({ included: false, exclusionReason: parsed.data.reason, excludedAt: new Date(), excludedByUserId: context.internalUser?.id ?? null, updatedAt: new Date() }).where(and(eq(storedVideos.accountId, account.id), eq(storedVideos.platformVideoId, video.platformVideoId)));
       await context.db.insert(activityEvents).values({ organizationId: context.organization.id, creatorId: account?.creatorId ?? null, actorUserId: context.internalUser?.id ?? null, type: "video.excluded", summary: "Video excluded as warmup or unpaid content.", metadata: { ...video, reason: parsed.data.reason } });
     }
+    invalidatePortalData();
     return Response.json({ ok: true, result });
   } catch (error) { return mutationErrorResponse(error); }
 }

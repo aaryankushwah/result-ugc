@@ -101,6 +101,21 @@ export async function getLiveViralData(): Promise<{ accounts: PortalAccount[]; v
   return { accounts, videos };
 }
 
+export async function trackViralAccounts(accounts: Array<{ platform: string; username: string; maxVideos?: number }>): Promise<unknown> {
+  if (!accounts.length) return { count: 0 };
+  return viralFetch("/accounts/tracked", {
+    method: "POST",
+    body: JSON.stringify({
+      isCompetitor: false,
+      accounts: accounts.map((account) => ({
+        platform: account.platform.toLowerCase(),
+        username: account.username.replace(/^@/, ""),
+        max_videos: account.maxVideos ?? 100,
+      })),
+    }),
+  });
+}
+
 function mapAccount(account: ViralAccount): PortalAccount {
   const username = account.username ?? "unknown";
   return {

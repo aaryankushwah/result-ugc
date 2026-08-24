@@ -1,9 +1,17 @@
 import "server-only";
 
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { getLiveViralData } from "./viral";
 import type { PerformancePoint, PortalCreator, PortalData, PortalVideo } from "./portal-types";
 import { getDatabasePortalData } from "./portal-database";
+import { PORTAL_DATA_CACHE_TAG } from "./portal-cache";
+
+const getCachedDatabasePortalData = unstable_cache(
+  getDatabasePortalData,
+  ["result-portal-data-v2"],
+  { revalidate: 30, tags: [PORTAL_DATA_CACHE_TAG] },
+);
 
 function buildPerformance(videos: PortalVideo[], days = 30): PerformancePoint[] {
   const byDate = new Map<string, { views: number; posts: number }>();
@@ -58,7 +66,7 @@ function candidateCreators(accounts: PortalData["accounts"], videos: PortalVideo
 export const getPortalData = cache(async (): Promise<PortalData> => {
   const attemptedAt = new Date().toISOString();
   try {
-    const databaseData = await getDatabasePortalData();
+    const databaseData = await getCachedDatabasePortalData();
     if (databaseData) return databaseData;
     const { accounts, videos } = await getLiveViralData();
     const newestRefresh = accounts.map((account) => account.refreshedAt).filter(Boolean).sort().at(-1) ?? null;

@@ -2,6 +2,7 @@ import { activityEvents, creators, socialAccounts } from "@result/db";
 import { and, eq } from "drizzle-orm";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
 import { syncViralSnapshots } from "@/lib/viral-sync";
+import { invalidatePortalData } from "@/lib/portal-cache";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,6 +15,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!creator) throw new Error("Creator could not be created");
     await context.db.update(socialAccounts).set({ creatorId: creator.id, suggestedCreatorId: null, linkState: "confirmed", linkConfidence: 1, linkedByUserId: context.internalUser?.id ?? null, linkedAt: new Date(), updatedAt: new Date() }).where(eq(socialAccounts.id, account.id));
     await context.db.insert(activityEvents).values({ organizationId: context.organization.id, creatorId: creator.id, actorUserId: context.internalUser?.id ?? null, type: "account.promoted_to_creator", summary: `@${account.username ?? "account"} was confirmed as a new Result creator.`, metadata: { viralOrgAccountId: account.viralOrgAccountId, platform: account.platform } });
+    invalidatePortalData();
     return Response.json({ ok: true, creatorId: creator.id });
   } catch (error) { return mutationErrorResponse(error); }
 }

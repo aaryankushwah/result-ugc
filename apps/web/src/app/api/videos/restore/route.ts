@@ -3,6 +3,7 @@ import { activityEvents, socialAccounts, videos as storedVideos } from "@result/
 import { and, eq } from "drizzle-orm";
 import { managerContext, mutationErrorResponse } from "@/lib/mutation-context";
 import { restoreViralVideos } from "@/lib/viral";
+import { invalidatePortalData } from "@/lib/portal-cache";
 
 const schema = z.object({ videos: z.array(z.object({ accountId: z.string().startsWith("orgacc_"), platform: z.enum(["facebook", "instagram", "tiktok", "youtube", "snapchat"]), platformVideoId: z.string().min(1) })).min(1).max(100) });
 
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
       if (account) await context.db.update(storedVideos).set({ included: true, exclusionReason: null, excludedAt: null, excludedByUserId: null, updatedAt: new Date() }).where(and(eq(storedVideos.accountId, account.id), eq(storedVideos.platformVideoId, video.platformVideoId)));
       await context.db.insert(activityEvents).values({ organizationId: context.organization.id, creatorId: account?.creatorId ?? null, actorUserId: context.internalUser?.id ?? null, type: "video.restored", summary: "Video restored to Result performance totals.", metadata: video });
     }
+    invalidatePortalData();
     return Response.json({ ok: true, result });
   } catch (error) {
     return mutationErrorResponse(error);
