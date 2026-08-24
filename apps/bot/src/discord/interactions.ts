@@ -26,6 +26,7 @@ import {
   type CallPollRecord,
 } from "../data/store.js";
 import { createCreatorChannel, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
+import { discordChannelNameMatches } from "./channel-names.js";
 import { archiveCreatorChannel } from "./platform-sync.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { launchpointGet } from "../integrations/launchpoint.js";
@@ -237,7 +238,9 @@ async function showHealth(interaction: ChatInputCommandInteraction): Promise<voi
     (category) => !interaction.guild?.channels.cache.some((channel) => channel.name === category.name && channel.isDMBased() === false),
   );
   const missingChannels = blueprintChannels.filter(
-    (channel) => !interaction.guild?.channels.cache.some((candidate) => candidate.name === channel.name),
+    (channel) => !interaction.guild?.channels.cache.some((candidate) =>
+      discordChannelNameMatches(candidate.name, channel.name),
+    ),
   );
   const adminRole = interaction.guild.roles.cache.find((role) => role.name === "Admin");
   const botAboveAdmin = Boolean(me && adminRole && me.roles.highest.comparePositionTo(adminRole) > 0);
