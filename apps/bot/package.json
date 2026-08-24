@@ -10,6 +10,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "deploy:commands": "tsx scripts/deploy-commands.ts",
+    "reconcile:once": "tsx scripts/reconcile-once.ts",
     "invite": "tsx scripts/print-invite.ts",
     "test": "vitest run tests"
   },

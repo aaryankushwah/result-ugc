@@ -23,6 +23,7 @@ export type PortalAccount = {
   refreshedAt: string | null;
   linkState: "suggested" | "confirmed" | "unlinked";
   error: string | null;
+  sourceUrl: string | null;
 };
 
 export type PortalVideo = {
@@ -48,12 +49,14 @@ export type PortalVideo = {
   trackingState: TrackingState;
   refreshedAt: string | null;
   error: string | null;
+  sourceUrl: string | null;
 };
 
 export type PortalRelationship = {
   id: string;
   provider: SigningProvider;
   syncMode: "api" | "manual";
+  externalId: string | null;
   program: string | null;
   state: RelationshipState;
   startsAt: string | null;
@@ -73,6 +76,7 @@ export type PortalCreator = {
   managerName: string | null;
   discord: {
     state: DiscordState;
+    userId: string | null;
     username: string | null;
     displayName: string | null;
     avatarUrl: string | null;

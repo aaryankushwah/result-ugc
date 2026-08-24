@@ -41,7 +41,7 @@ function candidateCreators(accounts: PortalData["accounts"], videos: PortalVideo
       attentionState: "Needs creator confirmation",
       nextStep: "Match this account to its Result creator",
       managerName: null,
-      discord: { state: "unknown", username: null, displayName: null, avatarUrl: null, channelId: null, guildId: null },
+      discord: { state: "unknown", userId: null, username: null, displayName: null, avatarUrl: null, channelId: null, guildId: null },
       relationships: [],
       accounts: [{ ...account, creatorId: `viral-${account.id}` }],
       notes: [],

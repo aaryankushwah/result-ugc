@@ -14,6 +14,7 @@ import {
   discordOperations,
   getDatabase,
   organizations,
+  socialAccounts,
   syncRuns,
 } from "@result/db";
 import { and, asc, eq, lte } from "drizzle-orm";
@@ -40,7 +41,7 @@ function channelOwnerId(channel: TextChannel): string | null {
   return channel.topic?.match(/Creator ID:\s*(\d+)/)?.[1] ?? null;
 }
 
-export async function reconcileGuild(guild: Guild): Promise<void> {
+export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   const orgId = await organizationId(guild);
   const [members] = await Promise.all([guild.members.fetch(), guild.roles.fetch(), guild.channels.fetch()]);
@@ -54,6 +55,7 @@ export async function reconcileGuild(guild: Guild): Promise<void> {
     if (userId) channelByUser.set(userId, channel);
   }
   const userIds = new Set<string>([
+    ...seedUserIds,
     ...legacy.creatorIds,
     ...channelByUser.keys(),
     ...members.filter((member) => Boolean(creatorRole && member.roles.cache.has(creatorRole.id))).keys(),
@@ -88,11 +90,47 @@ export async function reconcileGuild(guild: Guild): Promise<void> {
         }
       }
     }
+    changed += await suggestExactAccountLinks(orgId);
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsChanged: changed }).where(eq(syncRuns.id, run[0].id));
   } catch (error) {
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "failed", finishedAt: new Date(), recordsChanged: changed, error: error instanceof Error ? error.message : String(error) }).where(eq(syncRuns.id, run[0].id));
     throw error;
   }
+}
+
+function identityKey(value: string | null | undefined): string | null {
+  const normalized = value?.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  return normalized.length >= 3 ? normalized : null;
+}
+
+export async function suggestExactAccountLinks(organizationId: string): Promise<number> {
+  const [creatorRows, discordRows, accountRows] = await Promise.all([
+    getDatabase().select({ id: creators.id, displayName: creators.displayName }).from(creators).where(eq(creators.organizationId, organizationId)),
+    getDatabase().select({ creatorId: creatorDiscord.creatorId, username: creatorDiscord.username, displayName: creatorDiscord.displayName }).from(creatorDiscord).where(eq(creatorDiscord.organizationId, organizationId)),
+    getDatabase().select().from(socialAccounts).where(eq(socialAccounts.organizationId, organizationId)),
+  ]);
+  const creatorIdsByKey = new Map<string, Set<string>>();
+  const addKey = (value: string | null | undefined, creatorId: string) => {
+    const key = identityKey(value); if (!key) return;
+    const ids = creatorIdsByKey.get(key) ?? new Set<string>(); ids.add(creatorId); creatorIdsByKey.set(key, ids);
+  };
+  for (const creator of creatorRows) addKey(creator.displayName, creator.id);
+  for (const connection of discordRows) { addKey(connection.username, connection.creatorId); addKey(connection.displayName, connection.creatorId); }
+  let changed = 0;
+  for (const account of accountRows) {
+    if (account.linkState === "confirmed" || account.creatorId) continue;
+    const candidates = new Set<string>();
+    for (const value of [account.username, account.displayName]) {
+      const key = identityKey(value); if (!key) continue;
+      for (const creatorId of creatorIdsByKey.get(key) ?? []) candidates.add(creatorId);
+    }
+    const suggestedCreatorId = candidates.size === 1 ? [...candidates][0]! : null;
+    if (account.suggestedCreatorId === suggestedCreatorId && account.linkState === (suggestedCreatorId ? "suggested" : "unlinked")) continue;
+    await getDatabase().update(socialAccounts).set({ suggestedCreatorId, linkState: suggestedCreatorId ? "suggested" : "unlinked", linkConfidence: suggestedCreatorId ? 1 : null, updatedAt: new Date() }).where(eq(socialAccounts.id, account.id));
+    if (suggestedCreatorId) await logEvent(organizationId, suggestedCreatorId, "account.match_suggested", `@${account.username ?? "account"} exactly matched this creator and is awaiting manager confirmation.`, { viralOrgAccountId: account.viralOrgAccountId, platform: account.platform, confidence: 1 });
+    changed += 1;
+  }
+  return changed;
 }
 
 export async function reconcileMember(member: GuildMember): Promise<void> {

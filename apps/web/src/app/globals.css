@@ -112,6 +112,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .primary-button svg, .secondary-button svg, .toolbar-button svg { width: 13px; height: 13px; }
 .source-banner { min-height: 52px; padding: 10px 13px; display: flex; align-items: center; gap: 11px; border: 1px solid rgba(133,237,117,.16); border-radius: 10px; background: linear-gradient(90deg, rgba(133,237,117,.075), rgba(133,237,117,.015)); }
 .source-banner.compact { border-color: rgba(252,95,43,.15); background: linear-gradient(90deg, rgba(252,95,43,.06), transparent); }
+.source-banner.source-warning { border-color: rgba(252,95,43,.2); background: linear-gradient(90deg, rgba(252,95,43,.08), transparent); }
+.source-banner.source-warning > svg { color: var(--alert); }
 .source-banner > svg { width: 17px; color: var(--accent); }
 .source-banner.compact > svg { color: var(--alert); }
 .source-banner > div { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
@@ -286,9 +288,10 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .details-grid div, .settings-list div { display: flex; flex-direction: column; gap: 5px; }
 .details-grid dt, .settings-list dt { color: #5c5c5c; font-size: 8px; text-transform: uppercase; }
 .details-grid dd, .settings-list dd { margin: 0; color: #bbb; font-size: 10px; }
-.linked-account-list > div { min-height: 58px; padding: 8px 13px; display: grid; grid-template-columns: 32px 1fr auto auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--border); }
-.linked-account-list > div:last-child { border-bottom: 0; }
-.linked-account-list > div > span:nth-child(2) { display: flex; flex-direction: column; gap: 3px; }
+.linked-account-list > div, .linked-account-list > a { min-height: 58px; padding: 8px 13px; display: grid; grid-template-columns: 32px 1fr auto auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--border); }
+.linked-account-list > a:hover { background: #181818; }
+.linked-account-list > div:last-child, .linked-account-list > a:last-child { border-bottom: 0; }
+.linked-account-list > div > span:nth-child(2), .linked-account-list > a > span:nth-child(2) { display: flex; flex-direction: column; gap: 3px; }
 .linked-account-list strong { font-size: 10px; }
 .linked-account-list small { color: #656565; font-size: 8px; }
 .notes-list article { padding: 13px 15px; border-bottom: 1px solid var(--border); }
@@ -308,10 +311,14 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .relationship-card span { display: flex; flex-direction: column; gap: 2px; }
 .relationship-card strong { font-size: 9px; text-transform: capitalize; }
 .relationship-card small { color: #666; font-size: 8px; }
-.relationship-row { min-height: 76px; padding: 12px 15px; display: grid; grid-template-columns: 40px minmax(160px,1fr) repeat(3,minmax(120px,.6fr)); align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
+.relationship-row { min-height: 76px; padding: 12px 15px; display: grid; grid-template-columns: 40px minmax(150px,1fr) repeat(4,minmax(100px,.55fr)) 30px; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
 .relationship-row > span:not(.large-icon) { display: flex; flex-direction: column; gap: 4px; }
 .relationship-row strong { font-size: 9px; text-transform: capitalize; }
 .relationship-row small { color: #666; font-size: 8px; }
+.identity-keys dd { overflow-wrap: anywhere; font-family: var(--font-geist-mono); font-size: 8px; }
+.account-match-control { padding: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); }
+.account-match-control select { min-width: 0; height: 34px; flex: 1 1 160px; padding: 0 9px; border: 1px solid var(--border); border-radius: 8px; background: #101010; color: #bbb; font-size: 9px; }
+.account-match-control .form-error { width: 100%; margin: 0; }
 .empty-state { min-height: 230px; padding: 30px; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; }
 .empty-state.small { min-height: 190px; padding: 20px; }
 .empty-state > svg { width: 22px; margin-bottom: 12px; color: #555; }

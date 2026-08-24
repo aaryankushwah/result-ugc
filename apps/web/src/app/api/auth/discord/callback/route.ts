@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createSession, resolvePortalRole } from "@/lib/auth";
+import { createSession, recordPortalLogin, resolvePortalRole } from "@/lib/auth";
 
 type DiscordToken = { access_token: string };
 type DiscordUser = { id: string; username: string; global_name?: string | null; avatar?: string | null };
@@ -43,12 +43,13 @@ export async function GET(request: Request) {
     const member = await memberResponse.json() as DiscordMember;
     const role = resolvePortalRole(member.roles);
     if (!role) return NextResponse.redirect(new URL("/login?error=unauthorized_role", request.url));
-    await createSession({
+    const portalUser = {
       id: user.id,
       name: member.nick ?? user.global_name ?? user.username,
       avatarUrl: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=128` : null,
       role,
-    });
+    };
+    await Promise.all([createSession(portalUser), recordPortalLogin(portalUser)]);
     return NextResponse.redirect(new URL("/overview", request.url));
   } catch {
     return NextResponse.redirect(new URL("/login?error=oauth_failed", request.url));

@@ -10,6 +10,22 @@ export function CandidateActions({ accountId }: { accountId: string }) {
   return <div className="action-with-error"><button className="primary-button" onClick={promote} disabled={pending}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{pending ? "Confirming…" : "Confirm as new creator"}</button>{error ? <span><ShieldAlert />{error}</span> : null}</div>;
 }
 
+export function AccountMatchControl({ accountId, creators, currentCreatorId }: { accountId: string; creators: Array<{ id: string; displayName: string; discordUsername: string | null }>; currentCreatorId: string | null }) {
+  const [creatorId, setCreatorId] = useState(currentCreatorId ?? creators[0]?.id ?? "");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const submit = async () => {
+    if (!creatorId) return;
+    setPending(true); setError(null);
+    const response = await fetch(`/api/accounts/${accountId}/link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ creatorId }) });
+    const body = await response.json(); setPending(false);
+    if (!response.ok) { setError(body.error ?? "Could not link account"); return; }
+    router.push(`/creators/${creatorId}?tab=content`); router.refresh();
+  };
+  return <div className="account-match-control"><select value={creatorId} onChange={(event) => setCreatorId(event.target.value)} aria-label="Creator"><option value="" disabled>Select a creator</option>{creators.map((creator) => <option key={creator.id} value={creator.id}>{creator.displayName}{creator.discordUsername ? ` (@${creator.discordUsername})` : ""}</option>)}</select><button className="primary-button" disabled={pending || !creatorId} onClick={submit}><UserRoundCheck />{pending ? "Linking…" : currentCreatorId === creatorId ? "Confirm creator" : "Link to creator"}</button>{error ? <span className="form-error">{error}</span> : null}</div>;
+}
+
 export function CreatorQuickActions({ creatorId, discordMissing }: { creatorId: string; discordMissing: boolean }) {
   const [pending, setPending] = useState<string | null>(null); const router = useRouter();
   const run = async (type: "reconcile_creator" | "restore_access") => { setPending(type); await fetch(`/api/creators/${creatorId}/discord-operations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type }) }); setPending(null); router.refresh(); };

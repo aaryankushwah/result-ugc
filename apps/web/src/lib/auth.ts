@@ -4,6 +4,8 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { getDatabase, internalUsers, organizations } from "@result/db";
+import { eq } from "drizzle-orm";
 
 const SESSION_COOKIE = "result_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
@@ -39,6 +41,25 @@ export async function createSession(user: PortalUser): Promise<void> {
 
 export async function clearSession(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
+}
+
+export async function recordPortalLogin(user: PortalUser): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  const db = getDatabase();
+  let organization = (await db.select().from(organizations).where(eq(organizations.slug, "result")).limit(1))[0];
+  if (!organization) [organization] = await db.insert(organizations).values({ slug: "result", name: "Result", discordGuildId: process.env.DISCORD_GUILD_ID ?? null }).returning();
+  if (!organization) return;
+  await db.insert(internalUsers).values({
+    organizationId: organization.id,
+    discordUserId: user.id,
+    displayName: user.name,
+    avatarUrl: user.avatarUrl,
+    role: user.role,
+    lastLoginAt: new Date(),
+  }).onConflictDoUpdate({
+    target: [internalUsers.organizationId, internalUsers.discordUserId],
+    set: { displayName: user.name, avatarUrl: user.avatarUrl, role: user.role, lastLoginAt: new Date(), updatedAt: new Date() },
+  });
 }
 
 export const getCurrentUser = cache(async (): Promise<PortalUser | null> => {

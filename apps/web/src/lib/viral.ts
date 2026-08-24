@@ -102,12 +102,13 @@ export async function getLiveViralData(): Promise<{ accounts: PortalAccount[]; v
 }
 
 function mapAccount(account: ViralAccount): PortalAccount {
+  const username = account.username ?? "unknown";
   return {
     id: account.id,
     creatorId: null,
     platform: account.platform,
     platformAccountId: account.platformAccountId,
-    username: account.username ?? "unknown",
+    username,
     displayName: account.displayName ?? account.username ?? "Unknown account",
     avatarUrl: account.profilePictureUrl ?? null,
     followers: account.followerCount ?? null,
@@ -125,6 +126,9 @@ function mapAccount(account: ViralAccount): PortalAccount {
     refreshedAt: account.loadAt ?? null,
     linkState: "unlinked",
     error: account.lastErrorCode ?? null,
+    sourceUrl: account.platform.toLowerCase() === "instagram" ? `https://www.instagram.com/${username}/`
+      : account.platform.toLowerCase() === "tiktok" ? `https://www.tiktok.com/@${username}`
+        : account.platform.toLowerCase() === "youtube" ? `https://www.youtube.com/@${username}` : null,
   };
 }
 
@@ -152,6 +156,9 @@ function mapVideo(video: ViralVideo): PortalVideo {
     trackingState: deriveTrackingState({ loadAt: video.loadAt, lastErrorAt: video.lastErrorAt, staleAfterMinutes: 2_160 }),
     refreshedAt: video.loadAt ?? null,
     error: video.lastErrorCode ?? null,
+    sourceUrl: video.platform.toLowerCase() === "instagram" ? `https://www.instagram.com/reel/${video.platformVideoId}/`
+      : video.platform.toLowerCase() === "tiktok" ? `https://www.tiktok.com/@${video.accountUsername ?? "unknown"}/video/${video.platformVideoId}`
+        : video.platform.toLowerCase() === "youtube" ? `https://www.youtube.com/watch?v=${video.platformVideoId}` : null,
   };
 }
 
@@ -179,6 +186,9 @@ function mapExcludedVideo(video: ViralExcludedVideo): PortalVideo {
     trackingState: "healthy",
     refreshedAt: video.createdAt ?? null,
     error: null,
+    sourceUrl: video.platform.toLowerCase() === "instagram" ? `https://www.instagram.com/reel/${video.platformVideoId}/`
+      : video.platform.toLowerCase() === "tiktok" ? `https://www.tiktok.com/@${video.username ?? "unknown"}/video/${video.platformVideoId}`
+        : video.platform.toLowerCase() === "youtube" ? `https://www.youtube.com/watch?v=${video.platformVideoId}` : null,
   };
 }
 
