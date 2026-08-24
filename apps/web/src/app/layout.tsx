@@ -23,7 +23,7 @@ const resultFont = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Result UGC",
+  title: "Result",
   description: "Result's workspace for UGC tracking, intelligence, and briefs.",
 };
 
