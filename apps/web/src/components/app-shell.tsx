@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Bot, ChevronDown, CircleUserRound, FileCheck2, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, UsersRound, Video, X, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, UsersRound, Video, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -12,7 +12,7 @@ import type { PortalUser } from "@/lib/auth";
 const nav = [
   { label: "Workspace", items: [
     { href: "/overview", label: "Overview", icon: BarChart3 }, { href: "/creators", label: "Creators", icon: UsersRound },
-    { href: "/accounts", label: "Accounts", icon: CircleUserRound }, { href: "/videos", label: "Videos", icon: Video },
+    { href: "/videos", label: "Videos", icon: Video },
   ] },
   { label: "Operations", items: [
     { href: "/onboarding", label: "Onboarding", icon: FileCheck2 }, { href: "/activity", label: "Activity", icon: Activity },
