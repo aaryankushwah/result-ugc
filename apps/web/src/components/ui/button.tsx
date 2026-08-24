@@ -56,12 +56,12 @@ function Button({
 
   if (!asChild) {
     const dither = {
-      default: { color: "green" as const, variant: "gradient" as const, bloom: "low" as const },
+      default: { color: "purple" as const, variant: "gradient" as const, bloom: "low" as const },
       outline: { color: "grey" as const, variant: "dotted" as const, bloom: "off" as const },
       secondary: { color: "grey" as const, variant: "gradient" as const, bloom: "off" as const },
       ghost: { color: "grey" as const, variant: "dotted" as const, bloom: "off" as const },
       destructive: { color: "red" as const, variant: "hatched" as const, bloom: "low" as const },
-      link: { color: "green" as const, variant: "dotted" as const, bloom: "off" as const },
+      link: { color: "purple" as const, variant: "dotted" as const, bloom: "off" as const },
     }[variant ?? "default"]
 
     return (
