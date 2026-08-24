@@ -4,6 +4,7 @@ import { defaultOverviewMetricIds, readOverviewMetricIds, toggleOverviewMetric }
 describe("overview metric preferences", () => {
   it("uses the useful default dashboard metrics", () => {
     expect(readOverviewMetricIds(null)).toEqual(defaultOverviewMetricIds);
+    expect(defaultOverviewMetricIds).toEqual(["views", "engagement", "likes", "comments", "shares", "videos"]);
   });
 
   it("keeps valid unique metric ids and ignores unknown ids", () => {
