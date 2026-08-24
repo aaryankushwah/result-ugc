@@ -1,12 +1,14 @@
 "use client";
 
-import { Activity, AlertTriangle, Bookmark, CircleUserRound, Eye, FileVideo2, Gauge, Heart, MessageCircleMore, RotateCcw, Settings2, Share2, UserPlus, UsersRound } from "lucide-react";
+import { useState } from "react";
+import { Activity, AlertTriangle, Bookmark, CircleUserRound, Eye, FileVideo2, Gauge, GripVertical, Heart, MessageCircleMore, RotateCcw, Settings2, Share2, UserPlus, UsersRound } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DitherGradient } from "@/components/dither-kit/gradient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { defaultOverviewMetricIds, readOverviewMetricIds, toggleOverviewMetric, type OverviewMetricId } from "@/lib/overview-metrics";
+import { moveItem } from "@/lib/reorder";
 
 const icons = { activity: Activity, alert: AlertTriangle, bookmark: Bookmark, accounts: CircleUserRound, eye: Eye, video: FileVideo2, gauge: Gauge, heart: Heart, comments: MessageCircleMore, share: Share2, applicants: UserPlus, creators: UsersRound };
 
@@ -47,19 +49,54 @@ export function OverviewMetricPicker({ metrics }: { metrics: OverviewMetric[] })
 }
 
 export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
-  const { selected } = useMetricSelection();
-  const visible = metrics.filter((metric) => selected.includes(metric.id));
+  const { selected, update } = useMetricSelection();
+  const [dragged, setDragged] = useState<OverviewMetricId | null>(null);
+  const visible = selected.flatMap((id) => {
+    const metric = metrics.find((item) => item.id === id);
+    return metric ? [metric] : [];
+  });
+  const move = (item: OverviewMetricId, target: OverviewMetricId) => update(moveItem(selected, item, target));
   return <section className="metric-grid overview-metric-grid">
-    {visible.map((metric) => {
+    {visible.map((metric, index) => {
       const Icon = icons[metric.icon];
       const ditherColor = metric.attention ? "orange" : ["likes", "comments", "shares", "bookmarks", "engagement"].includes(metric.id) ? "pink" : ["views", "averageViews", "videos"].includes(metric.id) ? "blue" : "purple";
-      return <Card className={`metric-card overview-metric-card ${metric.attention ? "metric-attention" : ""}`} key={metric.id}>
+      return <Card
+        className={`metric-card overview-metric-card ${metric.attention ? "metric-attention" : ""}`}
+        data-dragging={dragged === metric.id}
+        draggable
+        key={metric.id}
+        tabIndex={0}
+        title="Drag to reorder"
+        onDragStart={(event) => {
+          setDragged(metric.id);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", metric.id);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          if (dragged) move(dragged, metric.id);
+          setDragged(null);
+        }}
+        onDragEnd={() => setDragged(null)}
+        onKeyDown={(event) => {
+          if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+          event.preventDefault();
+          const targetIndex = event.key === "ArrowLeft" ? index - 1 : index + 1;
+          const target = visible[targetIndex];
+          if (target) move(metric.id, target.id);
+        }}
+      >
         <DitherGradient from={ditherColor} direction="right" cell={2} opacity={metric.attention ? 0.34 : 0.28} className="overview-metric-dither" />
         <div className="metric-icon"><Icon /></div>
         <div className="overview-metric-copy">
           <p>{metric.label}</p>
           <strong>{metric.value}</strong>
         </div>
+        <GripVertical aria-hidden="true" className="overview-metric-grip" />
       </Card>;
     })}
   </section>;

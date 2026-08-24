@@ -8,10 +8,13 @@ import { formatNumber, formatPercent, PageTitle, StateBadge, timeAgo, TrackingBa
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
 
-export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string; series?: string; stats?: string }> }) {
   await requireUser();
   const [data, params] = await Promise.all([getPortalData(), searchParams]);
   const range = ["7", "14", "30"].includes(params.range ?? "") ? Number(params.range) : 30;
+  const preservedView = new URLSearchParams();
+  if (params.series) preservedView.set("series", params.series);
+  if (params.stats) preservedView.set("stats", params.stats);
   const performance = data.performance.slice(-range);
   const includedVideos = data.videos.filter((video) => video.included);
   const totals = {
@@ -57,7 +60,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
     <OverviewMetricGrid metrics={metricCards} />
     <section className="dashboard-grid dashboard-main-grid">
-      <Card className="panel chart-panel"><div className="panel-header"><h2>Performance</h2><div className="range-tabs">{[7, 14, 30].map((days) => <Link key={days} href={`/overview?range=${days}`} className={range === days ? "active" : ""}>{days}d</Link>)}</div></div><PerformanceChart data={performance} /></Card>
+      <Card className="panel chart-panel"><div className="panel-header"><h2>Performance</h2><div className="range-tabs">{[7, 14, 30].map((days) => {
+        const next = new URLSearchParams(preservedView);
+        next.set("range", String(days));
+        return <Link key={days} href={`/overview?${next.toString()}`} className={range === days ? "active" : ""}>{days}d</Link>;
+      })}</div></div><PerformanceChart data={performance} /></Card>
       <article className="panel todo-panel"><div className="panel-header"><h2>To do</h2><StateBadge label={`${exceptions.reduce((sum, item) => sum + item.count, 0)} open`} tone="attention" /></div><div className="todo-list">{exceptions.map((item) => <Link key={item.label} href={item.href} data-complete={item.count === 0}><span className="todo-state">{item.count === 0 ? <CheckCircle2 /> : <Circle />}</span><strong>{item.label}</strong><span className={`todo-count ${item.tone}`}>{item.count}</span><ArrowUpRight /></Link>)}</div></article>
     </section>
     <section className="dashboard-grid split-grid">
