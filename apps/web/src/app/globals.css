@@ -243,8 +243,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .poster-source { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; color: #bfbfbf; font-family: var(--font-geist-mono); font-size: 7px; letter-spacing: .12em; }
 .poster-source svg { width: 10px; }
 .reference-poster > strong { max-width: 170px; position: absolute; z-index: 1; left: 17px; bottom: 40px; color: #fff; font-size: 24px; font-weight: 520; letter-spacing: -.055em; line-height: .95; }
-.reference-poster > button { width: 31px; height: 31px; position: absolute; z-index: 2; top: 14px; right: 14px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(0,0,0,.45); color: white; }
-.reference-poster > button svg { width: 12px; }
+.reference-poster-link { width: 31px; height: 31px; position: absolute; z-index: 2; top: 14px; right: 14px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(0,0,0,.45); color: white; }
+.reference-poster-link svg { width: 12px; }
 .reference-poster > small { position: absolute; z-index: 2; right: 9px; bottom: 9px; padding: 3px 5px; border-radius: 4px; background: rgba(0,0,0,.65); color: #ddd; font-family: var(--font-geist-mono); font-size: 7px; }
 .reference-meta { min-height: 50px; padding: 9px 10px; display: flex; align-items: center; gap: 8px; }
 .reference-meta > svg { width: 16px; color: #888; }
@@ -366,6 +366,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .reference-form input,.assignment-fields input,.assignment-fields select { height: 39px; padding: 0 10px; }
 .reference-form textarea,.assignment-message textarea { padding: 9px 10px; resize: vertical; line-height: 1.5; }
 .reference-form input:focus,.reference-form textarea:focus,.assignment-fields input:focus,.assignment-fields select:focus,.assignment-message textarea:focus { border-color: rgba(133,237,117,.5); box-shadow: 0 0 0 2px rgba(133,237,117,.07); }
+.reference-platform-detected { margin: -5px 0 0; color: #747474; font-size: 11px; }
+.reference-platform-detected strong { color: #b5b5b5; font-weight: 600; text-transform: capitalize; }
 .reference-form .form-pair label:first-child > div { position: relative; }
 .reference-form .form-pair label:first-child > div svg { width: 13px; position: absolute; left: 10px; top: 13px; color: #555; }
 .reference-form .form-pair label:first-child > div input { padding-left: 31px; }
@@ -565,6 +567,15 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .transcript-field small,.reference-dialog-footer > span,.assign-dialog-footer > span { font-size: 10px; }
 .creator-picker strong { font-size: 13px; }
 .creator-picker span { font-size: 11px; }
+.creator-picker-search { height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--border); background: #121212; }
+.creator-picker-search:focus-within { border-color: rgba(133,237,117,.5); }
+.creator-picker-search svg { width: 15px; color: #666; }
+.creator-picker-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #ddd; font-size: 13px; }
+.creator-picker-empty { grid-column: 1 / -1; margin: 0; padding: 32px 12px; color: #6b6b6b; font-size: 12px; text-align: center; }
+.studio-notes-empty { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #5d5d5d; text-align: center; }
+.studio-notes-empty > svg { width: 22px; }
+.studio-notes-empty > strong { margin-top: 12px; color: #aaa; font-size: 13px; }
+.studio-notes-empty > p { max-width: 220px; margin: 6px 0 0; color: #666; font-size: 11px; line-height: 1.5; }
 
 @media (max-width: 1250px) {
   .writer-grid { grid-template-columns: 270px minmax(500px,1fr); }
