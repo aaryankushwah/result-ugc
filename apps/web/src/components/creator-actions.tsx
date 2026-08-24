@@ -112,10 +112,62 @@ export function AccountAssignmentButton({
   );
 }
 
-export function CreatorQuickActions({ creatorId, discordMissing }: { creatorId: string; discordMissing: boolean }) {
-  const [pending, setPending] = useState<string | null>(null); const router = useRouter();
-  const run = async (type: "reconcile_creator" | "restore_access") => { setPending(type); await fetch(`/api/creators/${creatorId}/discord-operations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type }) }); setPending(null); router.refresh(); };
-  return <>{discordMissing ? <Button variant="outline" disabled={Boolean(pending)} onClick={() => run("restore_access")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Queue access restore</Button> : <Button variant="outline" disabled={Boolean(pending)} onClick={() => run("reconcile_creator")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Reconcile Discord</Button>}</>;
+export type DiscordConnectionCandidate = { creatorId: string; userId: string; username: string | null; displayName: string; state: string };
+
+function DiscordConnectionButton({ creatorId, candidates }: { creatorId: string; candidates: DiscordConnectionCandidate[] }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [discordUserId, setDiscordUserId] = useState("");
+  const [sourceCreatorId, setSourceCreatorId] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const filtered = candidates.filter((candidate) => `${candidate.displayName} ${candidate.username ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  const connect = async () => {
+    setPending(true); setError(null);
+    const response = await fetch(`/api/creators/${creatorId}/discord-link`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ discordUserId, sourceCreatorId }) });
+    const result = await response.json(); setPending(false);
+    if (!response.ok) { setError(result.error ?? "Could not connect Discord"); return; }
+    setQueued(true); setOpen(false); router.refresh();
+  };
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button variant="outline" disabled={queued}><UserRoundCheck />{queued ? "Connection queued" : "Connect Discord"}</Button></DialogTrigger>
+    <DialogContent className="account-assignment-dialog">
+      <DialogHeader><DialogTitle>Connect Discord member</DialogTitle><DialogDescription>Link the actual Discord member to this canonical creator, then restore their Result roles and private channel.</DialogDescription></DialogHeader>
+      {candidates.length ? <>
+        <div className="assignment-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search synced Discord members…" /></div>
+        <div className="assignment-creator-list discord-candidate-list">
+          {filtered.length ? filtered.map((candidate) => <button type="button" className={discordUserId === candidate.userId ? "selected" : ""} onClick={() => { setDiscordUserId(candidate.userId); setSourceCreatorId(candidate.creatorId); setError(null); }} key={candidate.userId}>
+            <span>{candidate.displayName.slice(0, 1).toUpperCase()}</span>
+            <span><strong>{candidate.displayName}</strong><small>{candidate.username ? `Discord @${candidate.username}` : candidate.userId}</small></span>
+            <i>{discordUserId === candidate.userId ? <UserRoundCheck /> : null}</i>
+          </button>) : <p>No synced Discord members match that search.</p>}
+        </div>
+        <div className="discord-candidate-divider"><span>or use a Discord user ID</span></div>
+      </> : null}
+      <label className="form-field">Discord user ID<Input inputMode="numeric" value={discordUserId} onChange={(event) => { setDiscordUserId(event.target.value.replace(/\D/g, "")); setSourceCreatorId(null); setError(null); }} placeholder="e.g. 459809259580948480" /></label>
+      <p className="discord-id-help">In Discord, enable Developer Mode, right-click the member, then choose Copy User ID.</p>
+      {error ? <p className="form-error">{error}</p> : null}
+      <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={pending || !/^\d{15,22}$/.test(discordUserId)} onClick={connect}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />}{pending ? "Connecting…" : "Connect & restore access"}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
+
+export function CreatorQuickActions({ creatorId, discordState, discordUserId, candidates }: { creatorId: string; discordState: string; discordUserId: string | null; candidates: DiscordConnectionCandidate[] }) {
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const run = async (type: "reconcile_creator" | "restore_access") => {
+    setPending(type); setError(null);
+    const response = await fetch(`/api/creators/${creatorId}/discord-operations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type }) });
+    const result = await response.json(); setPending(null);
+    if (!response.ok) { setError(result.error ?? "Discord operation could not be queued"); return; }
+    router.refresh();
+  };
+  if (!discordUserId) return <DiscordConnectionButton creatorId={creatorId} candidates={candidates} />;
+  const missing = discordState !== "connected";
+  return <div className="action-with-error">{missing ? <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("restore_access")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Restore Discord access</Button> : <Button variant="outline" disabled={Boolean(pending)} onClick={() => void run("reconcile_creator")}>{pending ? <LoaderCircle className="spin" /> : <UserRoundCheck />} Reconcile Discord</Button>}{error ? <span><ShieldAlert />{error}</span> : null}</div>;
 }
 
 export function NoteButton({ creatorId }: { creatorId: string }) {

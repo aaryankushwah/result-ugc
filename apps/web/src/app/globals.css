@@ -354,6 +354,10 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .assignment-creator-list i { width: 22px; height: 22px; display: grid; place-items: center; color: var(--accent); }
 .assignment-creator-list i svg { width: 15px; }
 .assignment-creator-list > p { padding: 30px; color: #777; font-size: 13px; text-align: center; }
+.discord-candidate-list { max-height: 260px; }
+.discord-candidate-divider { display: flex; align-items: center; gap: 10px; color: #676767; font-size: 11px; }
+.discord-candidate-divider::before, .discord-candidate-divider::after { height: 1px; flex: 1; background: var(--border); content: ""; }
+.discord-id-help { margin-top: -4px; color: #6f6f6f; font-size: 11px; }
 .account-assignment-footer .unassign-button { margin-right: auto; color: var(--alert); }
 .badge-row, .account-platforms { display: flex; align-items: center; gap: 4px; }
 .account-platforms span { width: 21px; height: 18px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; color: #727272; font-size: 7px; }
