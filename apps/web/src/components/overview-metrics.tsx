@@ -51,6 +51,7 @@ export function OverviewMetricPicker({ metrics }: { metrics: OverviewMetric[] })
 export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
   const { selected, update } = useMetricSelection();
   const [dragged, setDragged] = useState<OverviewMetricId | null>(null);
+  const [dropTarget, setDropTarget] = useState<OverviewMetricId | null>(null);
   const visible = selected.flatMap((id) => {
     const metric = metrics.find((item) => item.id === id);
     return metric ? [metric] : [];
@@ -63,6 +64,7 @@ export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
       return <Card
         className={`metric-card overview-metric-card ${metric.attention ? "metric-attention" : ""}`}
         data-dragging={dragged === metric.id}
+        data-drop-target={dropTarget === metric.id}
         draggable
         key={metric.id}
         tabIndex={0}
@@ -76,12 +78,19 @@ export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {
           event.preventDefault();
           event.dataTransfer.dropEffect = "move";
         }}
+        onDragEnter={() => {
+          if (dragged && dragged !== metric.id) setDropTarget(metric.id);
+        }}
         onDrop={(event) => {
           event.preventDefault();
           if (dragged) move(dragged, metric.id);
           setDragged(null);
+          setDropTarget(null);
         }}
-        onDragEnd={() => setDragged(null)}
+        onDragEnd={() => {
+          setDragged(null);
+          setDropTarget(null);
+        }}
         onKeyDown={(event) => {
           if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
           event.preventDefault();

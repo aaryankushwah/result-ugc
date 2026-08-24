@@ -52,8 +52,11 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
-  const [selected, setSelected] = useState<MetricKey[]>(() => readMetricKeys(params.get("series")));
+  const seriesParam = params.get("series");
+  const [selection, setSelection] = useState(() => ({ source: seriesParam, keys: readMetricKeys(seriesParam) }));
+  const selected = selection.source === seriesParam ? selection.keys : readMetricKeys(seriesParam);
   const [dragged, setDragged] = useState<MetricKey | null>(null);
+  const [dropTarget, setDropTarget] = useState<MetricKey | null>(null);
   const chartData = useMemo(() => data.map((point) => ({ ...point, engagementRate: point.engagementRate * 100 })), [data]);
   const selectedSet = new Set(selected);
   const leftKeys = selected.filter((key) => metrics[key].axis === "left");
@@ -65,7 +68,7 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
   const rightTop = Math.max(-1, ...rightKeys.map((key) => selected.indexOf(key)));
   const barsAreFront = rightKeys.length > 0 && (!leftKeys.length || rightTop > leftTop);
   const update = (keys: MetricKey[]) => {
-    setSelected(keys);
+    setSelection({ source: seriesParam, keys });
     const next = new URLSearchParams(params.toString());
     if (keys.join(",") === defaultMetricKeys.join(",")) next.delete("series");
     else next.set("series", keys.join(","));
@@ -81,6 +84,7 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
         {selected.map((key, index) => <span
           className="performance-metric-chip"
           data-dragging={dragged === key}
+          data-drop-target={dropTarget === key}
           draggable
           key={key}
           aria-label={`Reorder ${metrics[key].label}`}
@@ -97,12 +101,19 @@ export function PerformanceChart({ data }: { data: PerformancePoint[] }) {
             event.preventDefault();
             event.dataTransfer.dropEffect = "move";
           }}
+          onDragEnter={() => {
+            if (dragged && dragged !== key) setDropTarget(key);
+          }}
           onDrop={(event) => {
             event.preventDefault();
             if (dragged) move(dragged, key);
             setDragged(null);
+            setDropTarget(null);
           }}
-          onDragEnd={() => setDragged(null)}
+          onDragEnd={() => {
+            setDragged(null);
+            setDropTarget(null);
+          }}
           onKeyDown={(event) => {
             if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
             event.preventDefault();
