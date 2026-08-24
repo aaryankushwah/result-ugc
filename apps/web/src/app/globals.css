@@ -1336,6 +1336,11 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light :is(.range-tabs,.view-toggle) button.active { background: #dfe2e7; color: #17191d; }
 .light .metric-icon { border-color: #d4d8de; background: #eef0f3; color: #4d5661; }
 .light .exception-count { border-color: #d4d8de; background: #eef0f3; color: #343a42; }
+.light .freshness-strip { border-color: #d8dce2; background: #d8dce2; }
+.light .freshness-strip > div { background: #fff; }
+.light .freshness-strip strong { color: #252a31; }
+.light .freshness-strip small,
+.light .freshness-strip b { color: #626b76; }
 .light .assignment-creator-list > button { border-color: #e0e3e7; background: #fff; color: #252a31; }
 .light .creator-account-row:hover { background: #f3f4f6; }
 .light .creator-account-open { color: #59636e; }
