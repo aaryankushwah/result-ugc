@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
+import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -31,9 +32,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`dark ${geistSans.variable} ${geistMono.variable} ${resultFont.variable} h-full antialiased`}
+      className={`light ${geistSans.variable} ${geistMono.variable} ${resultFont.variable} h-full antialiased`}
+      data-theme="light"
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col"><TooltipProvider>{children}</TooltipProvider></body>
+      <body className="min-h-full flex flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+        <Script id="result-theme" strategy="beforeInteractive">{`var t=null;try{t=localStorage.getItem("result-theme")}catch(e){}if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )result-theme=(light|dark)/);t=m?m[1]:"light"}var e=document.documentElement;e.classList.remove("dark","light");e.classList.add(t);e.dataset.theme=t`}</Script>
+      </body>
     </html>
   );
 }

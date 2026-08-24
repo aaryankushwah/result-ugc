@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, UsersRound, Video, X, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, UsersRound, Video, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import type { PortalUser } from "@/lib/auth";
+import { isTheme, nextTheme, themeCookie, themeFromCookie, type Theme } from "@/lib/theme";
 
 const nav = [
   { label: "Workspace", items: [
@@ -25,8 +26,14 @@ const nav = [
 type CreatorOption = { id: string; displayName: string; username: string | null };
 
 export function AppShell({ children, user, creators }: { children: React.ReactNode; user: PortalUser; creators: CreatorOption[] }) {
-  const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false); const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false); const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof document === "undefined") return "light";
+    let stored: string | null = null;
+    try { stored = window.localStorage.getItem("result-theme"); } catch { /* Cookies remain available in restricted browsers. */ }
+    return isTheme(stored) ? stored : themeFromCookie(document.cookie) ?? (document.documentElement.classList.contains("dark") ? "dark" : "light");
+  }); const pathname = usePathname();
   useEffect(() => { const handler = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, []);
+  const toggleTheme = () => { const value = nextTheme(theme); const root = document.documentElement; root.classList.remove("dark", "light"); root.classList.add(value); root.dataset.theme = value; document.cookie = themeCookie(value); try { window.localStorage.setItem("result-theme", value); } catch { /* The cookie is the persistence fallback. */ } setTheme(value); };
   return <div className={`app-frame ${collapsed ? "sidebar-collapsed" : ""}`}>
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="sidebar-controls"><Button variant="ghost" size="icon-sm" className="icon-button desktop-only" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>{collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}</Button><Button variant="ghost" size="icon-sm" className="icon-button mobile-only" onClick={() => setMobileOpen(false)} aria-label="Close menu"><X /></Button></div>
@@ -34,7 +41,7 @@ export function AppShell({ children, user, creators }: { children: React.ReactNo
       <nav className="sidebar-nav">{nav.map((group) => <div className="nav-group" key={group.label}><p>{group.label}</p>{group.items.map((item) => { const active = pathname === item.href || (item.href !== "/overview" && pathname.startsWith(`${item.href}/`)); return <Link href={item.href} key={item.href} className={active ? "active" : ""} title={collapsed ? item.label : undefined} onClick={() => setMobileOpen(false)}><item.icon /><span>{item.label}</span></Link>; })}</div>)}</nav>
       <div className="sidebar-user"><Avatar className="user-avatar"><AvatarImage src={user.avatarUrl ?? undefined} alt="" /><AvatarFallback>{user.name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar><span className="user-copy"><strong>{user.name}</strong><small>{user.role.replace("_", " ")}</small></span><form action="/api/auth/logout" method="post"><Button variant="ghost" size="icon-sm" className="icon-button" title="Sign out" aria-label="Sign out"><ChevronDown /></Button></form></div>
     </aside>
-    <div className="workspace"><header className="topbar"><Button variant="ghost" size="icon-sm" className="icon-button mobile-only" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu /></Button><Breadcrumb pathname={pathname} /><div className="topbar-actions"><span className="environment-pill"><Bot /> Internal workspace</span></div></header><main className="workspace-content">{children}</main></div>
+    <div className="workspace"><header className="topbar"><Button variant="ghost" size="icon-sm" className="icon-button mobile-only" onClick={() => setMobileOpen(true)} aria-label="Open menu"><Menu /></Button><Breadcrumb pathname={pathname} /><div className="topbar-actions"><Button variant="outline" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? <Moon /> : <Sun />}<span>{theme === "light" ? "Dark" : "Light"}</span></Button><span className="environment-pill"><Bot /> Internal workspace</span></div></header><main className="workspace-content">{children}</main></div>
     <CommandPalette creators={creators} open={paletteOpen} setOpen={setPaletteOpen} />
   </div>;
 }
