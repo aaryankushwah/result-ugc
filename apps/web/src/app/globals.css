@@ -453,76 +453,76 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .skeleton-panel { height: 430px; }
 @keyframes shimmer { to { transform: translateX(100%); } }
 
-/* Larger mono operating scale and roomier workspace rhythm. */
-body { font-size: 13px; line-height: 1.45; letter-spacing: -.01em; }
+/* Large, readable operating scale for a workspace used for long manager sessions. */
+body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .workspace-content { padding: 38px 42px 68px; }
 .page-stack { gap: 26px; }
 .page-title { min-height: 86px; gap: 28px; }
-.page-title .eyebrow, .eyebrow, .nav-group > p { font-size: 10px; }
-.page-title > div > p:last-child { margin-top: 12px; font-size: 14px; }
+.page-title .eyebrow, .eyebrow, .nav-group > p { font-size: 11px; }
+.page-title > div > p:last-child { margin-top: 12px; font-size: 16px; }
 .nav-group { margin-bottom: 22px; }
-.nav-group a { height: 40px; font-size: 13px; }
-.command-trigger span, .breadcrumb, .user-copy strong { font-size: 12px; }
-.user-copy small, .environment-pill, kbd { font-size: 10px; }
+.nav-group a { height: 44px; font-size: 15px; }
+.command-trigger span, .breadcrumb, .user-copy strong { font-size: 14px; }
+.user-copy small, .environment-pill, kbd { font-size: 12px; }
 .metric-grid, .dashboard-grid, .profile-grid, .profile-main, .profile-aside { gap: 14px; }
 .metric-card { min-height: 112px; padding: 18px; gap: 14px; }
-.metric-card p { font-size: 12px; }
-.metric-card strong { margin-top: 7px; font-size: 27px; }
-.metric-card span { margin-top: 4px; font-size: 10px; }
+.metric-card p { font-size: 14px; }
+.metric-card strong { margin-top: 7px; font-size: 30px; }
+.metric-card span { margin-top: 4px; font-size: 12px; }
 .panel-header { min-height: 68px; padding: 16px 18px; }
-.panel-header h2 { font-size: 15px; }
-.panel-header p { margin-top: 6px; font-size: 11px; }
+.panel-header h2 { font-size: 17px; }
+.panel-header p { margin-top: 6px; font-size: 13px; }
 .source-banner { min-height: 62px; padding: 13px 16px; }
-.source-banner strong { font-size: 13px; }
-.source-banner span, .source-banner > a { font-size: 11px; }
-.range-tabs a, .view-toggle button, .view-toggle a, .chart-legend, .text-link { font-size: 10px; }
+.source-banner strong { font-size: 15px; }
+.source-banner span, .source-banner > a { font-size: 13px; }
+.range-tabs a, .view-toggle button, .view-toggle a, .chart-legend, .text-link { font-size: 12px; }
 .exception-list a { min-height: 62px; padding: 10px; }
-.exception-list strong { font-size: 12px; }
-.state-badge, .status-badge { min-height: 24px; font-size: 10px; }
+.exception-list strong { font-size: 14px; }
+.state-badge, .status-badge { min-height: 26px; font-size: 11px; }
 .rank-list > a, .linked-account-list > div, .linked-account-list > a { min-height: 66px; padding-block: 10px; }
-.rank-copy strong, .rank-list > a > b, .linked-account-list strong { font-size: 12px; }
-.rank-copy small, .linked-account-list small { font-size: 10px; }
+.rank-copy strong, .rank-list > a > b, .linked-account-list strong { font-size: 14px; }
+.rank-copy small, .linked-account-list small { font-size: 12px; }
 .freshness-strip > div { min-height: 62px; padding: 12px 14px; }
-.freshness-strip strong { font-size: 11px; }
-.freshness-strip small, .freshness-strip b { font-size: 10px; }
+.freshness-strip strong { font-size: 13px; }
+.freshness-strip small, .freshness-strip b { font-size: 12px; }
 .roster-tabs { height: 56px; padding-inline: 16px; gap: 28px; }
-.roster-tabs button { font-size: 12px; }
-.roster-tabs button span { font-size: 10px; }
+.roster-tabs button { font-size: 14px; }
+.roster-tabs button span { font-size: 11px; }
 .table-toolbar { min-height: 64px; padding: 12px; gap: 9px; }
 .table-search { height: 38px; }
-.table-search input { font-size: 12px; }
-.dense-table th { height: 44px; font-size: 10px; }
-.dense-table td { height: 64px; font-size: 11px; }
-.creator-cell strong, .video-cell strong { font-size: 11px; }
-.creator-cell small, .video-cell small, .stack-cell small { font-size: 10px; }
-.table-pagination, .details-grid dt, .settings-list dt { font-size: 10px; }
-.details-grid dd, .settings-list dd, .notes-list p { font-size: 12px; }
-.profile-tabs a, .back-link { font-size: 11px; }
-.profile-identity p, .integration-card-body > p, .relationship-card strong, .relationship-row strong { font-size: 11px; }
-.relationship-card small, .relationship-row small, .notes-list span, .activity-row p, .activity-row time { font-size: 10px; }
-.empty-state strong, .activity-row strong, .request-list strong, .onboarding-steps strong { font-size: 12px; }
-.empty-state p, .request-list small, .onboarding-steps small { font-size: 10px; }
-.integration-card h2, .settings-grid h2 { font-size: 15px; }
-.integration-card > p, .settings-grid > .panel > p { font-size: 11px; }
-.integration-meta, .form-field { font-size: 10px; }
+.table-search input { font-size: 14px; }
+.dense-table th { height: 48px; font-size: 12px; }
+.dense-table td { height: 68px; font-size: 13px; }
+.creator-cell strong, .video-cell strong { font-size: 14px; }
+.creator-cell small, .video-cell small, .stack-cell small { font-size: 12px; }
+.table-pagination, .details-grid dt, .settings-list dt { font-size: 11px; }
+.details-grid dd, .settings-list dd, .notes-list p { font-size: 14px; }
+.profile-tabs a, .back-link { font-size: 13px; }
+.profile-identity p, .integration-card-body > p, .relationship-card strong, .relationship-row strong { font-size: 13px; }
+.relationship-card small, .relationship-row small, .notes-list span, .activity-row p, .activity-row time { font-size: 11px; }
+.empty-state strong, .activity-row strong, .request-list strong, .onboarding-steps strong { font-size: 14px; }
+.empty-state p, .request-list small, .onboarding-steps small { font-size: 12px; }
+.integration-card h2, .settings-grid h2 { font-size: 17px; }
+.integration-card > p, .settings-grid > .panel > p { font-size: 13px; }
+.integration-meta, .form-field { font-size: 11px; }
 
 /* Creator 360 prioritizes reading names, captions, notes, and relationship context. */
 .creator-profile, .creator-profile .data-panel, .creator-profile .dense-table { font-family: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, sans-serif; }
-.creator-profile .back-link { font-size: 11px; }
-.creator-profile .profile-identity p { color: #888; font-size: 11px; }
-.creator-profile .profile-tabs a { font-size: 12px; }
-.creator-profile .table-search input { color: #eeeeee; font-size: 13px; }
-.creator-profile .dense-table th { height: 48px; color: #929292; font-size: 11px; font-weight: 600; }
-.creator-profile .dense-table td { height: 70px; color: #c2c2c2; font-size: 12px; }
-.creator-profile .creator-cell strong, .creator-profile .video-cell strong { color: #f2f2f2; font-size: 13px; font-weight: 600; }
-.creator-profile .creator-cell small, .creator-profile .video-cell small, .creator-profile .stack-cell small { color: #909090; font-size: 11px; }
-.creator-profile .table-pagination { color: #858585; font-size: 10px; }
-.creator-profile .details-grid dt, .creator-profile .identity-keys dd { color: #858585; font-size: 10px; }
-.creator-profile .details-grid dd { color: #d4d4d4; font-size: 12px; }
-.creator-profile .linked-account-list strong, .creator-profile .relationship-row strong, .creator-profile .activity-row strong { font-size: 12px; }
-.creator-profile .linked-account-list small, .creator-profile .relationship-row small, .creator-profile .activity-row p, .creator-profile .activity-row time { color: #858585; font-size: 10px; }
-.creator-profile .notes-list p { color: #d8d8d8; font-size: 12px; }
-.creator-profile .notes-list span { color: #858585; font-size: 10px; }
+.creator-profile .back-link { font-size: 12px; }
+.creator-profile .profile-identity p { color: #909090; font-size: 13px; }
+.creator-profile .profile-tabs a { font-size: 14px; }
+.creator-profile .table-search input { color: #eeeeee; font-size: 15px; }
+.creator-profile .dense-table th { height: 52px; color: #989898; font-size: 13px; font-weight: 600; }
+.creator-profile .dense-table td { height: 76px; color: #c8c8c8; font-size: 14px; }
+.creator-profile .creator-cell strong, .creator-profile .video-cell strong { color: #f4f4f4; font-size: 15px; font-weight: 600; }
+.creator-profile .creator-cell small, .creator-profile .video-cell small, .creator-profile .stack-cell small { color: #969696; font-size: 12px; }
+.creator-profile .table-pagination { color: #8d8d8d; font-size: 11px; }
+.creator-profile .details-grid dt, .creator-profile .identity-keys dd { color: #8d8d8d; font-size: 11px; }
+.creator-profile .details-grid dd { color: #d8d8d8; font-size: 14px; }
+.creator-profile .linked-account-list strong, .creator-profile .relationship-row strong, .creator-profile .activity-row strong { font-size: 14px; }
+.creator-profile .linked-account-list small, .creator-profile .relationship-row small, .creator-profile .activity-row p, .creator-profile .activity-row time { color: #8d8d8d; font-size: 12px; }
+.creator-profile .notes-list p { color: #dedede; font-size: 14px; }
+.creator-profile .notes-list span { color: #8d8d8d; font-size: 11px; }
 
 @media (max-width: 1180px) {
   .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
