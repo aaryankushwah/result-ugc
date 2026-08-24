@@ -1,0 +1,19 @@
+node_modules/
+.next/
+dist/
+out/
+coverage/
+*.tsbuildinfo
+
+# Runtime state and secrets
+.data/
+.env
+.env.*
+!.env.example
+
+# Hosting and tooling
+.vercel/
+.turbo/
+*.log
+.DS_Store
+*.pem

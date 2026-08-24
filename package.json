@@ -1,0 +1,16 @@
+{
+  "name": "sodium-ugc",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @sodium/web build && pnpm --filter @sodium/discord-bot build",
+    "check": "pnpm --filter @sodium/web lint && pnpm --filter @sodium/discord-bot check",
+    "dev:web": "pnpm --filter @sodium/web dev",
+    "dev:bot": "pnpm --filter @sodium/discord-bot dev",
+    "test": "pnpm --filter @sodium/discord-bot test"
+  }
+}
