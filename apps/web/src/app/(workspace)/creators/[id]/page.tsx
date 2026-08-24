@@ -2,8 +2,7 @@ import { ArrowLeft, Database, ExternalLink, Hash, MessageSquareText, ShieldCheck
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { VideoTable } from "@/components/data-tables";
-import { CandidateActions, CreatorQuickActions, ManualRelationshipButton, NoteButton } from "@/components/creator-actions";
-import { Button } from "@/components/ui/button";
+import { CandidateActions, CreatorQuickActions, ManualRelationshipButton, NoteButton, type DiscordConnectionCandidate } from "@/components/creator-actions";
 import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
@@ -74,6 +73,7 @@ export default async function CreatorProfilePage({
   const videos = data.videos.filter((video) => creator.accounts.some((account) => account.id === video.accountId));
   const creatorActivities = data.activities.filter((event) => event.creatorId === creator.id);
   const confirmedAccounts = creator.accounts.filter((account) => account.linkState === "confirmed").length;
+  const discordCandidates: DiscordConnectionCandidate[] = data.creators.filter((candidate) => candidate.id !== creator.id && candidate.discord.userId && !candidate.accounts.length && !candidate.relationships.length && !candidate.notes.length).map((candidate) => ({ creatorId: candidate.id, userId: candidate.discord.userId!, username: candidate.discord.username, displayName: candidate.discord.displayName ?? candidate.displayName, state: candidate.discord.state }));
 
   return (
     <div className="page-stack creator-profile">
@@ -102,7 +102,7 @@ export default async function CreatorProfilePage({
           ) : (
             <>
               <NoteButton creatorId={creator.id} />
-              <CreatorQuickActions creatorId={creator.id} discordMissing={creator.discord.state !== "connected"} />
+              <CreatorQuickActions creatorId={creator.id} discordState={creator.discord.state} discordUserId={creator.discord.userId} candidates={discordCandidates} />
             </>
           )}
         </div>
@@ -183,7 +183,7 @@ export default async function CreatorProfilePage({
               {creator.discord.channelId ? (
                 <a className="panel-footer-link" href={`https://discord.com/channels/${creator.discord.guildId}/${creator.discord.channelId}`} target="_blank" rel="noreferrer">Open private channel <ExternalLink /></a>
               ) : (
-                <div className="panel-footer-action"><Button variant="outline">Queue access check</Button></div>
+                <div className="panel-footer-action"><CreatorQuickActions creatorId={creator.id} discordState={creator.discord.state} discordUserId={creator.discord.userId} candidates={discordCandidates} /></div>
               )}
             </section>
 
