@@ -474,6 +474,98 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .pipeline-table > button > strong { color: #bbb; font-family: var(--font-geist-mono); font-size: 9px; }
 .pipeline-table > button > svg { width: 12px; }
 
+/* Script Studio readability pass */
+.script-studio-shell .eyebrow { font-size: 10px; }
+.studio-primary { height: 42px !important; padding-inline: 16px !important; font-size: 14px !important; }
+.studio-preview-banner strong { font-size: 14px; }
+.studio-preview-banner span { font-size: 12px; }
+.pipeline-titlebar h1 { font-size: clamp(40px,4.5vw,56px); }
+.pipeline-titlebar > div > p:last-child { font-size: 15px; line-height: 1.5; }
+.neon-live { height: 36px; font-size: 11px; }
+.pipeline-overview article { min-height: 104px; padding: 17px 18px; }
+.pipeline-overview span { font-size: 10px; }
+.pipeline-overview strong { font-size: 32px; }
+.pipeline-overview small { font-size: 11px; }
+.pipeline-views button,.category-tabs button { height: 36px; font-size: 12px; }
+.category-tabs span { font-size: 10px; }
+.pipeline-search { width: 220px; height: 40px; }
+.pipeline-search input { font-size: 12px; }
+.pipeline-board { grid-template-columns: repeat(5,minmax(290px,1fr)); gap: 10px; }
+.pipeline-column > header { min-height: 76px; padding: 15px 14px 12px; }
+.pipeline-column > header span { font-size: 13px; }
+.pipeline-column > header strong { font-size: 12px; }
+.pipeline-column > header p { margin-top: 7px; font-size: 11px; }
+.pipeline-card { min-height: 250px; padding: 14px; }
+.pipeline-platform,.pipeline-card-top select { font-size: 10px; }
+.pipeline-card-top select { height: 27px; padding-inline: 7px; }
+.pipeline-card-title strong { font-size: 16px; line-height: 1.35; }
+.pipeline-card-title p { font-size: 12px; line-height: 1.5; }
+.pipeline-card-tags select,.pipeline-card-tags span { height: 27px; font-size: 10px; }
+.pipeline-card-tags select { max-width: 132px; }
+.pipeline-card-stats { margin-inline: -14px; padding-inline: 14px; }
+.pipeline-card-stats strong { font-size: 13px; }
+.pipeline-card-stats span,.pipeline-card footer time { font-size: 10px; }
+.assignment-faces span { width: 28px; height: 28px; font-size: 10px; }
+.assignment-faces em { font-size: 11px; }
+.pipeline-add { height: 44px; font-size: 11px; }
+.pipeline-table-head { min-height: 42px; font-size: 10px; }
+.pipeline-table > button { min-height: 68px; font-size: 12px; }
+.pipeline-table > button > div strong { font-size: 14px; }
+.pipeline-table > button > div span { font-size: 11px; }
+.pipeline-table > button > strong { font-size: 12px; }
+
+.writer-header { height: 64px; }
+.writer-header > div:first-child,.writer-back { font-size: 12px; }
+.writer-actions > button:not(.studio-primary) { height: 38px; font-size: 11px; }
+.writer-column-title p { font-size: 10px; }
+.writer-column-title h2 { font-size: 16px; }
+.poster-source,.reference-poster > small { font-size: 10px; }
+.reference-poster > strong { font-size: 28px; }
+.reference-meta strong { font-size: 12px; }
+.reference-meta span { font-size: 11px; }
+.transcript-heading h3 { font-size: 13px; }
+.transcript-heading span,.transcript-heading button { font-size: 11px; }
+.transcript-beats time,.transcript-beats article span { font-size: 10px; }
+.transcript-beats p { font-size: 12px; }
+.reference-empty h3 { font-size: 14px; }
+.reference-empty p { font-size: 12px; }
+.script-document-head input { font-size: clamp(31px,3.2vw,43px); }
+.script-document-head > div:first-child > p { font-size: 11px; }
+.writer-taxonomy label > span { font-size: 10px; }
+.writer-taxonomy input,.writer-taxonomy select { height: 38px; font-size: 12px; }
+.adaptation-note strong { font-size: 12px; }
+.adaptation-note span,.adaptation-note button { font-size: 11px; }
+.section-label > span,.section-label small,.delivery-input { font-size: 10px; }
+.section-label input { font-size: 15px; }
+.section-copy > textarea { font-size: 22px; line-height: 1.48; }
+.visual-direction input { font-size: 11px; }
+.visual-direction button { font-size: 10px; }
+.add-script-section { height: 42px; font-size: 11px; }
+.context-tabs button { font-size: 12px; }
+.context-tabs span { font-size: 10px; }
+.context-section-head h3 { font-size: 13px; }
+.context-section-head > span { font-size: 10px; }
+.brand-identity span { font-size: 11px; }
+.brand-brief dt { font-size: 10px; }
+.brand-brief dd { font-size: 12px; }
+.tag-list span { font-size: 10px; }
+.production-checklist label { font-size: 11px; }
+.context-tip strong { font-size: 11px; }
+.context-tip span { font-size: 10px; }
+.visual-assets article > div:nth-child(2) strong { font-size: 11px; }
+.visual-assets article > div:nth-child(2) span,.visual-mini span,.visual-mini strong { font-size: 10px; }
+.studio-notes article > span { font-size: 10px; }
+.studio-notes p,.studio-notes > button { font-size: 11px; }
+.studio-toast { font-size: 12px; }
+.reference-dialog [data-slot="dialog-title"],.assign-dialog [data-slot="dialog-title"] { font-size: 27px; }
+.reference-dialog [data-slot="dialog-description"],.assign-dialog [data-slot="dialog-description"] { font-size: 13px; }
+.dialog-kicker,.reference-form label > span,.assignment-fields label > span,.assignment-message > span { font-size: 10px; }
+.reference-form input,.reference-form textarea,.assignment-fields input,.assignment-fields select,.assignment-message textarea { font-size: 13px; }
+.intake-mode button { font-size: 12px; }
+.transcript-field small,.reference-dialog-footer > span,.assign-dialog-footer > span { font-size: 10px; }
+.creator-picker strong { font-size: 13px; }
+.creator-picker span { font-size: 11px; }
+
 @media (max-width: 1250px) {
   .writer-grid { grid-template-columns: 270px minmax(500px,1fr); }
   .writer-context { display: none; }
