@@ -737,7 +737,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .text-link svg { width: 11px; }
 .rank-list > a { min-height: 58px; padding: 7px 13px; display: grid; grid-template-columns: 24px 34px minmax(0,1fr) auto auto; align-items: center; gap: 9px; border-bottom: 1px solid rgba(255,255,255,.07); }
 .rank-list > a:last-child { border-bottom: 0; }
-.rank-list > a:hover { background: #181818; }
+.rank-list > a:hover { background: color-mix(in srgb,var(--foreground) 5%,transparent); }
 .rank { color: #505050; font-family: var(--font-geist-mono); font-size: 9px; }
 .account-avatar { width: 30px; height: 30px; }
 .rank-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
