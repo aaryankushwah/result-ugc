@@ -1350,24 +1350,28 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 
 .overview-stats-button { gap: 7px; }
 .overview-stats-button > span { min-width: 20px; padding: 1px 5px; border: 1px solid var(--border); background: var(--muted); color: var(--muted-foreground); font-size: 11px; line-height: 18px; }
-.overview-metric-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap: 6px; }
-.overview-metric-card.metric-card { min-width: 0; min-height: 58px; padding: 8px 28px 8px 10px; overflow: hidden; position: relative; display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: center; gap: 10px; isolation: isolate; background: var(--card); user-select: none; }
+.overview-metric-grid { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--border); background: var(--border); scrollbar-width: thin; }
+.overview-metric-card.metric-card { min-width: 168px; min-height: 64px; flex: 1 0 168px; padding: 8px 27px 8px 9px; overflow: hidden; position: relative; display: grid; grid-template-columns: 24px minmax(0,1fr); align-items: center; gap: 8px; isolation: isolate; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: var(--card); box-shadow: none; user-select: none; }
+.overview-metric-card.metric-card:last-child { border-right: 0; }
 .overview-metric-card.metric-card[data-dragging="true"] { opacity: .45; }
 .overview-metric-card.metric-card[data-drop-target="true"]::after { content: ""; position: absolute; inset: 3px; z-index: 3; border: 2px dotted var(--primary); background: color-mix(in srgb,var(--primary) 4%,transparent); pointer-events: none; }
 .overview-metric-card.metric-card:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.overview-metric-grip { position: absolute !important; top: 50%; right: 3px; width: 22px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); cursor: grab; touch-action: none; opacity: .65; transform: translateY(-50%); }
+.overview-metric-grip { position: absolute !important; top: 50%; right: 2px; width: 22px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); cursor: grab; touch-action: none; opacity: .42; transform: translateY(-50%); }
+.overview-metric-card:hover .overview-metric-grip,
+.overview-metric-grip:focus-visible { opacity: .85; }
 .overview-metric-grip:active { cursor: grabbing; }
 .overview-metric-grip > svg { width: 14px; height: 14px; }
 .overview-metric-card > :not(.overview-metric-dither) { position: relative; z-index: 1; }
-.overview-metric-dither { inset: 0 auto 0 0 !important; width: 64px; z-index: 0; opacity: .28; mask-image: linear-gradient(90deg,#000,rgba(0,0,0,.55) 48%,transparent 100%); }
-.overview-metric-card .metric-icon { width: 30px; height: 30px; background: var(--card); }
-.overview-metric-copy { min-width: 0; display: flex; align-items: baseline; justify-content: flex-start; gap: 10px; }
-.overview-metric-card.metric-card p { min-width: 0; overflow: hidden; margin: 0; color: var(--foreground); font-size: 13px; font-weight: 650; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.overview-metric-card.metric-card .overview-metric-copy > strong { flex: 0 0 auto; margin: 0; color: var(--foreground); font-size: 23px; font-weight: 700; line-height: 1; letter-spacing: -.04em; }
+.overview-metric-dither { inset: 0 auto 0 0 !important; width: 52px; z-index: 0; opacity: .2; mask-image: linear-gradient(90deg,#000,rgba(0,0,0,.45) 48%,transparent 100%); }
+.overview-metric-card .metric-icon { width: 24px; height: 24px; border: 0; border-radius: 0; background: transparent; }
+.overview-metric-card .metric-icon svg { width: 15px; height: 15px; }
+.overview-metric-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; }
+.overview-metric-card.metric-card p { min-width: 0; overflow: hidden; margin: 0; color: var(--muted-foreground); font-size: 11px; font-weight: 650; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.overview-metric-card.metric-card .overview-metric-copy > strong { flex: 0 0 auto; margin: 0; color: var(--foreground); font-size: 21px; font-weight: 720; line-height: 1; letter-spacing: -.04em; }
 .overview-metric-card.metric-attention { background: color-mix(in srgb,var(--alert) 5%,var(--card)); }
 .light .overview-metric-card.metric-card { background: #fff; }
-.light .overview-metric-dither { opacity: .18; }
-.light .overview-metric-card.metric-card p { color: #252a31; }
+.light .overview-metric-dither { opacity: .12; }
+.light .overview-metric-card.metric-card p { color: #626b76; }
 
 /* Remove decorative explanatory copy; keep data, state, identities, and errors. */
 .panel-header p,
