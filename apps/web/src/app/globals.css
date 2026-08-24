@@ -360,6 +360,10 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .account-assignment-footer .unassign-button { margin-right: auto; color: var(--alert); }
 .badge-row, .account-platforms { display: flex; align-items: center; gap: 4px; }
 .account-platforms span { width: 21px; height: 18px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 4px; color: #727272; font-size: 7px; }
+.account-platforms span svg { width: 13px; height: 13px; }
+.account-platforms span[data-platform="instagram"] { color: #d66aa4; }
+.account-platforms span[data-platform="youtube"] { color: #ff6161; }
+.account-platforms span[data-platform="tiktok"] { color: #e8e8e8; }
 .account-platforms strong { margin-right: 2px; color: #bbb; font-size: 9px; }
 .muted-cell { color: #565656; }
 .next-step-cell { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
