@@ -5,11 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  color-scheme: dark;
-  --surface-1: #161616;
-  --surface-2: #191919;
-  --surface-3: #202020;
-  --border: oklch(0.922 0 0);
+  color-scheme: light;
+  --surface-1: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eef1f4;
+  --border: #d9dde3;
   --muted: oklch(0.97 0 0);
   --accent: oklch(0.97 0 0);
   --alert: #fc5f2b;
@@ -145,7 +145,9 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .topbar { position: sticky; top: 0; z-index: 30; height: 60px; padding: 0 20px; display: flex; align-items: center; border-bottom: 1px solid var(--border); background: rgba(14,14,14,.86); backdrop-filter: blur(18px); }
 .breadcrumb { display: flex; align-items: center; gap: 10px; color: #555; font-size: 11px; }
 .breadcrumb strong { color: #c9c9c9; font-weight: 550; }
-.topbar-actions { margin-left: auto; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.theme-toggle { height: 28px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; font-size: 10px; }
+.theme-toggle svg { width: 13px; height: 13px; }
 .environment-pill { height: 28px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 7px; background: #151515; color: #777; font-size: 10px; }
 .environment-pill svg { width: 12px; }
 .workspace-content { min-width: 0; padding: 26px 28px 48px; }
@@ -1146,6 +1148,10 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 }
 
 .dark {
+  color-scheme: dark;
+  --surface-1: #161616;
+  --surface-2: #191919;
+  --surface-3: #202020;
   --background: #0e0e0e;
   --foreground: #f5f5f5;
   --card: #151515;
@@ -1178,6 +1184,120 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: rgba(169, 149, 255, 0.55);
 }
+
+/* Light mode is intentionally higher contrast than the dark workspace. */
+.light {
+  color-scheme: light;
+  --background: #f5f6f8;
+  --foreground: #17191d;
+  --card: #ffffff;
+  --card-foreground: #17191d;
+  --popover: #ffffff;
+  --popover-foreground: #17191d;
+  --primary: #6455d6;
+  --primary-foreground: #ffffff;
+  --secondary: #eceef2;
+  --secondary-foreground: #272b31;
+  --muted: #eef0f3;
+  --muted-foreground: #626b76;
+  --accent: #6455d6;
+  --accent-foreground: #ffffff;
+  --destructive: #c7461a;
+  --border: #d9dde3;
+  --input: #cfd4db;
+  --ring: rgba(100, 85, 214, .45);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #17191d;
+  --sidebar-primary: #6455d6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eceef2;
+  --sidebar-accent-foreground: #17191d;
+  --sidebar-border: #d9dde3;
+  --sidebar-ring: rgba(100, 85, 214, .45);
+}
+
+.light body,
+.light .app-frame,
+.light .workspace,
+.light .workspace-content { background: var(--background); color: var(--foreground); }
+.light .sidebar { background: #fff; }
+.light .topbar { background: rgba(255,255,255,.9); }
+.light .breadcrumb { color: #68717c; }
+.light .breadcrumb strong { color: #20242a; }
+.light .environment-pill,
+.light .theme-toggle,
+.light .command-trigger,
+.light .sidebar-user,
+.light kbd { border-color: var(--border); background: #f7f8fa; color: #535c67; box-shadow: none; }
+.light .icon-button { color: #5d6671; }
+.light .icon-button:hover,
+.light .nav-group a:hover { background: #eef0f3; color: #17191d; }
+.light .nav-group > p { color: #68717c; }
+.light .nav-group a { color: #4d5661; }
+.light .nav-group a.active { background: #e9e7fb; color: #201a55; box-shadow: inset 3px 0 0 #6455d6; }
+.light .nav-group a.active svg { color: #6455d6; }
+.light .user-avatar,
+.light .table-avatar,
+.light .account-avatar,
+.light .profile-avatar { border-color: #d3d7dd; background: #e7e9ed; color: #343a42; }
+.light .user-copy small { color: #68717c; }
+
+.light :is(.panel,.data-panel,.metric-card,.profile-header,.freshness-strip,.source-banner,.onboarding-steps,.login-card,.integration-card,.settings-card,.chart-card,.table-card,.creator-accounts-panel) { border-color: var(--border); background: #fff; }
+.light :is(.studio-metrics,.script-bank-table,.pipeline-overview,.pipeline-table,.pipeline-column,.pipeline-card,.reference-column,.writer-context,.script-editor,.reference-reel,.brand-identity,.tag-list span,.studio-notes > button,.creator-picker > button) { border-color: var(--border); background: #fff; }
+.light .writer-frame { background: #f5f6f8; }
+.light .writer-header { background: rgba(255,255,255,.94); }
+.light .pipeline-column.tone-winner { background: linear-gradient(180deg,rgba(83,163,74,.08),#fff 120px); }
+.light .tone-winner .pipeline-card { background: #f7fbf6; }
+.light :is(.script-bank-toolbar > label,.studio-select select,.studio-sort,.pipeline-views,.pipeline-search,.pipeline-card-top select,.pipeline-card-tags select,.pipeline-card-tags span,.writer-actions > button:not(.studio-primary),.writer-taxonomy input,.writer-taxonomy select,.visual-direction,.visual-direction button,.reference-form input,.reference-form textarea,.assignment-fields input,.assignment-fields select,.assignment-message textarea,.intake-mode,.creator-picker-search,.table-search,.assignment-search) { border-color: var(--border); background: #f8f9fb; color: #252a31; }
+.light :is(.script-bank-row:hover,.pipeline-table > button:hover,.pipeline-card:hover,.creator-picker > button:hover,.assignment-creator-list > button:hover,.assignment-creator-list > button.selected) { background: #f1f2f5; }
+.light .intake-mode button.active,
+.light .pipeline-views button.active,
+.light .category-tabs button.active { background: #e7e9ed; color: #20242a; }
+.light .assignment-faces span,
+.light .creator-picker [data-slot="avatar"],
+.light .studio-notes article > span { border-color: #fff; background: #e2e5e9; color: #343a42; }
+.light .reference-dialog,
+.light .assign-dialog { border-color: var(--border) !important; background: #fff !important; color: #17191d !important; box-shadow: 0 24px 80px rgba(25,32,42,.18) !important; }
+.light .reference-dialog-footer,
+.light .assign-dialog-footer { background: #f7f8fa !important; }
+
+.light :is(.page-title h1,.profile-identity h1,.studio-page-title h1,.pipeline-titlebar h1,.studio-metrics strong,.script-cell-main strong,.pipeline-overview strong,.pipeline-card-title strong,.pipeline-table > button > div strong,.script-document-head input,.section-label input,.section-copy > textarea,.brand-identity strong,.visual-mini strong,.panel h2,.metric-card strong,.creator-cell strong,.video-cell strong,.nested-account-handle strong,.creator-account-copy strong,.creator-account-stat strong,.primary-metric-cell,.dense-table strong,.request-list strong,.connected-system-row strong,.details-grid dd) { color: #17191d !important; }
+.light :is(.page-title p,.studio-page-title > div > p:last-child,.pipeline-titlebar > div > p:last-child,.studio-preview-banner span,.studio-metrics span,.studio-metrics small,.script-cell-main p,.script-bank-row time,.pipeline-overview span,.pipeline-overview small,.pipeline-column > header p,.pipeline-card-title p,.pipeline-card-stats span,.pipeline-card footer time,.writer-column-title p,.reference-meta span,.transcript-heading span,.transcript-beats time,.transcript-beats p,.script-document-head > div:first-child > p,.writer-taxonomy label > span,.adaptation-note span,.section-label > span,.section-label small,.delivery-input,.brand-identity span,.brand-brief dt,.brand-brief dd,.context-tip span,.visual-assets article span,.studio-notes p,.reference-dialog [data-slot="dialog-description"],.assign-dialog [data-slot="dialog-description"],.reference-form label > span,.assignment-fields label > span,.assignment-message > span,.creator-picker span,.panel-header p,.metric-card p,.creator-cell small,.video-cell small,.stack-cell small,.nested-account-identity small,.creator-account-copy small,.creator-account-stat small,.details-grid dt,.request-list small,.connected-system-row small,.table-pagination,.empty-state p) { color: #626b76 !important; }
+.light :is(input,textarea,select) { color: #1c2026; }
+.light ::placeholder { color: #7c8590; }
+
+.light .dense-table th { border-color: var(--border); background: #f2f3f5; color: #525c67; }
+.light .dense-table td { border-color: #e3e6ea; color: #343a42; }
+.light .dense-table tbody tr:hover td { background: #f4f5f7; }
+.light .creator-parent-row > td { background: #fff; }
+.light .nested-account-header-row > td { background: #eceef1 !important; color: #59636e; }
+.light .nested-account-row > td { background: #fafbfc; color: #343a42; }
+.light .nested-account-row:hover > td { background: #f1f3f5 !important; }
+.light .nested-account-row[data-link-state="suggested"] > td { background: #f3f0ff; }
+.light .nested-branch { border-color: #aab1ba; }
+.light .post-activity-day small { color: #69737e; }
+.light .post-activity-day strong { border-color: #d3d7dd; background: #f2f3f5; color: #5f6873; }
+.light .post-activity-day[data-active] strong { border-color: rgba(100,85,214,.55); background: #e9e7fb; color: #3b318f; }
+.light .source-banner { color: #343a42; }
+.light .table-message { background: #eeebff; color: #493ba8; }
+.light :is(.secondary-button,.toolbar-button) { border-color: #cfd4db; background: #fff; color: #343a42; box-shadow: none; }
+.light :is(.secondary-button,.toolbar-button):hover { border-color: #aeb5bf; background: #eef0f3; color: #17191d; }
+.light :is(.state-badge,.status-badge) { border-color: #cfd4db; background: #f1f3f5; color: #4d5661; }
+.light :is(.tone-success,.status-healthy) { border-color: #b9dfc1; background: #edf8ef; color: #237238; }
+.light :is(.tone-attention,.status-failed) { border-color: #efc0af; background: #fff1ec; color: #ad3c18; }
+.light .tone-info { border-color: #c1d4ef; background: #eef5ff; color: #315f9f; }
+.light .status-stale { border-color: #ead6a2; background: #fff7e5; color: #8a6110; }
+.light :is(.range-tabs,.view-toggle) { border-color: var(--border); background: #f2f3f5; }
+.light :is(.range-tabs,.view-toggle) button { color: #626b76; }
+.light :is(.range-tabs,.view-toggle) button.active { background: #dfe2e7; color: #17191d; }
+.light .metric-icon { border-color: #d4d8de; background: #eef0f3; color: #4d5661; }
+.light .exception-count { border-color: #d4d8de; background: #eef0f3; color: #343a42; }
+.light .assignment-creator-list > button { border-color: #e0e3e7; background: #fff; color: #252a31; }
+.light .creator-account-row:hover { background: #f3f4f6; }
+.light .creator-account-open { color: #59636e; }
+.light .profile-tabs a,
+.light .back-link { color: #626b76; }
+.light .profile-tabs a.active { color: #17191d; }
 
 @layer base {
   * {
