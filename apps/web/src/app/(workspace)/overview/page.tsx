@@ -34,18 +34,18 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { label: "Tracking stale or failed", count: data.accounts.filter((account) => account.trackingState === "stale" || account.trackingState === "failed").length, href: "/accounts?health=stale", tone: "neutral" as const },
   ];
   const metricCards: OverviewMetric[] = [
-    { id: "active", label: "Active creators", value: formatNumber(totals.active), helper: "Result roster", icon: "creators" },
-    { id: "applicants", label: "Applicants", value: formatNumber(totals.applicants), helper: "Awaiting review", icon: "applicants" },
-    { id: "accounts", label: "Tracked accounts", value: formatNumber(totals.accounts), helper: "Live from Viral", icon: "accounts" },
-    { id: "videos", label: "Posted videos", value: formatNumber(totals.videos), helper: "Included in totals", icon: "video" },
-    { id: "views", label: "Views", value: formatNumber(totals.views), helper: `${range}-day selection`, icon: "eye" },
-    { id: "averageViews", label: "Average views", value: formatNumber(totals.views / Math.max(1, totals.videos)), helper: "Per included video", icon: "gauge" },
-    { id: "likes", label: "Likes", value: formatNumber(totals.likes), helper: "Included videos", icon: "heart" },
-    { id: "comments", label: "Comments", value: formatNumber(totals.comments), helper: "Included videos", icon: "comments" },
-    { id: "shares", label: "Shares", value: formatNumber(totals.shares), helper: "Included videos", icon: "share" },
-    { id: "bookmarks", label: "Bookmarks", value: formatNumber(totals.bookmarks), helper: "Included videos", icon: "bookmark" },
-    { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), helper: "Interactions / views", icon: "activity" },
-    { id: "attention", label: "Needs attention", value: formatNumber(attention), helper: "Open exceptions", icon: "alert", attention: true },
+    { id: "active", label: "Active creators", value: formatNumber(totals.active), icon: "creators" },
+    { id: "applicants", label: "Applicants", value: formatNumber(totals.applicants), icon: "applicants" },
+    { id: "accounts", label: "Tracked accounts", value: formatNumber(totals.accounts), icon: "accounts" },
+    { id: "videos", label: "Posted videos", value: formatNumber(totals.videos), icon: "video" },
+    { id: "views", label: "Views", value: formatNumber(totals.views), icon: "eye" },
+    { id: "averageViews", label: "Average views", value: formatNumber(totals.views / Math.max(1, totals.videos)), icon: "gauge" },
+    { id: "likes", label: "Likes", value: formatNumber(totals.likes), icon: "heart" },
+    { id: "comments", label: "Comments", value: formatNumber(totals.comments), icon: "comments" },
+    { id: "shares", label: "Shares", value: formatNumber(totals.shares), icon: "share" },
+    { id: "bookmarks", label: "Bookmarks", value: formatNumber(totals.bookmarks), icon: "bookmark" },
+    { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), icon: "activity" },
+    { id: "attention", label: "Needs attention", value: formatNumber(attention), icon: "alert", attention: true },
   ];
   const topAccounts = [...data.accounts].sort((a, b) => b.views - a.views).slice(0, 5);
   const topVideos = [...includedVideos].sort((a, b) => b.views - a.views).slice(0, 5);
