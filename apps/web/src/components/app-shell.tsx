@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, UsersRound, Video, X, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, UsersRound, Video, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,7 +15,7 @@ const nav = [
     { href: "/videos", label: "Videos", icon: Video },
   ] },
   { label: "Operations", items: [
-    { href: "/onboarding", label: "Onboarding", icon: FileCheck2 }, { href: "/activity", label: "Activity", icon: Activity },
+    { href: "/scripts", label: "Script Studio", icon: FilePenLine }, { href: "/onboarding", label: "Onboarding", icon: FileCheck2 }, { href: "/activity", label: "Activity", icon: Activity },
   ] },
   { label: "Organization", items: [
     { href: "/integrations", label: "Integrations", icon: Zap }, { href: "/settings", label: "Settings", icon: Settings },
