@@ -1299,6 +1299,46 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light .back-link { color: #626b76; }
 .light .profile-tabs a.active { color: #17191d; }
 
+/* Keep dense manager screens legible at a glance in both themes. */
+body { font-weight: 500; }
+.breadcrumb strong,
+.page-title h1,
+.studio-page-title h1,
+.pipeline-titlebar h1,
+.profile-identity h1,
+.login-card h1 { font-weight: 650; }
+.script-document-head input,
+.section-copy > textarea { font-weight: 520; }
+.panel-header h2,
+.metric-card strong,
+.pipeline-overview strong,
+.pipeline-card-title strong,
+.script-cell-main strong,
+.creator-cell strong,
+.video-cell strong,
+.creator-account-copy strong,
+.creator-account-stat strong,
+.exception-list strong { font-weight: 650; }
+.primary-button,
+.secondary-button,
+.toolbar-button,
+.nav-group a,
+.roster-tabs button,
+.profile-tabs a,
+.dense-table th,
+.state-badge,
+.status-badge { font-weight: 650; }
+.dense-table td,
+.page-title > div > p:last-child,
+.panel-header p,
+.metric-card p,
+.metric-card span,
+.creator-cell small,
+.video-cell small,
+.stack-cell small,
+.creator-account-copy small,
+.creator-account-stat small { font-weight: 500; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
