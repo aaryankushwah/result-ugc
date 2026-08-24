@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { defaultOverviewMetricIds, readOverviewMetricIds, toggleOverviewMetric } from "./overview-metrics";
+import { defaultOverviewMetricIds, overviewMetricIds, readOverviewMetricIds, toggleOverviewMetric } from "./overview-metrics";
 
 describe("overview metric preferences", () => {
-  it("uses the useful default dashboard metrics", () => {
+  it("defaults to a readable subset of known stats, leading with performance", () => {
     expect(readOverviewMetricIds(null)).toEqual(defaultOverviewMetricIds);
-    expect(defaultOverviewMetricIds).toEqual(["views", "engagement", "likes", "comments", "shares", "videos"]);
+    expect(defaultOverviewMetricIds.every((id) => overviewMetricIds.includes(id))).toBe(true);
+    expect(new Set(defaultOverviewMetricIds).size).toBe(defaultOverviewMetricIds.length);
+    expect(defaultOverviewMetricIds.slice(0, 3)).toEqual(["views", "engagement", "likes"]);
+    // Keep the rail scannable: past ~8 the cards shrink below a readable width.
+    expect(defaultOverviewMetricIds.length).toBeLessThanOrEqual(8);
   });
 
   it("keeps valid unique metric ids and ignores unknown ids", () => {

@@ -99,14 +99,16 @@ export async function getLiveViralData(): Promise<{ accounts: PortalAccount[]; v
     viralFetch<ViralList<ViralVideo>>("/videos?perPage=100&sortCol=publishedAt&sortDir=desc"),
     viralFetch<ViralList<ViralExcludedVideo>>("/videos/excluded?perPage=100&sortCol=publishedAt&sortDir=desc"),
   ]);
-  const accounts = accountList.data.map(mapAccount);
-  const accountIds = new Set(accounts.map((account) => account.id));
+  const accountIds = new Set(accountList.data.map((account) => account.id));
   const includedVideos = videoList.data.filter((video) => accountIds.has(video.orgAccountId)).map(mapVideo);
   const includedKeys = new Set(includedVideos.map((video) => `${video.platform}:${video.platformVideoId}`));
   const excludedVideos = excludedList.data
     .filter((video) => accountIds.has(video.orgAccountId) && !includedKeys.has(`${video.platform}:${video.platformVideoId}`))
     .map(mapExcludedVideo);
   const videos = [...includedVideos, ...excludedVideos];
+  const videosByAccount = new Map<string, PortalVideo[]>();
+  for (const video of videos) videosByAccount.set(video.accountId, [...(videosByAccount.get(video.accountId) ?? []), video]);
+  const accounts = accountList.data.map((account) => mapAccount(account, videosByAccount.get(account.id) ?? []));
   return { accounts, videos };
 }
 
@@ -125,15 +127,9 @@ export async function trackViralAccounts(accounts: Array<{ platform: string; use
   });
 }
 
-function mapAccount(account: ViralAccount): PortalAccount {
+function mapAccount(account: ViralAccount, accountVideos: PortalVideo[]): PortalAccount {
   const username = account.username ?? "unknown";
-  const performanceHealth = deriveAccountPerformanceHealth({
-    totalVideosPublished: account.totalVideosPublished,
-    p50Views: account.p50Views,
-    postActivity: account.postActivity?.days,
-    weeklyViewStats: account.weeklyViewStats?.weeks,
-    daysSinceLastPost: account.daysSinceLastPost,
-  });
+  const performanceHealth = deriveAccountPerformanceHealth({ videos: accountVideos });
   return {
     id: account.id,
     creatorId: null,
@@ -155,6 +151,9 @@ function mapAccount(account: ViralAccount): PortalAccount {
     latestPostAt: account.latestVideoPublishedAt ?? null,
     performanceHealth: performanceHealth.state,
     performanceHealthReason: performanceHealth.reason,
+    warmedUp: performanceHealth.warmedUp,
+    trackedPosts: performanceHealth.trackedPosts,
+    warmupPosts: performanceHealth.warmupPosts,
     recentPosts7d: performanceHealth.recentPosts,
     recentMedianViews: performanceHealth.recentMedianViews,
     baselineMedianViews: performanceHealth.baselineMedianViews,

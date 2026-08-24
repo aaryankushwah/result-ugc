@@ -46,6 +46,43 @@ describe("Viral account performance health", () => {
     expect(deriveAccountPerformanceHealth({ totalVideosPublished: 12, p50Views: 1_000, daysSinceLastPost: 9, now }).state).toBe("inactive");
   });
 
+  it("keeps a warmed-up account healthy on a light posting week", () => {
+    expect(deriveAccountPerformanceHealth({
+      totalVideosPublished: 40,
+      p50Views: 1_000,
+      postActivity: [{ date: "2026-08-23", postedVideos: 1 }],
+      weeklyViewStats: [{ weekStart: "2026-08-17", avgViews: 980, p50Views: 900 }],
+      daysSinceLastPost: 1,
+      now,
+    })).toMatchObject({ state: "healthy", warmedUp: true, recentPosts: 1 });
+  });
+
+  it("does not fall back to warm-up when no completed week is available yet", () => {
+    expect(deriveAccountPerformanceHealth({
+      totalVideosPublished: 40,
+      p50Views: 1_000,
+      postActivity: activePosting,
+      weeklyViewStats: [{ weekStart: "2026-08-24", avgViews: 980, p50Views: 900 }],
+      daysSinceLastPost: 1,
+      now,
+    })).toMatchObject({ state: "healthy", warmedUp: true, recentMedianViews: null });
+  });
+
+  it("keeps an account warming until it has both enough posts and a baseline", () => {
+    expect(deriveAccountPerformanceHealth({ totalVideosPublished: 0, daysSinceLastPost: null, now })).toMatchObject({ state: "warming", warmedUp: false });
+    expect(deriveAccountPerformanceHealth({ totalVideosPublished: 12, p50Views: null, postActivity: activePosting, daysSinceLastPost: 1, now })).toMatchObject({ state: "warming", warmedUp: false, reason: "warm-up in progress — no view baseline yet" });
+  });
+
+  it("reports a warmed-up account with a slipping cadence as at risk, not warming", () => {
+    expect(deriveAccountPerformanceHealth({
+      totalVideosPublished: 40,
+      p50Views: 1_000,
+      weeklyViewStats: [{ weekStart: "2026-08-17", avgViews: 980, p50Views: 900 }],
+      daysSinceLastPost: 5,
+      now,
+    })).toMatchObject({ state: "at_risk", warmedUp: true });
+  });
+
   it("surfaces the weakest account on a creator", () => {
     expect(aggregateAccountPerformanceHealth(["healthy", "warming"])).toBe("warming");
     expect(aggregateAccountPerformanceHealth(["healthy", "at_risk"])).toBe("at_risk");

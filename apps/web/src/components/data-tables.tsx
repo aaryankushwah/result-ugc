@@ -155,8 +155,8 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       accessorFn: (row) => row.relationships.length,
       header: "Signing",
       cell: ({ row }) => row.original.relationships.length ? (
-        <div className="stack-cell"><div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div><small>{row.original.relationships[0]?.program ?? "Provider relationship"}</small></div>
-      ) : <span className="muted-cell">Not connected</span>,
+        <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div>
+      ) : <span className="muted-cell">No contract found</span>,
     },
     { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) },
     { accessorKey: "views30d", header: "30d views", cell: ({ getValue }) => <strong className="primary-metric-cell">{formatNumber(Number(getValue()))}</strong> },

@@ -107,48 +107,91 @@ export function aggregateTrackingState(states: readonly TrackingState[]): Tracki
   return "healthy";
 }
 
-type AccountPostActivityDay = { date: string; postedVideos: number };
-type AccountWeeklyViewStat = { weekStart: string; avgViews: number | null; p50Views: number | null };
+export type AccountHealthVideo = {
+  publishedAt?: string | Date | null;
+  views?: number | null;
+  /** false once a manager has marked the post as warm-up / unpaid content. */
+  included: boolean;
+};
+
+/**
+ * Creators post on fresh accounts, and the first posts are warm-up content whose
+ * views and engagement must not count. Warm-up is therefore decided from the
+ * posts a manager has actually kept — an account is "warming" until it has
+ * `warmupMinimumTrackedPosts` counted posts — and never from the account's raw
+ * platform totals, which still contain the warm-up posts. Warm-up is a one-way
+ * gate: once an account is warmed up, a light posting week reads as a cadence
+ * problem (at_risk / inactive), never as a return to warm-up.
+ */
+export const warmupMinimumTrackedPosts = 3;
+/** A post needs this long to accumulate views before it can move a median. */
+const baselineMaturityDays = 7;
+/** How far back a post still counts as "recent performance". */
+const recentPerformanceDays = 21;
+/** Recent median this far below baseline means the account is slipping. */
+const atRiskViewRatio = 0.55;
+
+function medianOf(values: readonly number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+}
 
 export function deriveAccountPerformanceHealth(input: {
-  totalVideosPublished?: number | null;
-  p50Views?: number | null;
-  postActivity?: AccountPostActivityDay[] | null;
-  weeklyViewStats?: AccountWeeklyViewStat[] | null;
-  daysSinceLastPost?: number | null;
+  videos?: readonly AccountHealthVideo[] | null;
   now?: Date;
 }): {
   state: AccountPerformanceHealthState;
   reason: string;
+  warmedUp: boolean;
+  trackedPosts: number;
+  warmupPosts: number;
   recentPosts: number;
+  daysSinceLastPost: number | null;
   recentMedianViews: number | null;
   baselineMedianViews: number | null;
 } {
   const now = input.now ?? new Date();
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const recentStart = today - 6 * 86_400_000;
-  const recentPosts = (input.postActivity ?? []).reduce((total, day) => {
-    const time = new Date(`${day.date}T00:00:00Z`).getTime();
-    return time >= recentStart && time <= today ? total + day.postedVideos : total;
-  }, 0);
-  const completedWeeks = (input.weeklyViewStats ?? [])
-    .filter((week) => week.p50Views !== null && new Date(`${week.weekStart}T00:00:00Z`).getTime() + 7 * 86_400_000 <= today)
-    .sort((left, right) => left.weekStart.localeCompare(right.weekStart));
-  const recentMedianViews = completedWeeks.at(-1)?.p50Views ?? null;
-  const baselineMedianViews = input.p50Views ?? null;
-  const published = input.totalVideosPublished ?? 0;
-  const daysSinceLastPost = input.daysSinceLastPost ?? null;
+  const nowTime = now.getTime();
+  const all = (input.videos ?? []).map((video) => ({
+    included: video.included,
+    views: video.views ?? 0,
+    time: video.publishedAt ? new Date(video.publishedAt).getTime() : Number.NaN,
+  })).filter((video) => !Number.isNaN(video.time));
+  const tracked = all.filter((video) => video.included);
+  const warmupPosts = all.length - tracked.length;
+  const trackedPosts = tracked.length;
 
-  if (!published) return { state: "warming", reason: "warm-up not started — no tracked posts", recentPosts, recentMedianViews, baselineMedianViews };
-  if (daysSinceLastPost !== null && daysSinceLastPost > 7) return { state: "inactive", reason: `posting paused — last post ${daysSinceLastPost} days ago`, recentPosts, recentMedianViews, baselineMedianViews };
-  if (published < 3 || baselineMedianViews === null) return { state: "warming", reason: `warm-up in progress — ${published} tracked ${published === 1 ? "post" : "posts"}`, recentPosts, recentMedianViews, baselineMedianViews };
-  if (daysSinceLastPost !== null && daysSinceLastPost > 3) return { state: "at_risk", reason: `posting cadence slipping — no post for ${daysSinceLastPost} days`, recentPosts, recentMedianViews, baselineMedianViews };
-  if (recentPosts < 3) return { state: "warming", reason: `warm-up in progress — ${recentPosts} ${recentPosts === 1 ? "post" : "posts"} in the last 7 days`, recentPosts, recentMedianViews, baselineMedianViews };
-  if (recentMedianViews !== null && baselineMedianViews > 0 && recentMedianViews / baselineMedianViews < 0.55) {
-    return { state: "at_risk", reason: `recent median views are ${Math.round((recentMedianViews / baselineMedianViews) * 100)}% of baseline`, recentPosts, recentMedianViews, baselineMedianViews };
+  const latestPostTime = tracked.reduce((latest, video) => Math.max(latest, video.time), 0);
+  const daysSinceLastPost = latestPostTime ? Math.floor((nowTime - latestPostTime) / 86_400_000) : null;
+  const recentPosts = tracked.filter((video) => nowTime - video.time <= 7 * 86_400_000).length;
+  const mature = tracked.filter((video) => nowTime - video.time >= baselineMaturityDays * 86_400_000);
+  const baselineMedianViews = mature.length >= warmupMinimumTrackedPosts ? medianOf(mature.map((video) => video.views)) : null;
+  const recentMedianViews = medianOf(mature.filter((video) => nowTime - video.time <= recentPerformanceDays * 86_400_000).map((video) => video.views));
+  const warmedUp = trackedPosts >= warmupMinimumTrackedPosts;
+  const base = { warmedUp, trackedPosts, warmupPosts, recentPosts, daysSinceLastPost, recentMedianViews, baselineMedianViews };
+
+  if (!all.length) return { state: "unknown", reason: "no posts synced for this account yet", ...base };
+  if (!trackedPosts) {
+    return { state: "warming", reason: `warm-up only — ${warmupPosts} ${warmupPosts === 1 ? "post" : "posts"} excluded, none counted yet`, ...base };
   }
-  if (recentMedianViews === null) return { state: "warming", reason: "building a completed-week performance baseline", recentPosts, recentMedianViews, baselineMedianViews };
-  return { state: "healthy", reason: "recent videos performing", recentPosts, recentMedianViews, baselineMedianViews };
+  if (daysSinceLastPost !== null && daysSinceLastPost > 7) {
+    return { state: "inactive", reason: `posting paused — last counted post ${daysSinceLastPost} days ago`, ...base };
+  }
+  if (!warmedUp) {
+    return { state: "warming", reason: `warm-up in progress — ${trackedPosts} of ${warmupMinimumTrackedPosts} counted posts`, ...base };
+  }
+  if (daysSinceLastPost !== null && daysSinceLastPost > 3) {
+    return { state: "at_risk", reason: `posting cadence slipping — no post for ${daysSinceLastPost} days`, ...base };
+  }
+  if (baselineMedianViews !== null && baselineMedianViews > 0 && recentMedianViews !== null && recentMedianViews / baselineMedianViews < atRiskViewRatio) {
+    return { state: "at_risk", reason: `recent median views are ${Math.round((recentMedianViews / baselineMedianViews) * 100)}% of baseline`, ...base };
+  }
+  if (baselineMedianViews === null) {
+    return { state: "healthy", reason: "posting on cadence — building a view baseline from counted posts", ...base };
+  }
+  return { state: "healthy", reason: "counted posts performing against baseline", ...base };
 }
 
 export function aggregateAccountPerformanceHealth(states: readonly AccountPerformanceHealthState[]): AccountPerformanceHealthState {
