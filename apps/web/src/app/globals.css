@@ -859,6 +859,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .profile-identity p { margin: 0; color: #6f6f6f; font-size: 9px; }
 .profile-actions { display: flex; gap: 7px; }
 .action-with-error { display: flex; align-items: flex-end; flex-direction: column; gap: 5px; }
+.discord-quick-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
 .action-with-error > span { display: flex; align-items: center; gap: 4px; color: var(--alert); font-size: 8px; }
 .action-with-error > span svg { width: 10px; }
 .spin { animation: spin .8s linear infinite; }
@@ -933,9 +934,11 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .onboarding-steps svg { width: 13px; }
 .onboarding-steps strong { font-size: 10px; }
 .onboarding-steps small { color: #606060; font-size: 8px; }
-.request-list > a { min-height: 66px; padding: 10px 14px; display: grid; grid-template-columns: 34px minmax(170px,1fr) minmax(180px,1fr) auto 18px; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
+.request-list > a { min-height: 66px; padding: 10px 14px; display: grid; grid-template-columns: 34px minmax(0,1fr) minmax(0,1.35fr) 110px 18px; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); }
 .request-list > a:hover { background: #181818; }
 .request-list > a > span:not(.account-avatar):not(.state-badge) { display: flex; flex-direction: column; gap: 3px; }
+.request-list > a > span:nth-child(2), .request-list > a > span:nth-child(3) { min-width: 0; }
+.request-list > a > span:nth-child(2) strong, .request-list > a > span:nth-child(2) small, .request-list > a > span:nth-child(3) strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .request-list strong { font-size: 9px; }
 .request-list small { color: #616161; font-size: 8px; }
 .request-list > a > svg { width: 12px; color: #555; }
