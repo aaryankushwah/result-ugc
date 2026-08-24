@@ -121,6 +121,37 @@ export type PerformancePoint = {
   engagementRate: number;
 };
 
+export type PortalAttributionLink = {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  shortLink: string;
+  destinationUrl: string;
+  state: string;
+  clicks: number;
+  leads: number;
+  conversions: number;
+  sales: number;
+  saleAmount: number;
+  lastClickedAt: string | null;
+  refreshedAt: string | null;
+  error: string | null;
+};
+
+export type PortalAttributionPoint = {
+  date: string;
+  clicks: number;
+  leads: number;
+  conversions: number;
+  sales: number;
+  revenue: number;
+};
+
+export type PortalAttribution = {
+  links: PortalAttributionLink[];
+  series: PortalAttributionPoint[];
+};
+
 export type PortalData = {
   organization: { id: string | null; name: string; slug: string };
   creators: PortalCreator[];
@@ -128,6 +159,7 @@ export type PortalData = {
   videos: PortalVideo[];
   activities: PortalActivity[];
   performance: PerformancePoint[];
+  attribution: PortalAttribution;
   freshness: Freshness[];
   providerErrors: string[];
   sourceMode: "database" | "live_provider" | "unconfigured";

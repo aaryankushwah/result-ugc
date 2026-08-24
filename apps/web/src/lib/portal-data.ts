@@ -57,11 +57,13 @@ export const getPortalData = cache(async (): Promise<PortalData> => {
       videos,
       activities: [],
       performance: buildPerformance(videos),
+      attribution: { links: [], series: [] },
       freshness: [
         { source: "viral", lastSuccessAt: newestRefresh, lastAttemptAt: attemptedAt, state: "fresh", message: `${accounts.length} accounts read live` },
         { source: "discord", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "Database reconciliation pending" },
         { source: "launchpoint", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "Database synchronization pending" },
         { source: "sideshift", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "Manual verification only" },
+        { source: "dub", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "Add DUB_API_KEY to provision creator links" },
       ],
       providerErrors: [],
       sourceMode: "live_provider",
@@ -70,11 +72,13 @@ export const getPortalData = cache(async (): Promise<PortalData> => {
     return {
       organization: { id: null, name: "Result", slug: "result" },
       creators: [], accounts: [], videos: [], activities: [], performance: buildPerformance([]),
+      attribution: { links: [], series: [] },
       freshness: [
         { source: "viral", lastSuccessAt: null, lastAttemptAt: attemptedAt, state: "failed", message: error instanceof Error ? error.message : "Viral request failed" },
         { source: "discord", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured" },
         { source: "launchpoint", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured" },
         { source: "sideshift", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured" },
+        { source: "dub", lastSuccessAt: null, lastAttemptAt: null, state: "not_configured" },
       ],
       providerErrors: [error instanceof Error ? error.message : "Viral request failed"],
       sourceMode: "unconfigured",

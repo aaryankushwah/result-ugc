@@ -1,0 +1,1 @@
+ALTER TABLE "creator_attribution_links" ADD COLUMN "discord_delivered_at" timestamp with time zone;

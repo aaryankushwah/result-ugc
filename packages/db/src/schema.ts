@@ -148,6 +148,54 @@ export const socialAccounts = pgTable("social_accounts", {
   index("social_accounts_creator_idx").on(table.creatorId),
 ]);
 
+export const creatorAttributionLinks = pgTable("creator_attribution_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  creatorId: uuid("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().default("dub"),
+  providerLinkId: text("provider_link_id").notNull(),
+  externalId: text("external_id").notNull(),
+  shortLink: text("short_link").notNull(),
+  destinationUrl: text("destination_url").notNull(),
+  linkKey: text("link_key"),
+  state: text("state").notNull().default("active"),
+  clicks: integer("clicks").notNull().default(0),
+  leads: integer("leads").notNull().default(0),
+  conversions: integer("conversions").notNull().default(0),
+  sales: integer("sales").notNull().default(0),
+  saleAmount: integer("sale_amount").notNull().default(0),
+  lastClickedAt: timestamp("last_clicked_at", { withTimezone: true }),
+  discordDeliveredAt: timestamp("discord_delivered_at", { withTimezone: true }),
+  sourceRefreshedAt: timestamp("source_refreshed_at", { withTimezone: true }),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  raw: jsonb("raw").$type<Record<string, unknown>>(),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("creator_attribution_links_creator_unique").on(table.organizationId, table.creatorId),
+  uniqueIndex("creator_attribution_links_provider_id_unique").on(table.organizationId, table.provider, table.providerLinkId),
+]);
+
+export const attributionDailySnapshots = pgTable("attribution_daily_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  creatorId: uuid("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  attributionLinkId: uuid("attribution_link_id").notNull().references(() => creatorAttributionLinks.id, { onDelete: "cascade" }),
+  bucketAt: timestamp("bucket_at", { withTimezone: true }).notNull(),
+  clicks: integer("clicks").notNull().default(0),
+  leads: integer("leads").notNull().default(0),
+  conversions: integer("conversions").notNull().default(0),
+  sales: integer("sales").notNull().default(0),
+  saleAmount: integer("sale_amount").notNull().default(0),
+  sourceRefreshedAt: timestamp("source_refreshed_at", { withTimezone: true }).notNull(),
+  raw: jsonb("raw").$type<Record<string, unknown>>(),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("attribution_daily_snapshots_link_bucket_unique").on(table.attributionLinkId, table.bucketAt),
+  index("attribution_daily_snapshots_org_bucket_idx").on(table.organizationId, table.bucketAt),
+  index("attribution_daily_snapshots_creator_bucket_idx").on(table.creatorId, table.bucketAt),
+]);
+
 export const videos = pgTable("videos", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
