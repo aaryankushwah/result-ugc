@@ -8,6 +8,20 @@
       "when": 1787566818268,
       "tag": "0000_bent_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787574560613,
+      "tag": "0001_shiny_wiccan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787575032239,
+      "tag": "0002_chief_chamber",
+      "breakpoints": true
     }
   ]
 }

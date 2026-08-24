@@ -27,6 +27,11 @@ export const trackingStateEnum = pgEnum("tracking_state", ["healthy", "stale", "
 export const linkStateEnum = pgEnum("account_link_state", ["suggested", "confirmed", "unlinked"]);
 export const operationStateEnum = pgEnum("operation_state", ["queued", "running", "succeeded", "failed"]);
 export const userRoleEnum = pgEnum("internal_user_role", ["admin", "ugc_manager", "viewer"]);
+export const scriptStatusEnum = pgEnum("script_status", ["draft", "ready", "assigned", "in_review", "approved", "published", "archived"]);
+export const scriptAssignmentStateEnum = pgEnum("script_assignment_state", ["assigned", "viewed", "filming", "submitted", "changes_requested", "approved", "cancelled"]);
+export const scriptPipelineStageEnum = pgEnum("script_pipeline_stage", ["not_started", "testing", "iterate", "winner", "retired"]);
+export const scriptPriorityEnum = pgEnum("script_priority", ["low", "medium", "high"]);
+export const scriptTestStateEnum = pgEnum("script_test_state", ["planned", "live", "complete", "stopped"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -185,6 +190,146 @@ export const creatorNotes = pgTable("creator_notes", {
   body: text("body").notNull(),
   ...timestamps,
 }, (table) => [index("creator_notes_creator_idx").on(table.creatorId, table.createdAt)]);
+
+export type ScriptSection = {
+  id: string;
+  label: string;
+  timecode: string;
+  delivery: string;
+  copy: string;
+  visualDirection: string;
+  assetIds: string[];
+};
+
+export type TranscriptSection = {
+  id: string;
+  label: string;
+  timecode: string;
+  text: string;
+};
+
+export const brandProfiles = pgTable("brand_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  productDescription: text("product_description").notNull(),
+  audience: text("audience").notNull(),
+  voice: jsonb("voice").$type<string[]>().notNull().default([]),
+  bannedPhrases: jsonb("banned_phrases").$type<string[]>().notNull().default([]),
+  proofPoints: jsonb("proof_points").$type<string[]>().notNull().default([]),
+  updatedByUserId: uuid("updated_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [uniqueIndex("brand_profiles_org_unique").on(table.organizationId)]);
+
+export const scriptReferences = pgTable("script_references", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  sourcePlatform: text("source_platform").notNull().default("instagram"),
+  sourceUrl: text("source_url"),
+  sourceCreator: text("source_creator"),
+  transcriptState: text("transcript_state").notNull().default("provided"),
+  transcript: text("transcript").notNull(),
+  transcriptSections: jsonb("transcript_sections").$type<TranscriptSection[]>().notNull().default([]),
+  sourceMetadata: jsonb("source_metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdByUserId: uuid("created_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [index("script_references_org_created_idx").on(table.organizationId, table.createdAt)]);
+
+export const scripts = pgTable("scripts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  referenceId: uuid("reference_id").references(() => scriptReferences.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  status: scriptStatusEnum("status").notNull().default("draft"),
+  pipelineStage: scriptPipelineStageEnum("pipeline_stage").notNull().default("not_started"),
+  priority: scriptPriorityEnum("priority").notNull().default("medium"),
+  category: text("category").notNull().default("Uncategorized"),
+  format: text("format").notNull().default("Talking head"),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  targetPlatform: text("target_platform").notNull().default("instagram"),
+  durationSeconds: integer("duration_seconds"),
+  hook: text("hook"),
+  sections: jsonb("sections").$type<ScriptSection[]>().notNull().default([]),
+  brandSnapshot: jsonb("brand_snapshot").$type<Record<string, unknown>>().notNull().default({}),
+  latestVersion: integer("latest_version").notNull().default(1),
+  createdByUserId: uuid("created_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  updatedByUserId: uuid("updated_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [
+  index("scripts_org_status_updated_idx").on(table.organizationId, table.status, table.updatedAt),
+  index("scripts_org_pipeline_updated_idx").on(table.organizationId, table.pipelineStage, table.updatedAt),
+  index("scripts_org_category_idx").on(table.organizationId, table.category),
+  index("scripts_reference_idx").on(table.referenceId),
+]);
+
+export const scriptVersions = pgTable("script_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scriptId: uuid("script_id").notNull().references(() => scripts.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  title: text("title").notNull(),
+  sections: jsonb("sections").$type<ScriptSection[]>().notNull().default([]),
+  changeSummary: text("change_summary"),
+  createdByUserId: uuid("created_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("script_versions_script_version_unique").on(table.scriptId, table.version),
+  index("script_versions_org_created_idx").on(table.organizationId, table.createdAt),
+]);
+
+export const scriptAssignments = pgTable("script_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scriptId: uuid("script_id").notNull().references(() => scripts.id, { onDelete: "cascade" }),
+  creatorId: uuid("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  state: scriptAssignmentStateEnum("state").notNull().default("assigned"),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  message: text("message"),
+  assignedByUserId: uuid("assigned_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  discordOperationId: uuid("discord_operation_id"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("script_assignments_script_creator_unique").on(table.scriptId, table.creatorId),
+  index("script_assignments_org_state_due_idx").on(table.organizationId, table.state, table.dueAt),
+  index("script_assignments_creator_idx").on(table.creatorId, table.updatedAt),
+]);
+
+export const scriptAssets = pgTable("script_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scriptId: uuid("script_id").notNull().references(() => scripts.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  kind: text("kind").notNull(),
+  sourceUrl: text("source_url"),
+  downloadUrl: text("download_url"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdByUserId: uuid("created_by_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [index("script_assets_script_created_idx").on(table.scriptId, table.createdAt)]);
+
+export const scriptTests = pgTable("script_tests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scriptId: uuid("script_id").notNull().references(() => scripts.id, { onDelete: "cascade" }),
+  creatorId: uuid("creator_id").references(() => creators.id, { onDelete: "set null" }),
+  videoId: uuid("video_id").references(() => videos.id, { onDelete: "set null" }),
+  state: scriptTestStateEnum("state").notNull().default("planned"),
+  variantLabel: text("variant_label").notNull().default("A"),
+  creativeAngle: text("creative_angle"),
+  hypothesis: text("hypothesis"),
+  views: integer("views").notNull().default(0),
+  hookRate: real("hook_rate"),
+  averageWatchTimeSeconds: real("average_watch_time_seconds"),
+  conversionRate: real("conversion_rate"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index("script_tests_org_state_idx").on(table.organizationId, table.state, table.updatedAt),
+  index("script_tests_script_idx").on(table.scriptId, table.createdAt),
+  uniqueIndex("script_tests_video_unique").on(table.organizationId, table.videoId),
+]);
 
 export const activityEvents = pgTable("activity_events", {
   id: uuid("id").primaryKey().defaultRandom(),

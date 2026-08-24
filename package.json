@@ -13,7 +13,7 @@
     "db:migrate": "pnpm --filter @result/db migrate",
     "dev:web": "pnpm --filter @result/web dev",
     "dev:bot": "pnpm --filter @result/discord-bot dev",
-    "test": "pnpm --filter @result/discord-bot test",
+    "test": "pnpm --filter @result/web test && pnpm --filter @result/discord-bot test",
     "verify": "pnpm check && pnpm test && pnpm build"
   }
 }
