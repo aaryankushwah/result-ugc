@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
+import { engagementTotals, totalInteractions } from "./engagement";
 import { getLiveViralData } from "./viral";
 import type { PortalCreator, PortalData, PortalVideo } from "./portal-types";
 import { getDatabasePortalData } from "./portal-database";
@@ -20,7 +21,8 @@ function candidateCreators(accounts: PortalData["accounts"], videos: PortalVideo
     const accountVideos = videos.filter((video) => video.accountId === account.id);
     const recentVideos = accountVideos.filter((video) => video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
     const views30d = recentVideos.reduce((sum, video) => sum + (video.included ? video.views : 0), 0);
-    const interactions = recentVideos.reduce((sum, video) => sum + video.likes + video.comments + video.shares + video.bookmarks, 0);
+    const engagement = engagementTotals(recentVideos, { countAll: true });
+    const interactions = totalInteractions(engagement);
     return {
       id: `viral-${account.id}`,
       displayName: account.displayName,
@@ -35,6 +37,10 @@ function candidateCreators(accounts: PortalData["accounts"], videos: PortalVideo
       notes: [],
       posts30d: recentVideos.length,
       views30d,
+      likes30d: engagement.likes,
+      comments30d: engagement.comments,
+      shares30d: engagement.shares,
+      bookmarks30d: engagement.bookmarks,
       engagementRate: views30d > 0 ? interactions / views30d : 0,
       trackingState: account.trackingState,
       lastActivityAt: account.latestPostAt,

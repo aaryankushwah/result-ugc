@@ -99,6 +99,11 @@ export type PortalCreator = {
   notes: Array<{ id: string; body: string; author: string | null; createdAt: string }>;
   posts30d: number;
   views30d: number;
+  /** Engagement split out so each part can be shown as its own column. */
+  likes30d: number;
+  comments30d: number;
+  shares30d: number;
+  bookmarks30d: number;
   engagementRate: number;
   trackingState: TrackingState;
   lastActivityAt: string | null;

@@ -8,7 +8,7 @@ function creator(accountIds = ["acc-1"]): PortalCreator {
   return {
     id: "creator-1", displayName: "Creator", email: null, lifecycle: "active", attentionState: null, nextStep: null, managerName: null,
     discord: { state: "connected", userId: "1", username: "creator", displayName: null, avatarUrl: null, channelId: null, guildId: null },
-    relationships: [], notes: [], posts30d: 0, views30d: 0, engagementRate: 0, trackingState: "healthy", lastActivityAt: null, source: "result",
+    relationships: [], notes: [], posts30d: 0, views30d: 0, likes30d: 0, comments30d: 0, shares30d: 0, bookmarks30d: 0, engagementRate: 0, trackingState: "healthy", lastActivityAt: null, source: "result",
     accounts: accountIds.map((id, index) => ({
       id, creatorId: "creator-1", platform: "tiktok", platformAccountId: id, username: `handle${index || ""}`, displayName: "", avatarUrl: null,
       followers: 0, following: 0, posts: 0, views: 0, likes: 0, comments: 0, shares: 0, bookmarks: 0, averageViews: 0, engagementRate: 0,

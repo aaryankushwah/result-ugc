@@ -1,6 +1,6 @@
 "use client";
 
-import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, type VisibilityState, useReactTable } from "@tanstack/react-table";
+import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, useReactTable } from "@tanstack/react-table";
 import { aggregateAccountPerformanceHealth } from "@result/domain";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Eye, EyeOff, Filter, Instagram, Search, X, Youtube } from "lucide-react";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
 import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
+import { useColumnVisibility } from "@/lib/use-column-visibility";
 import { buildVideoVisibilityRequests, countVideosChanging, videoVisibilityFailureMessage, videoVisibilityResultMessage } from "@/lib/video-visibility";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
 
@@ -89,9 +90,29 @@ function VisibilityMenu({ videos, included, label, className }: { videos: Portal
 
 const creatorTabLifecycle: Record<string, PortalCreator["lifecycle"]> = { requests: "request", active: "active", watch: "watch", offboarded: "offboarded" };
 
+// Engagement broken into its parts so comments can be read on their own rather
+// than only folded into engagementRate. Comments show by default because that is
+// the number managers ask for; the rest stay one click away in the Columns menu
+// so the table does not arrive unreadably wide.
+const creatorEngagementColumns: ColumnDef<PortalCreator>[] = [
+  { accessorKey: "comments30d", header: "30d comments", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "likes30d", header: "30d likes", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "shares30d", header: "30d shares", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "bookmarks30d", header: "30d saves", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+];
+const creatorEngagementHidden = { likes30d: false, shares30d: false, bookmarks30d: false };
+
+const accountEngagementColumns: ColumnDef<PortalAccount>[] = [
+  { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+  { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+];
+const accountEngagementHidden = { likes: false, shares: false, bookmarks: false };
+
 export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
   const params = useSearchParams(); const pathname = usePathname(); const router = useRouter(); const tab = params.get("tab") ?? "active";
-  const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]); const [visibility, setVisibility] = useState<VisibilityState>({}); const [selection, setSelection] = useState<RowSelectionState>({});
+  const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("creator-roster", creatorEngagementHidden); const [selection, setSelection] = useState<RowSelectionState>({});
   const filtered = useMemo(() => creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[tab] && `${creator.displayName} ${creator.discord.username ?? ""} ${creator.accounts.map((account) => account.username).join(" ")} ${creator.nextStep ?? ""}`.toLowerCase().includes(search.toLowerCase())), [creators, tab, search]);
   const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.displayName}`} />, enableSorting: false },
@@ -101,6 +122,7 @@ export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
     { id: "relationships", accessorFn: (row) => row.relationships.length, header: "Signing", cell: ({ row }) => row.original.relationships.length ? <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div> : <span className="muted-cell">No relationship</span> },
     { id: "accounts", accessorFn: (row) => row.accounts.length, header: "Accounts", cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} /> },
     { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "views30d", header: "30d views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> },
+    ...creatorEngagementColumns,
     { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> }, { accessorKey: "lastActivityAt", header: "Last activity", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
   ], []);
@@ -116,7 +138,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const tab = params.get("tab") ?? "active";
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]);
-  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [visibility, setVisibility] = useColumnVisibility("creator-accounts-roster", creatorEngagementHidden);
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const peekId = params.get("peek");
@@ -208,6 +230,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       header: "Avg. views",
       cell: ({ getValue }) => formatNumber(Number(getValue())),
     },
+    ...creatorEngagementColumns,
     { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) },
     { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> },
@@ -287,6 +310,12 @@ function CreatorAccountsTable({
     posts30d: "Views",
     views30d: "Avg. views",
     averageViews: "Engagement",
+    // Account rows report the provider's lifetime totals, matching how the
+    // columns above already read for a single account.
+    comments30d: "Comments",
+    likes30d: "Likes",
+    shares30d: "Shares",
+    bookmarks30d: "Saves",
     engagementRate: "Latest post",
     tracking: "Status",
     nextStep: "Creator",
@@ -303,6 +332,10 @@ function CreatorAccountsTable({
     if (columnId === "posts30d") return <strong>{formatNumber(account.views)}</strong>;
     if (columnId === "views30d") return formatNumber(account.averageViews);
     if (columnId === "averageViews") return formatPercent(account.engagementRate);
+    if (columnId === "comments30d") return formatNumber(account.comments);
+    if (columnId === "likes30d") return formatNumber(account.likes);
+    if (columnId === "shares30d") return formatNumber(account.shares);
+    if (columnId === "bookmarks30d") return formatNumber(account.bookmarks);
     if (columnId === "engagementRate") return timeAgo(account.latestPostAt);
     if (columnId === "tracking") return <span className="nested-account-badges"><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></span>;
     if (columnId === "nextStep") return <AccountAssignmentButton accountId={account.id} username={account.username} creators={assignmentCreators} currentCreatorId={creator.source === "result" ? creator.id : null} linkState={account.linkState} />;
@@ -343,11 +376,12 @@ function CreatorAccountsTable({
 }
 
 export function AccountTable({ accounts }: { accounts: PortalAccount[] }) {
-  const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views", desc: true }]); const [visibility, setVisibility] = useState<VisibilityState>({});
+  const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("accounts", accountEngagementHidden);
   const filtered = useMemo(() => accounts.filter((account) => `${account.username} ${account.displayName} ${account.platform}`.toLowerCase().includes(search.toLowerCase())), [accounts, search]);
   const columns = useMemo<ColumnDef<PortalAccount>[]>(() => [
     { accessorKey: "username", header: "Account", cell: ({ row }) => <Link href={`/accounts/${encodeURIComponent(row.original.id)}`} className="creator-cell"><Avatar src={row.original.avatarUrl} name={row.original.username} /><span><strong>@{row.original.username}</strong><small>{row.original.displayName}</small></span></Link> }, { accessorKey: "platform", header: "Platform", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone="info" /> },
     { accessorKey: "followers", header: "Followers", cell: ({ getValue }) => formatNumber(Number(getValue() ?? 0)) }, { accessorKey: "posts", header: "Posts", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "averageViews", header: "Avg. views", cell: ({ getValue }) => formatNumber(Number(getValue())) },
+    ...accountEngagementColumns,
     { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "latestPostAt", header: "Latest post", cell: ({ getValue }) => timeAgo(getValue() as string | null) }, { accessorKey: "linkState", header: "Creator link", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone={getValue() === "confirmed" ? "success" : "attention"} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <div className="stack-cell"><TrackingBadge state={row.original.trackingState} /><small>{timeAgo(row.original.refreshedAt)}</small></div> },
   ], []);
   const table = useReactTable({ data: filtered, columns, state: { sorting, columnVisibility: visibility }, onSortingChange: setSorting, onColumnVisibilityChange: setVisibility, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(), initialState: { pagination: { pageSize: 20 } } });
@@ -356,7 +390,7 @@ export function AccountTable({ accounts }: { accounts: PortalAccount[] }) {
 
 export function VideoTable({ videos, visibility: initialVisibilityMode = "included" }: { videos: PortalVideo[]; visibility?: "included" | "excluded" }) {
   const router = useRouter();
-  const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "publishedAt", desc: true }]); const [visibility, setVisibility] = useState<VisibilityState>({ bookmarks: false }); const [selection, setSelection] = useState<RowSelectionState>({}); const [pending, setPending] = useState(false); const [message, setMessage] = useState<string | null>(null);
+  const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "publishedAt", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("videos", { bookmarks: false }); const [selection, setSelection] = useState<RowSelectionState>({}); const [pending, setPending] = useState(false); const [message, setMessage] = useState<string | null>(null);
   const [visibilityMode, setVisibilityMode] = useState<"included" | "excluded">(initialVisibilityMode);
   const excludedCount = useMemo(() => videos.filter((video) => !video.included).length, [videos]);
   const filtered = useMemo(() => videos.filter((video) => video.included === (visibilityMode === "included") && `${video.caption} ${video.accountUsername} ${video.platform}`.toLowerCase().includes(search.toLowerCase())), [videos, search, visibilityMode]);

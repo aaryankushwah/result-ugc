@@ -18,6 +18,7 @@ import {
 import { desc, eq } from "drizzle-orm";
 import { aggregateTrackingState, deriveAccountPerformanceHealth } from "@result/domain";
 import type { PortalAccount, PortalActivity, PortalAttributionPoint, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
+import { engagementTotals, totalInteractions } from "./engagement";
 import { buildPerformance } from "./performance";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
@@ -152,7 +153,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     const confirmedAccountIds = new Set(creatorAccounts.filter((account) => account.linkState === "confirmed").map((account) => account.id));
     const recentVideos = videos.filter((video) => confirmedAccountIds.has(video.accountId) && video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
     const views = recentVideos.reduce((sum, video) => sum + (video.included ? video.views : 0), 0);
-    const interactions = recentVideos.reduce((sum, video) => sum + (video.included ? video.likes + video.comments + video.shares + video.bookmarks : 0), 0);
+    const engagement = engagementTotals(recentVideos);
+    const interactions = totalInteractions(engagement);
     const relationships: PortalRelationship[] = relationshipRows.filter((row) => row.creatorId === creator.id).map((row) => ({
       id: row.id,
       provider: row.provider,
@@ -190,6 +192,10 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       notes: noteRows.filter((note) => note.creatorId === creator.id).map((note) => ({ id: note.id, body: note.body, author: note.authorUserId ? managerById.get(note.authorUserId) ?? null : null, createdAt: note.createdAt.toISOString() })),
       posts30d: recentVideos.filter((video) => video.included).length,
       views30d: views,
+      likes30d: engagement.likes,
+      comments30d: engagement.comments,
+      shares30d: engagement.shares,
+      bookmarks30d: engagement.bookmarks,
       engagementRate: views ? interactions / views : 0,
       trackingState,
       lastActivityAt: creator.lastActivityAt?.toISOString() ?? null,
@@ -202,7 +208,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     const accountVideos = videos.filter((video) => video.accountId === account.id);
     const recentVideos = accountVideos.filter((video) => video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
     const views30d = recentVideos.reduce((sum, video) => sum + (video.included ? video.views : 0), 0);
-    const interactions = recentVideos.reduce((sum, video) => sum + (video.included ? video.likes + video.comments + video.shares + video.bookmarks : 0), 0);
+    const engagement = engagementTotals(recentVideos);
+    const interactions = totalInteractions(engagement);
     return {
       id: `viral-${account.id}`,
       displayName: account.displayName,
@@ -217,6 +224,10 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       notes: [],
       posts30d: recentVideos.filter((video) => video.included).length,
       views30d,
+      likes30d: engagement.likes,
+      comments30d: engagement.comments,
+      shares30d: engagement.shares,
+      bookmarks30d: engagement.bookmarks,
       engagementRate: views30d ? interactions / views30d : 0,
       trackingState: account.trackingState,
       lastActivityAt: account.latestPostAt,

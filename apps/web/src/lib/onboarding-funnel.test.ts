@@ -22,7 +22,7 @@ function creator(overrides: Partial<PortalCreator> = {}): PortalCreator {
   return {
     id: "creator-1", displayName: "Creator", email: null, lifecycle: "active", attentionState: null, nextStep: null, managerName: null,
     discord: { state: "connected", userId: "1", username: "creator", displayName: "Creator", avatarUrl: null, channelId: null, guildId: null },
-    relationships: [relationship()], accounts: [account()], notes: [], posts30d: 0, views30d: 0, engagementRate: 0,
+    relationships: [relationship()], accounts: [account()], notes: [], posts30d: 0, views30d: 0, likes30d: 0, comments30d: 0, shares30d: 0, bookmarks30d: 0, engagementRate: 0,
     trackingState: "healthy", lastActivityAt: null, source: "result", ...overrides,
   };
 }
