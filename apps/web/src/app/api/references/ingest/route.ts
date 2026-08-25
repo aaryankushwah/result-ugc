@@ -4,6 +4,7 @@ import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
 import { invalidatePortalData } from "@/lib/portal-cache";
 import { parseReferenceUrl, ReferenceResolutionError, resolvePastedUrl } from "@/lib/reference-ingest";
+import { cleanScriptTitle } from "@/lib/script-title";
 import { transcribeVideo, TranscriptionError } from "@/lib/transcription";
 
 // Short-link expansion (free) + live lookup (~3s) + Whisper (~10-20s) for a short video.
@@ -112,6 +113,8 @@ export async function POST(request: Request) {
 
 function suggestTitle(caption: string | null, author: string | null): string {
   const firstLine = caption?.split(/\n+/).map((line) => line.trim()).find(Boolean);
-  if (firstLine) return firstLine.slice(0, 120);
+  // Captions are usually mostly hashtags; keep the idea, drop the spam.
+  const cleaned = firstLine ? cleanScriptTitle(firstLine) : "";
+  if (cleaned) return cleaned.slice(0, 120);
   return author ? `Video from @${author}` : "Imported video";
 }

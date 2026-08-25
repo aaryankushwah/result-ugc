@@ -3,13 +3,13 @@
 import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, Moon, MousePointerClick, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, UsersRound, Video, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import type { PortalUser } from "@/lib/auth";
-import { isTheme, nextTheme, themeCookie, themeFromCookie, type Theme } from "@/lib/theme";
+import { nextTheme, themeCookie, themeFromRoot, type Theme } from "@/lib/theme";
 
 const nav = [
   { label: "Workspace", items: [
@@ -31,14 +31,14 @@ type CreatorOption = { id: string; displayName: string; username: string | null 
 type ViewTransitionDocument = Document & { startViewTransition?: (update: () => void) => { ready: Promise<void> } };
 
 export function AppShell({ children, user, creators }: { children: React.ReactNode; user: PortalUser; creators: CreatorOption[] }) {
-  const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false); const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof document === "undefined") return "light";
-    let stored: string | null = null;
-    try { stored = window.localStorage.getItem("result-theme"); } catch { /* Cookies remain available in restricted browsers. */ }
-    return isTheme(stored) ? stored : themeFromCookie(document.cookie) ?? (document.documentElement.classList.contains("dark") ? "dark" : "light");
-  }); const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false); const [mobileOpen, setMobileOpen] = useState(false); const [paletteOpen, setPaletteOpen] = useState(false); const pathname = usePathname();
+  const theme = useSyncExternalStore(
+    (notify) => { window.addEventListener("result-theme-change", notify); return () => window.removeEventListener("result-theme-change", notify); },
+    () => themeFromRoot(document.documentElement.className, document.documentElement.dataset.theme),
+    (): Theme => "light",
+  );
   useEffect(() => { const handler = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setPaletteOpen((open) => !open); } }; window.addEventListener("keydown", handler); return () => window.removeEventListener("keydown", handler); }, []);
-  const applyTheme = (value: Theme) => { const root = document.documentElement; root.classList.remove("dark", "light"); root.classList.add(value); root.dataset.theme = value; document.cookie = themeCookie(value); try { window.localStorage.setItem("result-theme", value); } catch { /* The cookie is the persistence fallback. */ } setTheme(value); };
+  const applyTheme = (value: Theme) => { const root = document.documentElement; root.classList.remove("dark", "light"); root.classList.add(value); root.dataset.theme = value; document.cookie = themeCookie(value); try { window.localStorage.setItem("result-theme", value); } catch { /* The cookie is the persistence fallback. */ } window.dispatchEvent(new Event("result-theme-change")); };
   // Reveal the incoming theme as a circle growing from the toggle. Without the
   // View Transitions API, or when motion is reduced, the switch stays instant.
   const toggleTheme = (event: React.MouseEvent<HTMLButtonElement>) => {

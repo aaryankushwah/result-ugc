@@ -5,18 +5,19 @@ import { aggregateAccountPerformanceHealth } from "@result/domain";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, ExternalLink, Eye, EyeOff, Filter, Instagram, Search, X, Youtube } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, Fragment, useContext, useMemo, useState } from "react";
+import { createContext, Fragment, useCallback, useContext, useMemo, useState } from "react";
 import rosterStyles from "./creator-accounts-roster.module.css";
 import { Button } from "@/components/ui/button";
 import { AccountAssignmentButton } from "@/components/creator-actions";
 import { CreatorPeek } from "@/components/creator-peek";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
+import { creatorMatchesFilters } from "@/lib/creator-filters";
 import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
 import { useColumnVisibility } from "@/lib/use-column-visibility";
 import { buildVideoVisibilityRequests, countVideosChanging, videoVisibilityFailureMessage, videoVisibilityResultMessage } from "@/lib/video-visibility";
@@ -37,13 +38,18 @@ function AccountHealthDot({ creator }: { creator: PortalCreator }) {
   const trackedPosts = healthAccounts.reduce((total, account) => total + (account.trackedPosts ?? 0), 0);
   const warmupPosts = healthAccounts.reduce((total, account) => total + (account.warmupPosts ?? 0), 0);
   const counts = `${trackedPosts} counted ${trackedPosts === 1 ? "post" : "posts"}${warmupPosts ? `, ${warmupPosts} excluded as warm-up` : ""}`;
-  const label = `Account health: ${state.replace("_", " ")} — ${reason} (${counts})`;
+  const stateLabel = state === "at_risk" ? "At risk" : `${state.slice(0, 1).toUpperCase()}${state.slice(1)}`;
+  const label = `Account health: ${state.replace("_", " ")} — ${reason}. ${counts}`;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="account-health-dot" data-state={state} role="img" aria-label={label} />
+        <span className="account-health-dot" data-state={state} role="img" aria-label={label} tabIndex={0} />
       </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6}>{label}</TooltipContent>
+      <TooltipContent className="account-health-tooltip" side="top" sideOffset={8}>
+        <strong><span data-state={state} />Account health: {stateLabel}</strong>
+        <span>{reason}</span>
+        <small>{counts}</small>
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -141,24 +147,32 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const [visibility, setVisibility] = useColumnVisibility("creator-accounts-roster", creatorEngagementHidden);
   const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const discordFilter = params.get("discord");
+  const providerFilter = params.get("provider");
+  const healthFilter = params.get("health");
+  const filterCount = [discordFilter, providerFilter, healthFilter].filter(Boolean).length;
   const peekId = params.get("peek");
-  const setPeekParam = (id: string | null) => {
+  const setPeekParam = useCallback((id: string | null) => {
     const next = new URLSearchParams(params.toString());
     if (id) next.set("peek", id); else next.delete("peek");
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-  };
-  const openPeek = (id: string) => setPeekParam(id);
+  }, [params, pathname, router]);
+  const openPeek = useCallback((id: string) => setPeekParam(id), [setPeekParam]);
+  const setFilterParam = useCallback((key: "discord" | "provider" | "health", value: string | null) => {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value); else next.delete(key);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    setSelection({});
+    setExpanded({});
+  }, [params, pathname, router]);
   const peeked = creators.find((candidate) => candidate.id === peekId) ?? null;
   const assignmentCreators = useMemo(() => creators.filter((creator) => creator.source === "result" && creator.lifecycle !== "offboarded").map((creator) => ({ id: creator.id, displayName: creator.displayName, discordUsername: creator.discord.username })), [creators]);
   const accountActivity = useMemo(() => new Map(creators.flatMap((creator) => creator.accounts.map((account) => [account.id, sevenDayPostActivity(videos, [account.id])] as const))), [creators, videos]);
   const creatorActivity = useMemo(() => new Map(creators.map((creator) => [creator.id, sevenDayPostActivity(videos, creator.accounts.map((account) => account.id))] as const)), [creators, videos]);
 
-  const filtered = useMemo(() => creators.filter((creator) => {
-    const relationships = creator.relationships.map((relationship) => `${relationship.provider} ${relationship.program ?? ""}`).join(" ");
-    const accounts = creator.accounts.map((account) => `${account.username} ${account.displayName} ${account.platform}`).join(" ");
-    const haystack = `${creator.displayName} ${creator.discord.username ?? ""} ${creator.email ?? ""} ${relationships} ${accounts} ${creator.nextStep ?? ""}`.toLowerCase();
-    return creator.lifecycle === creatorTabLifecycle[tab] && haystack.includes(search.toLowerCase());
-  }), [creators, tab, search]);
+  const filtered = useMemo(() => creators.filter((creator) => creatorMatchesFilters(creator, {
+    lifecycle: creatorTabLifecycle[tab], search, discord: discordFilter, provider: providerFilter, health: healthFilter,
+  })), [creators, tab, search, discordFilter, providerFilter, healthFilter]);
 
   const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
     {
@@ -235,7 +249,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> },
     { accessorKey: "lastActivityAt", header: "Updated", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
-  ], [creatorActivity, expanded]);
+  ], [creatorActivity, expanded, openPeek]);
 
   const table = useReactTable({
     data: filtered,
@@ -276,7 +290,25 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
         columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))}
         toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}
       >
-        <Button variant="outline" size="sm" className="toolbar-button"><Filter /> Filters</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Filter /> Filters{filterCount ? <span className="filter-count">{filterCount}</span> : null}</Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-56">
+            <DropdownMenuLabel>Discord</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem checked={discordFilter === "connected"} onCheckedChange={(checked) => setFilterParam("discord", checked ? "connected" : null)}>Connected</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={discordFilter === "missing_access"} onCheckedChange={(checked) => setFilterParam("discord", checked ? "missing_access" : null)}>Missing or left</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Signing</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem checked={providerFilter === "launchpoint"} onCheckedChange={(checked) => setFilterParam("provider", checked ? "launchpoint" : null)}>Launchpoint</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={providerFilter === "sideshift"} onCheckedChange={(checked) => setFilterParam("provider", checked ? "sideshift" : null)}>SideShift</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={providerFilter === "unlinked"} onCheckedChange={(checked) => setFilterParam("provider", checked ? "unlinked" : null)}>No relationship</DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Tracking</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem checked={healthFilter === "healthy"} onCheckedChange={(checked) => setFilterParam("health", checked ? "healthy" : null)}>Healthy</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={healthFilter === "stale"} onCheckedChange={(checked) => setFilterParam("health", checked ? "stale" : null)}>Stale or failed</DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem checked={healthFilter === "untracked"} onCheckedChange={(checked) => setFilterParam("health", checked ? "untracked" : null)}>Untracked</DropdownMenuCheckboxItem>
+            {filterCount ? <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { const next = new URLSearchParams(params.toString()); next.delete("discord"); next.delete("provider"); next.delete("health"); router.replace(`${pathname}?${next.toString()}`, { scroll: false }); setSelection({}); setExpanded({}); }}>Clear filters</DropdownMenuItem></> : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="outline" size="sm" className="toolbar-button" onClick={toggleAll}><ChevronsUpDown /> {allExpanded ? "Collapse all" : "Expand all"}</Button>
         {Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}
       </TableToolbar>

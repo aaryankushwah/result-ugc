@@ -17,7 +17,7 @@ import {
   type Interaction,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
-import { creatorDiscord, getDatabase, scriptAssignments, scripts } from "@result/db";
+import { creatorDiscord, creators, getDatabase, scriptAssignments, scripts } from "@result/db";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { blueprintChannels, categories, roles } from "../config/blueprint.js";
 import {
@@ -27,9 +27,10 @@ import {
   type SubmissionStatus,
   type CallPollRecord,
 } from "../data/store.js";
-import { createCreatorChannel, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
+import { createCreatorChannel, creatorIdFromChannelTopic, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
 import { discordChannelNameMatches } from "./channel-names.js";
 import { archiveCreatorChannel } from "./platform-sync.js";
+import { buildScriptChecklist } from "./script-checklist.js";
 import { scriptShareUrl } from "./script-delivery.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
@@ -1285,15 +1286,14 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
   }
 }
 
-/** Discord embed field limits: 256 for name, 1024 for value. */
-function clipField(value: string, limit: number): string {
-  return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
-}
-
 /**
- * Lists the scripts assigned to a creator, with links to the creator-facing view.
- * Available to every creator, not just staff; the optional `creator` option is
- * staff-only so a manager can look someone else up.
+ * Lists the scripts assigned to a creator as a checklist.
+ *
+ * Target resolution, most explicit first:
+ *   1. the `creator` option (staff only)
+ *   2. the owner of the private channel it was run in (staff, or that creator)
+ *   3. the caller themselves
+ * So a manager running it inside someone's private channel sees that creator's list.
  */
 async function showAssignedScripts(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!interaction.guild) return;
@@ -1304,62 +1304,56 @@ async function showAssignedScripts(interaction: ChatInputCommandInteraction): Pr
     return;
   }
 
+  const staff = isStaff(interaction);
   const requested = interaction.options.getUser("creator");
-  if (requested && !isStaff(interaction)) {
+  if (requested && !staff) {
     await interaction.editReply("Only the moderation team can look up another creator's scripts.");
     return;
   }
-  const targetUserId = requested?.id ?? interaction.user.id;
+
+  const channel = interaction.channel;
+  const channelOwnerId = channel && "topic" in channel ? creatorIdFromChannelTopic(channel.topic) : null;
+
+  let targetUserId = interaction.user.id;
+  if (requested) targetUserId = requested.id;
+  else if (channelOwnerId && (staff || channelOwnerId === interaction.user.id)) targetUserId = channelOwnerId;
+
+  if (targetUserId !== interaction.user.id && !staff) {
+    await interaction.editReply("Only the moderation team can look up another creator's scripts.");
+    return;
+  }
 
   const connection = (await getDatabase()
-    .select({ creatorId: creatorDiscord.creatorId })
+    .select({ creatorId: creatorDiscord.creatorId, displayName: creators.displayName })
     .from(creatorDiscord)
+    .innerJoin(creators, eq(creators.id, creatorDiscord.creatorId))
     .where(and(eq(creatorDiscord.guildId, interaction.guild.id), eq(creatorDiscord.discordUserId, targetUserId)))
     .limit(1))[0];
 
   if (!connection) {
-    await interaction.editReply(requested
-      ? `${requested.username} is not linked to a Result creator yet.`
-      : "You are not linked to a Result creator yet. Ask your manager to connect you.");
+    await interaction.editReply(targetUserId === interaction.user.id
+      ? "You are not linked to a Result creator yet. Ask your manager to connect you."
+      : `<@${targetUserId}> is not linked to a Result creator yet.`);
     return;
   }
 
+  const LIMIT = 10;
   const rows = await getDatabase()
     .select({
       title: scripts.title,
-      hook: scripts.hook,
       state: scriptAssignments.state,
       dueAt: scriptAssignments.dueAt,
       shareToken: scriptAssignments.shareToken,
-      updatedAt: scriptAssignments.updatedAt,
     })
     .from(scriptAssignments)
     .innerJoin(scripts, eq(scripts.id, scriptAssignments.scriptId))
     .where(and(eq(scriptAssignments.creatorId, connection.creatorId), ne(scriptAssignments.state, "cancelled")))
     .orderBy(desc(scriptAssignments.updatedAt))
-    .limit(10);
+    .limit(LIMIT + 1);
 
-  if (!rows.length) {
-    await interaction.editReply(requested
-      ? `${requested.username} has no scripts assigned right now.`
-      : "You have no scripts assigned right now. You will get a message here when one lands.");
-    return;
-  }
-
-  const embed = new EmbedBuilder()
-    .setTitle(requested ? `Scripts for ${requested.username}` : "Your scripts")
-    .setColor(Colors.Blurple)
-    .setFooter({ text: rows.length === 10 ? "Showing the 10 most recent." : `${rows.length} script${rows.length === 1 ? "" : "s"}.` });
-
-  for (const row of rows) {
-    const url = scriptShareUrl(row.shareToken);
-    const details = [
-      `Status: ${row.state.replaceAll("_", " ")}`,
-      row.dueAt ? `Due <t:${Math.floor(new Date(row.dueAt).getTime() / 1_000)}:D>` : null,
-      url ? `[Open the script](${url})` : "Link not available yet — ask your manager.",
-    ].filter(Boolean).join(" · ");
-    embed.addFields({ name: clipField(row.title, 240), value: clipField(details, 1_000) });
-  }
-
-  await interaction.editReply({ embeds: [embed] });
+  const forName = targetUserId === interaction.user.id ? "you" : connection.displayName;
+  await interaction.editReply({
+    content: buildScriptChecklist(rows.slice(0, LIMIT), { forName, truncated: rows.length > LIMIT }),
+    allowedMentions: { parse: [] },
+  });
 }

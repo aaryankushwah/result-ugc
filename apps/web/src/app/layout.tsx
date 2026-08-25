@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
-import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 import "./script-pipeline.css";
@@ -47,9 +46,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-theme="light"
       suppressHydrationWarning
     >
+      <head>
+        <script
+          type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: `var t=null;try{t=localStorage.getItem("result-theme")}catch(e){}if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )result-theme=(light|dark)/);t=m?m[1]:"light"}var e=document.documentElement;e.classList.remove("dark","light");e.classList.add(t);e.dataset.theme=t` }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <TooltipProvider>{children}</TooltipProvider>
-        <Script id="result-theme" strategy="beforeInteractive">{`var t=null;try{t=localStorage.getItem("result-theme")}catch(e){}if(t!=="dark"&&t!=="light"){var m=document.cookie.match(/(?:^|; )result-theme=(light|dark)/);t=m?m[1]:"light"}var e=document.documentElement;e.classList.remove("dark","light");e.classList.add(t);e.dataset.theme=t`}</Script>
       </body>
     </html>
   );

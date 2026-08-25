@@ -17,6 +17,8 @@ export function scriptShareUrl(shareToken: string | null): string | null {
 
 /**
  * Builds the private-channel message for a newly assigned script.
+ * Deliberately carries no transcript preview — a raw hook dump reads as a wall
+ * of truncated text in Discord. The link is the way in.
  * Pure so it can be unit tested without a Discord client.
  */
 export function buildScriptAssignmentMessage(input: ScriptAssignmentPayload & { discordUserId: string }): {
@@ -24,20 +26,31 @@ export function buildScriptAssignmentMessage(input: ScriptAssignmentPayload & { 
   embed: EmbedBuilder;
 } {
   const url = scriptShareUrl(input.shareToken);
-  const lines = [`**New script for you** · <@${input.discordUserId}>`];
-  if (input.dueAt) lines.push(`Due ${formatDue(input.dueAt)}.`);
-  lines.push(url ? `Open it here: ${url}` : "Your manager will share the script link shortly.");
-
   const embed = new EmbedBuilder()
-    .setTitle(input.scriptTitle)
+    .setTitle(clip(cleanTitle(input.scriptTitle), 240))
     .setColor(0xa9_95_ff);
-
-  const description = [input.scriptHook, input.message].filter((value): value is string => Boolean(value?.trim())).join("\n\n");
-  if (description) embed.setDescription(clip(description, 4_000));
   if (url) embed.setURL(url);
-  if (input.dueAt) embed.addFields({ name: "Due", value: formatDue(input.dueAt), inline: true });
 
-  return { content: lines.join("\n"), embed };
+  const facts: string[] = ["Ready to film"];
+  if (input.dueAt) facts.push(`Due ${formatDue(input.dueAt)}`);
+  embed.addFields({ name: "Status", value: facts.join(" · "), inline: false });
+
+  if (input.message?.trim()) {
+    embed.addFields({ name: "From your manager", value: clip(input.message.trim(), 1_000), inline: false });
+  }
+  embed.addFields({
+    name: "Script",
+    value: url ? `[Open the full script](${url})` : "Your manager will share the link shortly.",
+    inline: false,
+  });
+
+  return { content: `**New script for you** · <@${input.discordUserId}>`, embed };
+}
+
+/** Reference titles are often raw captions; drop trailing hashtag spam. */
+export function cleanTitle(title: string): string {
+  const withoutTags = title.replace(/(?:^|\s)#[\p{L}\p{N}_]+/gu, " ").replace(/\s+/g, " ").trim();
+  return withoutTags || title.trim() || "Untitled script";
 }
 
 function formatDue(value: string): string {

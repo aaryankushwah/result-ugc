@@ -1,8 +1,7 @@
-import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, Circle, FileVideo2, Link2, Radio } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, Circle, FileVideo2, Radio } from "lucide-react";
 import Link from "next/link";
-import { OverviewMetricGrid, OverviewMetricPicker, type OverviewMetric } from "@/components/overview-metrics";
+import { CopyOverviewViewButton, OverviewMetricGrid, OverviewMetricPicker, type OverviewMetric } from "@/components/overview-metrics";
 import { PerformanceChart } from "@/components/performance-chart";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatNumber, formatPercent, PageTitle, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
@@ -60,7 +59,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
-    <PageTitle title="Result" titleClassName="font-result result-ugc-title" titleSuffix={<span className="result-ugc-mark">UGC</span>} actions={<><OverviewMetricPicker metrics={metricCards} /><Button variant="outline"><Link2 /> Copy this view</Button></>} />
+    <PageTitle title="Result" titleClassName="font-result result-ugc-title" actions={<><OverviewMetricPicker metrics={metricCards} /><CopyOverviewViewButton /></>} />
     {data.sourceMode === "live_provider" ? <div className="source-banner"><Radio /><div><strong>Live Viral data is connected.</strong><span>Creator candidates need confirmation after the shared database is connected; they are not silently treated as signed creators.</span></div><Link href="/integrations">Review setup <ArrowUpRight /></Link></div> : null}
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
     <OverviewMetricGrid metrics={metricCards} />

@@ -16,3 +16,8 @@ export function themeFromCookie(cookie: string): Theme | null {
 export function themeCookie(theme: Theme): string {
   return `result-theme=${theme}; path=/; max-age=31536000; samesite=lax`;
 }
+
+export function themeFromRoot(className: string, dataTheme?: string | null): Theme {
+  if (isTheme(dataTheme ?? null)) return dataTheme as Theme;
+  return className.split(/\s+/).includes("dark") ? "dark" : "light";
+}

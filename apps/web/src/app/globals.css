@@ -887,6 +887,16 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .account-health-dot[data-state="at_risk"],
 .account-health-dot[data-state="inactive"] { color: #e76555; }
 .account-health-dot[data-state="unknown"] { border: 1px solid currentColor; color: #777d86; background: transparent; }
+.account-health-tooltip { width: 240px !important; max-width: 240px !important; padding: 11px 12px !important; display: flex !important; align-items: stretch !important; flex-direction: column; gap: 4px !important; border: 1px solid rgba(255,255,255,.14); border-radius: 0 !important; background: #0d0d0e !important; color: #f6f6f7 !important; box-shadow: 0 10px 30px rgba(0,0,0,.24); line-height: 1.35; }
+.account-health-tooltip strong { display: flex; align-items: center; gap: 7px; color: #fff; font-size: 12px; font-weight: 650; }
+.account-health-tooltip strong > span { width: 7px; height: 7px; flex: 0 0 7px; background: currentColor; }
+.account-health-tooltip strong > span[data-state="healthy"] { color: #58b86c; }
+.account-health-tooltip strong > span[data-state="warming"] { color: #d3a13d; }
+.account-health-tooltip strong > span[data-state="at_risk"],
+.account-health-tooltip strong > span[data-state="inactive"] { color: #e76555; }
+.account-health-tooltip strong > span[data-state="unknown"] { border: 1px solid #8b9098; background: transparent; }
+.account-health-tooltip > span { color: #d7d7d9; font-size: 11px; }
+.account-health-tooltip small { color: #89898f; font-size: 10px; }
 .creator-cell strong, .video-cell strong { max-width: 210px; overflow: hidden; text-overflow: ellipsis; color: #ddd; }
 .creator-cell small, .video-cell small, .stack-cell small { color: #606060; }
 .unified-creator-roster { border: 1px solid var(--border); background: #121212; }
@@ -897,6 +907,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .unified-creator-roster .table-search { width: min(520px,42vw); height: 44px; }
 .unified-creator-roster .table-search input { font-size: 15px; }
 .unified-creator-roster .toolbar-button { height: 44px; font-size: 14px; }
+.filter-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid currentColor; font-size: 11px; font-weight: 800; line-height: 1; }
 .unified-creator-roster .dense-table th { height: 52px; font-size: 13px; }
 .unified-creator-roster .dense-table td { font-size: 15px; }
 .unified-creator-roster .creator-cell strong { font-size: 16px; }
@@ -1077,6 +1088,10 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .activity-row svg { width: 11px; }
 .activity-row p { margin: 3px 0 0; color: #626262; }
 .activity-row time { color: #626262; }
+.activity-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-height: 48px; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 14px; font-weight: 700; }
+.activity-pagination a { color: var(--foreground); text-decoration: none; border: 1px solid var(--border); padding: 7px 10px; }
+.activity-pagination a:hover { background: var(--muted); }
+.activity-pagination a[aria-disabled="true"] { pointer-events: none; opacity: .42; }
 .integration-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .integration-card { min-height: 230px; padding: 15px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 11px; background: #151515; }
 .integration-card-head { display: flex; align-items: center; justify-content: space-between; }
@@ -1864,3 +1879,243 @@ body,
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }
 }
+
+/* Pipeline card, simplified: no transcript preview, metrics as the anchor.
+   Overrides the earlier .pipeline-card rules in this file. */
+.pipeline-card { min-height: 0; padding: 13px 14px 11px; box-shadow: none; }
+.pipeline-card:hover { box-shadow: none; transform: none; border-color: color-mix(in srgb, var(--pipeline-stage) 55%, rgba(255,255,255,.2)); }
+
+/* Title: two lines maximum, never a wall of caption. */
+.pipeline-card-title { margin-top: 9px; }
+.pipeline-card-title strong {
+  font-size: 14px; line-height: 1.3; font-weight: 600; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.pipeline-card-title p { display: none; }
+
+/* The data. Large, mono, high contrast - this is what the board is read for. */
+.pipeline-card-stats {
+  margin: 12px -14px 0; padding: 10px 14px 9px;
+  border-bottom: 0; background: transparent;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.pipeline-card-stats div { border-right: 0; padding-left: 0 !important; gap: 1px; }
+.pipeline-card-stats strong {
+  font-size: 21px; line-height: 1.1; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.pipeline-card-stats span {
+  margin-top: 0; font-size: 9px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--text-muted); font-family: var(--font-geist-mono);
+}
+
+/* Controls recede: they are edit affordances, not information. */
+.pipeline-card-tags { margin-top: 10px; opacity: .72; transition: opacity .15s ease; }
+.pipeline-card:hover .pipeline-card-tags { opacity: 1; }
+.pipeline-card-tags select, .pipeline-card-tags span { font-size: 10px; height: 22px; }
+.pipeline-card-top select { opacity: .72; transition: opacity .15s ease; }
+.pipeline-card:hover .pipeline-card-top select { opacity: 1; }
+.pipeline-card footer { margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.05); }
+
+.light .pipeline-card-stats { border-top-color: var(--border); }
+.light .pipeline-card footer { border-top-color: var(--border); }
+
+/* ── Pipeline card, Notion-calm ────────────────────────────────────────────
+   A filled surface tinted by its stage instead of a bordered box with a left
+   bar. Controls lose their chrome and read as text; priority is the one piece
+   of colour. Corners stay square per the house zero-radius rule. */
+.pipeline-cards { padding: 6px; gap: 6px; }
+
+.pipeline-card {
+  padding: 12px 13px 11px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--pipeline-stage) 7%, var(--surface-2));
+  box-shadow: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+/* The left accent bar is what made it feel like a ticket stub. */
+.pipeline-card::before { display: none; }
+.pipeline-card:hover {
+  transform: none; box-shadow: none;
+  background: color-mix(in srgb, var(--pipeline-stage) 12%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--pipeline-stage) 30%, transparent);
+}
+.tone-winner .pipeline-card, .tone-retired .pipeline-card { background: color-mix(in srgb, var(--pipeline-stage) 7%, var(--surface-2)); }
+
+/* Platform: a small stage-coloured dot, not an eyebrow shouting INSTAGRAM. */
+.pipeline-card-top { gap: 6px; }
+.pipeline-platform {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-muted); font-family: var(--font-geist-mono);
+}
+.pipeline-platform i { width: 6px; height: 6px; flex: none; background: var(--pipeline-stage); }
+
+/* Title carries the card. */
+.pipeline-card-title { margin-top: 8px; }
+.pipeline-card-title strong { font-size: 14.5px; line-height: 1.35; font-weight: 600; }
+
+/* Controls read as text. Only priority keeps colour. */
+.pipeline-card-tags { margin-top: 9px; gap: 8px; opacity: 1; }
+.pipeline-card-tags select, .pipeline-card-tags span {
+  height: auto; padding: 0; border: 0; background: transparent;
+  color: var(--text-muted); font-size: 11px;
+}
+.pipeline-card-tags select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+.pipeline-card-tags select:hover { color: var(--text-primary); }
+
+.priority-pill {
+  padding: 3px 8px !important; font-size: 10.5px !important; font-weight: 600;
+  letter-spacing: .01em; text-transform: capitalize; cursor: pointer;
+  appearance: none; -webkit-appearance: none; border: 0; outline: 0;
+}
+.priority-pill[data-priority="high"]   { background: color-mix(in srgb, var(--destructive) 20%, transparent); color: var(--destructive); }
+.priority-pill[data-priority="medium"] { background: color-mix(in srgb, #d9a441 22%, transparent); color: #b5822b; }
+.priority-pill[data-priority="low"]    { background: color-mix(in srgb, var(--text-muted) 16%, transparent); color: var(--text-muted); }
+.dark .priority-pill[data-priority="medium"] { color: #e0b662; }
+
+/* Metrics: still readable, no longer a bordered table strip. */
+.pipeline-card-stats {
+  margin: 11px 0 0; padding: 0; border: 0; background: transparent;
+  display: flex; gap: 16px;
+}
+.pipeline-card-stats div { flex: none; flex-direction: row; align-items: baseline; gap: 4px; border: 0; padding: 0 !important; }
+.pipeline-card-stats strong { font-size: 13px; font-weight: 650; color: var(--text-primary); }
+.pipeline-card-stats span { margin: 0; font-size: 10px; letter-spacing: .02em; text-transform: none; color: var(--text-muted); }
+
+.pipeline-card footer { margin-top: 10px; padding-top: 0; border: 0; min-height: 22px; }
+.pipeline-card footer time { font-size: 10.5px; color: var(--text-muted); }
+.pipeline-card footer > button { width: 22px; height: 22px; }
+.pipeline-card footer > button svg { width: 10px; }
+.assignment-faces span { width: 20px; height: 20px; font-size: 9px; border-radius: 999px; }
+
+/* Specificity corrections: the base .pipeline-card-top select / stats rules
+   above outrank the single-class versions, so restate them scoped to the card. */
+.pipeline-card { background: color-mix(in srgb, var(--pipeline-stage) 8%, var(--surface-3)); border-color: transparent; }
+.pipeline-card:hover { background: color-mix(in srgb, var(--pipeline-stage) 14%, var(--surface-3)); }
+.tone-winner .pipeline-card, .tone-retired .pipeline-card { background: color-mix(in srgb, var(--pipeline-stage) 8%, var(--surface-3)); }
+
+.pipeline-card .pipeline-card-stats {
+  margin: 11px 0 0 !important; padding: 0 !important;
+  background: transparent !important; border: 0 !important;
+}
+
+.pipeline-card-top select.priority-pill {
+  height: auto; margin-left: auto;
+  padding: 3px 9px; border: 0; outline: 0;
+  font-size: 10.5px; font-weight: 650; text-transform: capitalize;
+  appearance: none; -webkit-appearance: none;
+}
+.pipeline-card-top select.priority-pill[data-priority="high"]   { background: color-mix(in srgb, var(--destructive) 20%, transparent); color: var(--destructive); }
+.pipeline-card-top select.priority-pill[data-priority="medium"] { background: color-mix(in srgb, #d9a441 26%, transparent); color: #97671b; }
+.pipeline-card-top select.priority-pill[data-priority="low"]    { background: color-mix(in srgb, var(--text-muted) 18%, transparent); color: var(--text-muted); }
+.dark .pipeline-card-top select.priority-pill[data-priority="medium"] { color: #e3bc6b; }
+
+/* Theme-scoped restatement — the .light block above hardcodes white cards,
+   bordered chips and drop shadows, which outrank the single-class rules. */
+.light .pipeline-card,
+.dark .pipeline-card {
+  background: color-mix(in srgb, var(--pipeline-stage) 9%, var(--surface-3));
+  border-color: transparent;
+  box-shadow: none;
+}
+.light .tone-winner .pipeline-card,
+.dark .tone-winner .pipeline-card { background: color-mix(in srgb, var(--pipeline-stage) 9%, var(--surface-3)); }
+
+.light .pipeline-card:hover,
+.dark .pipeline-card:hover {
+  background: color-mix(in srgb, var(--pipeline-stage) 16%, var(--surface-3));
+  border-color: color-mix(in srgb, var(--pipeline-stage) 34%, transparent);
+  box-shadow: none;
+}
+
+/* Category and format read as plain text, not chips. */
+.light .pipeline-card-tags select, .dark .pipeline-card-tags select,
+.light .pipeline-card-tags span,   .dark .pipeline-card-tags span {
+  border: 0; background: transparent; color: var(--text-muted);
+  padding: 0; height: auto; font-size: 11px;
+}
+.light .pipeline-card-tags select:hover, .dark .pipeline-card-tags select:hover { color: var(--text-primary); }
+
+.light .pipeline-card-stats, .dark .pipeline-card-stats { border: 0; background: transparent; }
+
+/* Priority keeps its colour in both themes. */
+.light .pipeline-card-top select.priority-pill[data-priority="high"],
+.dark  .pipeline-card-top select.priority-pill[data-priority="high"]   { border: 0; background: color-mix(in srgb, var(--destructive) 20%, transparent); color: var(--destructive); }
+.light .pipeline-card-top select.priority-pill[data-priority="medium"] { border: 0; background: #f6ead1; color: #8a5f16; }
+.dark  .pipeline-card-top select.priority-pill[data-priority="medium"] { border: 0; background: color-mix(in srgb, #d9a441 24%, transparent); color: #e3bc6b; }
+.light .pipeline-card-top select.priority-pill[data-priority="low"],
+.dark  .pipeline-card-top select.priority-pill[data-priority="low"]    { border: 0; background: color-mix(in srgb, var(--text-muted) 18%, transparent); color: var(--text-muted); }
+
+/* Column recedes, card lifts — the relationship Notion uses. Previously both
+   were white, so the cards had nothing to sit on. */
+.light .pipeline-column { background: var(--surface-2); border-color: var(--border); }
+.dark  .pipeline-column { background: color-mix(in srgb, var(--pipeline-stage) 4%, var(--canvas-deep, #0e0e0e)); border-color: transparent; }
+
+.light .pipeline-card,
+.light .tone-winner .pipeline-card {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--pipeline-stage) 16%, #e6e9ee);
+}
+.light .pipeline-card:hover {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--pipeline-stage) 45%, #d6dae1);
+}
+.dark .pipeline-card,
+.dark .tone-winner .pipeline-card {
+  background: color-mix(in srgb, var(--pipeline-stage) 12%, #1b1b1e);
+  border-color: transparent;
+}
+.dark .pipeline-card:hover { background: color-mix(in srgb, var(--pipeline-stage) 19%, #1b1b1e); }
+
+/* Breathing room: Notion cards are roomy, not cramped. */
+.pipeline-cards { padding: 8px; gap: 8px; }
+.pipeline-card { padding: 14px 14px 12px; }
+.pipeline-card-stats { gap: 14px; }
+.pipeline-card-stats strong { font-size: 13.5px; }
+
+/* The .light :is(...) group above resolves to a higher specificity than a
+   plain .light .class pair (one of its arguments is compound), so these need
+   !important — the same escape hatch that block already uses for text colour. */
+.pipeline-card-tags select,
+.pipeline-card-tags span {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  padding: 0 !important;
+  height: auto !important;
+}
+.pipeline-card-tags select:hover { color: var(--text-primary) !important; }
+.pipeline-card-top select.priority-pill { border: 0 !important; }
+
+/* Last of the chrome: avatar reads as a chip, not a bordered box; the add
+   affordance is a quiet text row like Notion's "+ New project". */
+.pipeline-card .assignment-faces span {
+  border: 0 !important;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pipeline-stage) 26%, var(--surface-3)) !important;
+  color: var(--text-primary);
+  font-size: 9px; font-weight: 600;
+}
+.pipeline-card .assignment-faces em { color: var(--text-muted); font-style: normal; font-size: 11px; }
+
+.pipeline-add {
+  border: 0 !important; background: transparent !important;
+  color: var(--text-muted) !important; justify-content: flex-start !important;
+  padding-left: 4px !important; font-size: 12px;
+}
+.pipeline-add:hover { color: var(--text-primary) !important; background: transparent !important; }
+
+/* Dither-kit wash behind each card, coloured by its pipeline stage.
+   Static single paint per card — no animation loop — so a full board is cheap. */
+.pipeline-card-wash { z-index: 0; transition: opacity .15s ease; }
+/* Bottom-weighted: the wash sits under the metrics row, leaving the title clean.
+   A mask keeps the top third free so text never sits on texture. */
+.pipeline-card-wash { -webkit-mask-image: linear-gradient(to top, #000 0%, #000 22%, transparent 58%); mask-image: linear-gradient(to top, #000 0%, #000 22%, transparent 58%); }
+.light .pipeline-card-wash { opacity: .28; }
+.dark  .pipeline-card-wash { opacity: .34; }
+.pipeline-card:hover .pipeline-card-wash { opacity: .34; }
+.dark .pipeline-card:hover .pipeline-card-wash { opacity: .5; }
+
+/* Card content sits above the canvas. */
+.pipeline-card > *:not(.pipeline-card-wash) { position: relative; z-index: 1; }

@@ -211,6 +211,15 @@ function creatorChannelName(member: GuildMember): string {
   return normalized || `creator-${member.id.slice(-6)}`;
 }
 
+/**
+ * Reads the Discord user id out of a creator channel's topic marker.
+ * Discord's topic is authoritative for channel ownership; the database column
+ * is a mirror of it. Pure, so it is unit tested.
+ */
+export function creatorIdFromChannelTopic(topic: string | null | undefined): string | null {
+  return topic?.match(/Creator ID:\s*(\d{5,32})/)?.[1] ?? null;
+}
+
 export function findCreatorChannel(guild: Guild, userId: string): TextChannel | undefined {
   const markerText = `Creator ID: ${userId}`;
   const channel = guild.channels.cache.find(

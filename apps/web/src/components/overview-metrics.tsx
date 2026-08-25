@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Activity, AlertTriangle, Bookmark, CircleUserRound, Eye, FileVideo2, Gauge, GripVertical, Heart, MessageCircleMore, RotateCcw, Settings2, Share2, UserPlus, UsersRound } from "lucide-react";
+import { Activity, AlertTriangle, Bookmark, Check, CircleUserRound, Eye, FileVideo2, Gauge, GripVertical, Heart, Link2, MessageCircleMore, RotateCcw, Settings2, Share2, UserPlus, UsersRound } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,20 @@ export function OverviewMetricPicker({ metrics }: { metrics: OverviewMetric[] })
       <DropdownMenuItem onSelect={() => update(defaultOverviewMetricIds)}><RotateCcw /> Reset defaults</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>;
+}
+
+export function CopyOverviewViewButton() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1_500);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return <Button variant="outline" onClick={copy}>{copied ? <Check /> : <Link2 />}{copied ? "Copied" : "Copy this view"}</Button>;
 }
 
 export function OverviewMetricGrid({ metrics }: { metrics: OverviewMetric[] }) {

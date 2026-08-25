@@ -32,6 +32,33 @@ export async function launchpointGet<T = unknown>(path: string, params: Record<s
   return payload as T;
 }
 
+/**
+ * Launchpoint caps `limit` per endpoint and rejects anything larger with a bare
+ * 400 {"error":"Invalid request"}. Verified 2026-08-25: /creators and /contracts
+ * allow at most 100, /posts allows 500.
+ */
+const PAGE_LIMIT: Record<string, number> = { "/creators": 100, "/contracts": 100, "/posts": 500, "/programs": 100 };
+const MAX_PAGES = 25;
+
+/** Fetches every page of a Launchpoint collection, respecting its per-endpoint limit. */
+export async function launchpointList<T>(path: string, params: Record<string, string | undefined> = {}): Promise<T[]> {
+  const limit = PAGE_LIMIT[path] ?? 100;
+  const rows: T[] = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const result = await launchpointGet<{ data?: T[]; totalPages?: number }>(path, {
+      ...params,
+      limit: String(limit),
+      page: String(page),
+    });
+    const batch = result.data ?? [];
+    rows.push(...batch);
+    const totalPages = typeof result.totalPages === "number" ? result.totalPages : undefined;
+    if (batch.length < limit) break;
+    if (totalPages !== undefined && page >= totalPages) break;
+  }
+  return rows;
+}
+
 export type LaunchpointCreator = { id?: string; name?: string; email?: string; username?: string; status?: string };
 export type LaunchpointContract = { id?: string; creatorId?: string; programId?: string; programName?: string; status?: string; startDate?: string; endDate?: string; createdAt?: string; updatedAt?: string };
 type LaunchpointProgram = { id?: string; name?: string; status?: string };
@@ -43,21 +70,20 @@ export class LaunchpointAdapter implements SigningProviderAdapter {
   readonly syncMode = "api" as const;
 
   async listCreators(): Promise<ProviderCreator[]> {
-    const result = await launchpointGet<{ data?: LaunchpointCreator[] }>("/creators", { limit: "500" });
-    return (result.data ?? []).flatMap((creator) => creator.id ? [this.mapCreator(creator)] : []);
+    const rows = await launchpointList<LaunchpointCreator>("/creators");
+    return rows.flatMap((creator) => creator.id ? [this.mapCreator(creator)] : []);
   }
 
   async listRelationshipRecords(): Promise<LaunchpointRelationshipRecord[]> {
-    const result = await launchpointGet<{ data?: LaunchpointContract[] }>("/contracts", { limit: "500" });
-    return (result.data ?? []).flatMap((contract) => {
+    const rows = await launchpointList<LaunchpointContract>("/contracts");
+    return rows.flatMap((contract) => {
       if (!contract.id || !contract.creatorId) return [];
       return [{ ...this.mapRelationship(contract), creatorExternalId: contract.creatorId }];
     });
   }
 
   async listPosts(): Promise<LaunchpointPost[]> {
-    const result = await launchpointGet<{ data?: LaunchpointPost[] }>("/posts", { limit: "500" });
-    return result.data ?? [];
+    return launchpointList<LaunchpointPost>("/posts");
   }
 
   async searchCreators(query: string): Promise<ProviderCreator[]> {
