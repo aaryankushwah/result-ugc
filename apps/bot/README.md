@@ -14,24 +14,24 @@ The existing Discord `#rules`, default text channel, and voice channel are left 
 
 ## Commands
 
-- Setup: `/setup`, `/quickstart`, `/setup-onboarding`, `/health`
+- Setup: `/setup`, `/health`
 - Creators: `/add-creator`, `/delete-creator`, `/creator-assign`, `/creator-review`, `/creator-progress`, `/issue-link`, `/delete-link`
+- Creator work: `/scripts`
 - Content: Launchpoint is the source of truth for creator submissions and approvals; legacy local content commands are hidden from Discord.
-- Program: `/programs`, `/program-remove`, `/set-quota`, `/set-trial`, `/reminders`, `/refresh-metrics`, `/export`
 - Launchpoint: `/launchpoint creators`, `/launchpoint contracts`, `/launchpoint programs`, `/launchpoint kpis`, `/launchpoint leaderboard`, `/launchpoint payouts` (read-only)
-- Launchpoint content sync: new posts returned by Launchpoint are checked every 10 minutes and announced in `#approved-content` once, with creator, platform, link, and performance details.
+- Launchpoint content sync: new source creatives returned by Launchpoint are checked every 10 minutes, deduplicated across cross-posts, and announced in `#approved-content` once. Failed Discord deliveries are retried instead of being marked complete.
 - Calls: `/group-call` posts a timezone-aware weekly availability poll; `/group-call-results` posts the ranked best times; `/group-call-reset confirm:true` clears the current poll's responses for a fresh vote. Creators choose EST/PST/IST, days, and all workable times.
-- Help and security: `/help`, `/set-key`
+- Help: `/help`
 
-Editing-assignment commands and FOMO monitoring are intentionally excluded. `/set-key` never accepts secrets in Discord; it explains how to set `METRICS_API_KEY` locally in `.env`.
+Legacy local submissions, quota, exports, and editing-assignment commands are intentionally excluded. Launchpoint and the Result portal are the production sources of truth.
 
 The Launchpoint public API is currently read-only: it can expose creators, contract statuses, programs, posts, analytics, payouts, pay structures, and invite links, but the published API does not provide a contract-cancellation mutation. To cancel a contract, use Launchpoint's dashboard/support workflow; the bot can still surface the resulting `cancelled` status through `/launchpoint contracts`.
 
 Set `DUB_API_KEY` and `DUB_DEFAULT_URL` on the bot host to enable creator attribution. The bot idempotently allocates one conversion-tracked Dub link to every active Result creator, posts it in the creator's private channel whenever Discord is connected, and refreshes Dub totals every 15 minutes. The manager portal reads those source-backed snapshots from Postgres. `/issue-link` remains available inside a creator's private channel (or `#bot-tests`) for an immediate/manual upsert; `url:` overrides the default destination. For Dub partner attribution, pass that creator's Dub `partner_id` (or set `DUB_DEFAULT_PARTNER_ID`). `/delete-link link:<id-or-url> confirm:true` removes a saved link from Dub.
 
-Program state is stored locally in `.data/state.json` with owner-only file permissions and is excluded from Git. `/program-remove confirm:true` removes only that saved state; it never deletes Discord roles or channels.
+Legacy bot state is migrated into the shared Postgres database when `DATABASE_URL` is configured. A local `.data/state.json` fallback remains available only for isolated development and is excluded from Git.
 
-Creator workflow: `/creator-review creator:@name` automatically resolves the existing Launchpoint creator link when the identity is unambiguous. Notes and next steps remain private staff data.
+Creator workflow: `/creator-assign` records an explicit Launchpoint identity on the canonical Result creator immediately. `/creator-review creator:@name` reads that mapping; notes and next steps remain private staff data.
 
 ## Verification
 

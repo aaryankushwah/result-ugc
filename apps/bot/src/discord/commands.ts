@@ -19,9 +19,9 @@ export const commandBuilders = [
     .setDMPermission(false),
   new SlashCommandBuilder()
     .setName("delete-creator")
-    .setDescription("Kick a creator from Discord and delete their private channel")
-    .addUserOption((option) => option.setName("member").setDescription("Creator whose private channel should be deleted").setRequired(true))
-    .addBooleanOption((option) => option.setName("confirm").setDescription("Confirm permanent channel deletion").setRequired(true))
+    .setDescription("Offboard a creator and preserve their channel in the staff archive")
+    .addUserOption((option) => option.setName("member").setDescription("Creator to offboard").setRequired(true))
+    .addBooleanOption((option) => option.setName("confirm").setDescription("Confirm access removal, archival, and kick").setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .setDMPermission(false),
   new SlashCommandBuilder()

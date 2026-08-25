@@ -4,7 +4,7 @@ import {
   ButtonStyle,
   Colors,
   EmbedBuilder,
-  GuildFeature,
+  ChannelType,
   GuildVerificationLevel,
   MessageFlags,
   PermissionFlagsBits,
@@ -17,7 +17,7 @@ import {
   type Interaction,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
-import { creatorDiscord, creators, getDatabase, scriptAssignments, scripts } from "@result/db";
+import { creatorDiscord, creators, getDatabase, organizations, scriptAssignments, scripts } from "@result/db";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { blueprintChannels, categories, roles } from "../config/blueprint.js";
 import {
@@ -34,7 +34,8 @@ import { buildScriptChecklist } from "./script-checklist.js";
 import { scriptShareUrl } from "./script-delivery.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
-import { launchpointGet } from "../integrations/launchpoint.js";
+import { launchpointGet, launchpointList } from "../integrations/launchpoint.js";
+import { persistLaunchpointAssignment } from "./provider-sync.js";
 import { runReminderSweep } from "./reminders.js";
 import { CALL_TIMEZONES, type CallTimezone, currentMondayUtc, dateLabel, formatSlot, generateCallSlots, nextMondayUtc, validDate } from "./calls.js";
 
@@ -45,20 +46,24 @@ type LaunchpointDirectoryCreator = { id: string; name: string; status?: string; 
 type LaunchpointDirectoryPost = { creatorId?: string; contractorName?: string };
 let launchpointCreatorCache: { expiresAt: number; creators: LaunchpointDirectoryCreator[] } = { expiresAt: 0, creators: [] };
 
+export function resetLaunchpointCreatorDirectoryCache(): void {
+  launchpointCreatorCache = { expiresAt: 0, creators: [] };
+}
+
 export async function launchpointCreatorDirectory(): Promise<LaunchpointDirectoryCreator[]> {
   if (launchpointCreatorCache.expiresAt > Date.now()) return launchpointCreatorCache.creators;
   const [creatorResult, postResult] = await Promise.allSettled([
-    launchpointGet<{ data?: Array<{ id?: string; name?: string; status?: string; campaigns?: Array<{ contractStatus?: string; programName?: string }> }> }>("/creators", { limit: "500" }),
-    launchpointGet<{ data?: LaunchpointDirectoryPost[] }>("/posts", { limit: "500" }),
+    launchpointList<{ id?: string; name?: string; status?: string; campaigns?: Array<{ contractStatus?: string; programName?: string }> }>("/creators"),
+    launchpointList<LaunchpointDirectoryPost>("/posts"),
   ]);
   const byId = new Map<string, LaunchpointDirectoryCreator>();
   if (creatorResult.status === "fulfilled") {
-    for (const creator of creatorResult.value.data ?? []) {
+    for (const creator of creatorResult.value) {
       if (creator.id && creator.name) byId.set(creator.id, { id: creator.id, name: creator.name, ...(creator.status ? { status: creator.status } : {}), ...(creator.campaigns ? { campaigns: creator.campaigns } : {}) });
     }
   }
   if (postResult.status === "fulfilled") {
-    for (const post of postResult.value.data ?? []) {
+    for (const post of postResult.value) {
       if (post.creatorId && post.contractorName && !byId.has(post.creatorId)) byId.set(post.creatorId, { id: post.creatorId, name: post.contractorName });
     }
   }
@@ -239,9 +244,8 @@ async function showHealth(interaction: ChatInputCommandInteraction): Promise<voi
   await interaction.guild.roles.fetch();
   const me = interaction.guild.members.me;
   const missingRoles = roles.filter((role) => !interaction.guild?.roles.cache.some((candidate) => candidate.name === role.name));
-  const missingCategories = categories.filter(
-    (category) => !interaction.guild?.channels.cache.some((channel) => channel.name === category.name && channel.isDMBased() === false),
-  );
+  const missingCategories = categories.filter((category) =>
+    !interaction.guild?.channels.cache.some((channel) => channel.name === category.name && channel.type === ChannelType.GuildCategory));
   const missingChannels = blueprintChannels.filter(
     (channel) => !interaction.guild?.channels.cache.some((candidate) =>
       discordChannelNameMatches(candidate.name, channel.name),
@@ -252,12 +256,15 @@ async function showHealth(interaction: ChatInputCommandInteraction): Promise<voi
   const checks = [
     ["Bot Administrator", Boolean(me?.permissions.has(PermissionFlagsBits.Administrator))],
     ["Bot role above Admin", botAboveAdmin],
-    ["Community enabled", interaction.guild.features.includes(GuildFeature.Community)],
     ["Verification level Medium or lower", interaction.guild.verificationLevel <= GuildVerificationLevel.Medium],
     ["Rules channel present", interaction.guild.channels.cache.some((channel) => channel.name === "rules")],
     ["Required roles", missingRoles.length === 0],
     ["Required categories", missingCategories.length === 0],
     ["Required channels", missingChannels.length === 0],
+    ["Portal database connected", Boolean(process.env.DATABASE_URL)],
+    ["Launchpoint connected", Boolean(process.env.LAUNCHPOINT_API_KEY)],
+    ["Portal synchronization scheduled", Boolean(process.env.RESULT_PORTAL_URL && process.env.RESULT_PORTAL_CRON_SECRET)],
+    ["Dub links connected", Boolean(process.env.DUB_API_KEY)],
   ] as const;
   const healthy = checks.every(([, passed]) => passed);
   const details = [
@@ -279,11 +286,13 @@ async function showHelp(interaction: ChatInputCommandInteraction): Promise<void>
     .setTitle("Result Clanker")
     .setDescription(
       [
-        "**Setup** — `/setup`, `/health`, `/creator-progress`",
+        "**Setup** — `/setup`, `/health`",
         "**Creators** — `/add-creator`, `/delete-creator`, `/creator-assign`, `/creator-review`, `/issue-link`, `/delete-link`",
+        "**Creator work** — `/scripts`",
+        "**Progress** — `/creator-progress` sends the current weekly Launchpoint check-in",
+        "**Calls** — `/group-call`, `/group-call-results`, `/group-call-reset`",
         "**Content** — Launchpoint is the source of truth for submissions and approvals",
         "**Launchpoint** — `/launchpoint creators|contracts|programs|kpis|leaderboard|payouts` (read-only)",
-        "**Security** — `/set-key` explains how to configure a metrics key without posting it in Discord",
         "",
         "Members verify in `#verify`, then wait for staff approval. Approved creators receive the UGC channels and a private workspace.",
       ].join("\n"),
@@ -496,20 +505,21 @@ async function completeCreatorAssignment(interaction: import("discord.js").Strin
     review.launchpointCreatorId = creator.id;
     review.updatedAt = new Date().toISOString();
   });
-  await interaction.update({ content: `Linked <@${discordMemberId}> to **${creator.name}** in Launchpoint.`, components: [] });
-}
-
-async function autocompleteLaunchpointCreator(interaction: import("discord.js").AutocompleteInteraction): Promise<void> {
-  const focused = interaction.options.getFocused().toLowerCase();
   try {
-    const creators = await launchpointCreatorDirectory();
-    const choices = creators.filter((item) => !focused || `${item.name} ${item.id}`.toLowerCase().includes(focused)).slice(0, 25).map((item) => ({
-      name: `${item.name} · ${item.status || "unknown"}`.slice(0, 100),
-      value: item.id!,
-    }));
-    await interaction.respond(choices);
-  } catch {
-    await interaction.respond([]);
+    const result = await persistLaunchpointAssignment({
+      guildId: interaction.guild.id,
+      discordUserId: discordMemberId,
+      launchpointCreatorId: creator.id,
+      launchpointCreatorName: creator.name,
+      assignedByDiscordUserId: interaction.user.id,
+    });
+    const suffix = result === "synced" ? " The Result portal is updated too." : " The bot mapping is saved; the portal will update after Discord reconciliation.";
+    await interaction.update({ content: `Linked <@${discordMemberId}> to **${creator.name}** in Launchpoint.${suffix}`, components: [] });
+  } catch (error) {
+    await interaction.update({
+      content: `Linked <@${discordMemberId}> to **${creator.name}** in the bot, but the Result portal update failed: ${error instanceof Error ? error.message : "unknown synchronization error"}`,
+      components: [],
+    });
   }
 }
 
@@ -1254,7 +1264,6 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
 export async function handleInteraction(interaction: Interaction): Promise<void> {
   try {
     if (interaction.isAutocomplete() && interaction.commandName === "delete-link") await autocompleteDeleteLink(interaction);
-    else if (interaction.isAutocomplete() && interaction.commandName === "creator-assign") await autocompleteLaunchpointCreator(interaction);
     else if (interaction.isChatInputCommand()) await handleCommand(interaction);
     else if (interaction.isStringSelectMenu() && interaction.customId.startsWith("creator-assign:")) await completeCreatorAssignment(interaction);
     else if (interaction.isStringSelectMenu() && interaction.customId.startsWith("call:")) await handleCallSelect(interaction);
@@ -1327,7 +1336,13 @@ async function showAssignedScripts(interaction: ChatInputCommandInteraction): Pr
     .select({ creatorId: creatorDiscord.creatorId, displayName: creators.displayName })
     .from(creatorDiscord)
     .innerJoin(creators, eq(creators.id, creatorDiscord.creatorId))
-    .where(and(eq(creatorDiscord.guildId, interaction.guild.id), eq(creatorDiscord.discordUserId, targetUserId)))
+    .innerJoin(organizations, eq(organizations.id, creatorDiscord.organizationId))
+    .where(and(
+      eq(organizations.slug, "result"),
+      eq(organizations.discordGuildId, interaction.guild.id),
+      eq(creatorDiscord.guildId, interaction.guild.id),
+      eq(creatorDiscord.discordUserId, targetUserId),
+    ))
     .limit(1))[0];
 
   if (!connection) {

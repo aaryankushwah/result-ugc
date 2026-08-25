@@ -46,10 +46,31 @@ function channelOwnerId(channel: TextChannel): string | null {
   return channel.topic?.match(/Creator ID:\s*(\d+)/)?.[1] ?? null;
 }
 
-export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): Promise<void> {
+export type ReconciliationMode = "full" | "targeted";
+
+export function reconciliationUserIds(input: {
+  mode: ReconciliationMode;
+  seedUserIds: string[];
+  legacyUserIds: string[];
+  channelUserIds: string[];
+  connectionUserIds: string[];
+  roleUserIds: string[];
+}): Set<string> {
+  if (input.mode === "targeted") return new Set(input.seedUserIds);
+  return new Set([
+    ...input.seedUserIds,
+    ...input.legacyUserIds,
+    ...input.channelUserIds,
+    ...input.connectionUserIds,
+    ...input.roleUserIds,
+  ]);
+}
+
+export async function reconcileGuild(guild: Guild, seedUserIds: string[] = [], mode: ReconciliationMode = "full"): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   const orgId = await organizationId(guild);
-  const [members] = await Promise.all([guild.members.fetch(), guild.roles.fetch(), guild.channels.fetch()]);
+  if (mode === "full") await Promise.all([guild.members.fetch(), guild.roles.fetch(), guild.channels.fetch()]);
+  const members = guild.members.cache;
   const creatorRole = guild.roles.cache.find((role) => role.name === CREATOR_ROLE);
   const applicantRole = guild.roles.cache.find((role) => role.name === APPLICANT_ROLE);
   const legacy = await getGuildState(guild.id);
@@ -59,21 +80,25 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
     const userId = channelOwnerId(channel);
     if (userId) channelByUser.set(userId, channel);
   }
-  const userIds = new Set<string>([
-    ...seedUserIds,
-    ...legacy.creatorIds,
-    ...channelByUser.keys(),
-    ...members.filter((member) => Boolean(creatorRole && member.roles.cache.has(creatorRole.id))).keys(),
-    ...members.filter((member) => Boolean(applicantRole && member.roles.cache.has(applicantRole.id))).keys(),
+  const [connectionRows, creatorRows, relationshipRows] = await Promise.all([
+    getDatabase().select().from(creatorDiscord).where(and(eq(creatorDiscord.organizationId, orgId), eq(creatorDiscord.guildId, guild.id))),
+    getDatabase().select({ id: creators.id, displayName: creators.displayName, email: creators.email }).from(creators).where(eq(creators.organizationId, orgId)),
+    getDatabase().select({ creatorId: signingRelationships.creatorId, raw: signingRelationships.raw }).from(signingRelationships).where(eq(signingRelationships.organizationId, orgId)),
   ]);
+  const userIds = reconciliationUserIds({
+    mode,
+    seedUserIds,
+    legacyUserIds: legacy.creatorIds,
+    channelUserIds: [...channelByUser.keys()],
+    connectionUserIds: connectionRows.flatMap((row) => row.discordUserId ? [row.discordUserId] : []),
+    roleUserIds: [
+      ...members.filter((member) => Boolean(creatorRole && member.roles.cache.has(creatorRole.id))).keys(),
+      ...members.filter((member) => Boolean(applicantRole && member.roles.cache.has(applicantRole.id))).keys(),
+    ],
+  });
   const run = await getDatabase().insert(syncRuns).values({ organizationId: orgId, source: "discord", state: "running", recordsSeen: userIds.size }).returning({ id: syncRuns.id });
   let changed = 0;
   try {
-    const [connectionRows, creatorRows, relationshipRows] = await Promise.all([
-      getDatabase().select().from(creatorDiscord).where(and(eq(creatorDiscord.organizationId, orgId), eq(creatorDiscord.guildId, guild.id))),
-      getDatabase().select({ id: creators.id, displayName: creators.displayName, email: creators.email }).from(creators).where(eq(creators.organizationId, orgId)),
-      getDatabase().select({ creatorId: signingRelationships.creatorId, raw: signingRelationships.raw }).from(signingRelationships).where(eq(signingRelationships.organizationId, orgId)),
-    ]);
     const connectionByUserId = new Map(connectionRows.filter((row) => row.discordUserId).map((row) => [row.discordUserId!, row]));
     const connectedCreatorIds = new Set(connectionRows.map((row) => row.creatorId));
     const creatorIdsByIdentity = new Map<string, Set<string>>();
@@ -119,7 +144,11 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
         changed += 1;
       } else if (current) {
         const didChange = current.state !== state || current.privateChannelId !== (channel?.id ?? null);
-        await getDatabase().update(creatorDiscord).set({ username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date(), updatedAt: new Date() }).where(eq(creatorDiscord.creatorId, creatorId));
+        await getDatabase().update(creatorDiscord).set({ username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date(), updatedAt: new Date() }).where(and(
+          eq(creatorDiscord.organizationId, orgId),
+          eq(creatorDiscord.guildId, guild.id),
+          eq(creatorDiscord.creatorId, creatorId),
+        ));
         if (didChange) {
           await logEvent(orgId, creatorId, "discord.state_changed", `Discord access changed to ${state}.`, { previousState: current.state, state, channelId: channel?.id ?? null });
           changed += 1;
@@ -137,7 +166,7 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = []): 
 export const suggestExactAccountLinks = reconcileCreatorAccountLinks;
 
 export async function reconcileMember(member: GuildMember): Promise<void> {
-  await reconcileGuild(member.guild);
+  await reconcileGuild(member.guild, [member.id], "targeted");
 }
 
 async function logEvent(orgId: string, creatorId: string | null, type: string, summary: string, metadata: Record<string, unknown> = {}): Promise<void> {
@@ -193,7 +222,7 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
       if (member) await member.kick(typeof operation.payload.reason === "string" ? operation.payload.reason : "Offboarded in Result");
       if (operation.creatorId) await getDatabase().update(creators).set({ lifecycle: "offboarded", offboardReason: typeof operation.payload.reason === "string" ? operation.payload.reason : null, offboardedAt: new Date(), updatedAt: new Date() }).where(eq(creators.id, operation.creatorId));
     } else if (operation.type === "reconcile_creator") {
-      await reconcileGuild(guild);
+      await reconcileGuild(guild, [userId], "targeted");
     } else if (operation.type === "send_script_assignment") {
       const delivery = await postToCreatorChannel(guild, { discordUserId: userId, privateChannelId: channelId }, {
         scriptTitle: typeof operation.payload.scriptTitle === "string" ? operation.payload.scriptTitle : "Your next script",
@@ -208,7 +237,7 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
     await getDatabase().update(discordOperations).set({ state: "succeeded", finishedAt: new Date(), result: { channelId, discordUserId: userId, ...(deliveredMessageId ? { messageId: deliveredMessageId } : {}) }, lastError: null, updatedAt: new Date() }).where(eq(discordOperations.id, operation.id));
     await logEvent(operation.organizationId, operation.creatorId, `discord.operation.${operation.type}.succeeded`, `Discord operation ${operation.type.replaceAll("_", " ")} succeeded.`, { operationId: operation.id, channelId });
     // Notification-only operations change no identity state, so skip the guild sweep.
-    if (requiresGuildReconciliation(operation.type)) await reconcileGuild(guild);
+    if (requiresGuildReconciliation(operation.type)) await reconcileGuild(guild, [userId], "targeted");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const retry = operation.attempts + 1 < 3;

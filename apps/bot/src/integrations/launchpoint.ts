@@ -15,21 +15,43 @@ function apiKey(): string {
   return value;
 }
 
-export async function launchpointGet<T = unknown>(path: string, params: Record<string, string | undefined> = {}, timeoutMs = 12_000): Promise<T> {
+function retryAfterMs(response: Response, attempt: number, baseDelayMs: number): number {
+  const header = response.headers.get("retry-after");
+  const seconds = header ? Number(header) : Number.NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, 5_000);
+  return baseDelayMs * 2 ** attempt;
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return milliseconds > 0 ? new Promise((resolve) => setTimeout(resolve, milliseconds)) : Promise.resolve();
+}
+
+export async function launchpointGet<T = unknown>(path: string, params: Record<string, string | undefined> = {}, timeoutMs = 12_000, baseRetryDelayMs = 250): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
   for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
-  const response = await fetch(url, {
-    headers: { "x-api-key": apiKey(), Accept: "application/json" },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  const payload = await response.json().catch(() => undefined);
-  if (!response.ok) {
-    const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
-      ? payload.error
-      : `Launchpoint API request failed (${response.status}).`;
-    throw new LaunchpointApiError(response.status, message);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: { "x-api-key": apiKey(), Accept: "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const payload = await response.json().catch(() => undefined);
+      if (response.ok) return payload as T;
+      const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+        ? payload.error
+        : `Launchpoint API request failed (${response.status}).`;
+      const error = new LaunchpointApiError(response.status, message);
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) throw error;
+      lastError = error;
+      await wait(retryAfterMs(response, attempt, baseRetryDelayMs));
+    } catch (error) {
+      lastError = error;
+      if (error instanceof LaunchpointApiError || attempt === 2) throw error;
+      await wait(baseRetryDelayMs * 2 ** attempt);
+    }
   }
-  return payload as T;
+  throw lastError instanceof Error ? lastError : new Error("Launchpoint request failed after retries.");
 }
 
 /**
