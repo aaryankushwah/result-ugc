@@ -23,8 +23,12 @@ function useMetricSelection() {
   const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
-  const selected = readOverviewMetricIds(params.get("stats"));
+  const statsParam = params.get("stats");
+  const [selection, setSelection] = useState(() => ({ source: statsParam, ids: readOverviewMetricIds(statsParam) }));
+  const selected = selection.source === statsParam ? selection.ids : readOverviewMetricIds(statsParam);
   const update = (ids: OverviewMetricId[]) => {
+    // Keep reorders and visibility changes rendered while the URL transition catches up.
+    setSelection({ source: statsParam, ids });
     const next = new URLSearchParams(params.toString());
     if (ids.join(",") === defaultOverviewMetricIds.join(",")) next.delete("stats");
     else next.set("stats", ids.join(","));
