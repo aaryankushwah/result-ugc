@@ -2,6 +2,12 @@ import type { StudioAsset, StudioScript } from "./script-studio-data";
 
 export type StudioAssignment = StudioScript["assignments"][number];
 
+export const UNCATEGORIZED_SCRIPT_CATEGORY = "Uncategorized";
+
+export function filterScriptsByCategory<T extends { category: string }>(scripts: T[], category: string): T[] {
+  return category === "all" ? scripts : scripts.filter((script) => script.category === category);
+}
+
 export function isPersistedCreatorId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

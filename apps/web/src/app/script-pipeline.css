@@ -12,6 +12,31 @@
 .pipeline-view-toggle { margin-left: auto; }
 .pipeline-view-toggle button { height: 34px; font-size: 12px; font-weight: 600; }
 .pipeline-view-toggle svg { width: 13px; }
+.pipeline-filter-context {
+  min-height: 42px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2) 76%, var(--accent) 24%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.pipeline-filter-context p { margin: 0; }
+.pipeline-filter-context strong { color: var(--foreground); font-weight: 700; }
+.pipeline-filter-context button {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pipeline-filter-context button:hover { color: var(--accent); text-decoration: underline; }
 
 .pipeline-board {
   padding: 14px;
@@ -55,6 +80,7 @@
   .pipeline-toolbar { align-items: stretch; flex-wrap: wrap; }
   .pipeline-toolbar .pipeline-search { width: 100%; }
   .pipeline-view-toggle { margin-left: 0; }
+  .pipeline-filter-context { align-items: flex-start; }
   .pipeline-board {
     margin-right: 0;
     padding: 10px;

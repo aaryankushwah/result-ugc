@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "./script-studio-state";
+import { filterScriptsByCategory, isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "./script-studio-state";
 
 describe("script studio state", () => {
+  it("filters the script bank by its persisted category", () => {
+    const scripts = [
+      { id: "script-a", category: "Uncategorized" },
+      { id: "script-b", category: "Education" },
+    ];
+
+    expect(filterScriptsByCategory(scripts, "all")).toEqual(scripts);
+    expect(filterScriptsByCategory(scripts, "Uncategorized")).toEqual([scripts[0]]);
+    expect(filterScriptsByCategory(scripts, "Education")).toEqual([scripts[1]]);
+  });
+
   it("keeps existing creator assignments when another creator is added", () => {
     const current = [{ id: "old", creatorId: "creator-a", creatorName: "A", state: "assigned", dueAt: null }];
     const incoming = [{ id: "new", creatorId: "creator-b", creatorName: "B", state: "assigned", dueAt: null }];

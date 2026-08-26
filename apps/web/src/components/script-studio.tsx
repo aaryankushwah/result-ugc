@@ -41,7 +41,7 @@ import { scriptClipboardText, scriptPlainText } from "@/lib/script-blocks";
 import { diffWords, preservedRatio } from "@/lib/script-diff";
 import { parseReferenceUrl } from "@/lib/reference-url";
 import { cleanScriptTitle } from "@/lib/script-title";
-import { mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "@/lib/script-studio-state";
+import { filterScriptsByCategory, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript, UNCATEGORIZED_SCRIPT_CATEGORY } from "@/lib/script-studio-state";
 import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
 type StudioScreen = "bank" | "writer";
@@ -60,7 +60,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   const [failedNotifications, setFailedNotifications] = useState(initialData.failedNotifications);
   const [active, setActive] = useState<StudioScript | null>(initialData.scripts[0] ?? null);
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [importOpen, setImportOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -351,7 +351,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
     <ImportDialog open={importOpen} setOpen={setImportOpen} onImport={importReel} onCreate={createDraft} importing={importing} />
     <BrandDialog key={brandOpen ? "brand-open" : "brand-closed"} open={brandOpen} setOpen={setBrandOpen} brand={brand} setBrand={setBrand} notify={notify} canManage={canManage} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
@@ -377,7 +377,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   </div>;
 }
 
-function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, openWriter, requestDelete, openImport, openBrand, failedNotifications, notify, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; status:string; setStatus:(value:string)=>void; openWriter:(script:StudioScript)=>void; requestDelete:(script:StudioScript)=>void; openImport:()=>void; openBrand:()=>void; failedNotifications:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
+function ScriptBank({ scripts, allScripts, query, setQuery, categoryFilter, setCategoryFilter, openWriter, requestDelete, openImport, openBrand, failedNotifications, notify, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; categoryFilter:string; setCategoryFilter:(value:string)=>void; openWriter:(script:StudioScript)=>void; requestDelete:(script:StudioScript)=>void; openImport:()=>void; openBrand:()=>void; failedNotifications:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
   const [view,setView]=useState<"pipeline"|"table">("pipeline");
   const [dragged,setDragged]=useState<string|null>(null);
   const [dropStage,setDropStage]=useState<StudioScript["pipelineStage"]|null>(null);
@@ -389,7 +389,7 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
     { id:"retired" as const, label:"Retired", description:"Stopped or archived", tone:"retired" },
   ];
   const categories=["all",...Array.from(new Set(allScripts.map((script)=>script.category))).sort()];
-  const filteredByCategory=scripts.filter((script)=>status==="all"||script.category===status);
+  const filteredByCategory=filterScriptsByCategory(scripts,categoryFilter);
   const totalViews=allScripts.reduce((sum,script)=>sum+script.performance.views,0);
   const hookRates=allScripts.map((script)=>script.performance.hookRate).filter((value):value is number=>value!==null);
   const activeTests=allScripts.filter((script)=>script.pipelineStage==="testing").length;
@@ -411,8 +411,9 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
       </article>)}
     </section>
     <section className="pipeline-workspace data-panel">
-      <nav className="roster-tabs pipeline-category-tabs" aria-label="Script categories">{categories.slice(0,7).map((category)=><button key={category} data-state={status===category?"active":"inactive"} onClick={()=>setStatus(category)}>{category==="all"?"All scripts":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</nav>
+      <nav className="roster-tabs pipeline-category-tabs" aria-label="Script categories">{categories.slice(0,7).map((category)=><button type="button" key={category} aria-pressed={categoryFilter===category} data-state={categoryFilter===category?"active":"inactive"} onClick={()=>setCategoryFilter(category)}>{category==="all"?"All scripts":category===UNCATEGORIZED_SCRIPT_CATEGORY?"Needs category":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</nav>
       <div className="table-toolbar pipeline-toolbar"><label className="table-search pipeline-search"><Search/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search scripts"/></label><div className="view-toggle pipeline-view-toggle" aria-label="Script view"><button className={view==="pipeline"?"active":""} onClick={()=>setView("pipeline")}><LayoutDashboard/>Pipeline</button><button className={view==="table"?"active":""} onClick={()=>setView("table")}><Table2/>Table</button></div></div>
+      {categoryFilter!=="all"?<div className="pipeline-filter-context" role="status"><p>{categoryFilter===UNCATEGORIZED_SCRIPT_CATEGORY?<><strong>{filteredByCategory.length} {filteredByCategory.length===1?"script":"scripts"}</strong> need {filteredByCategory.length===1?"a category":"categories"}. Choose one from a card to organize {filteredByCategory.length===1?"it":"them"}.</>:<><strong>Showing {filteredByCategory.length} {filteredByCategory.length===1?"script":"scripts"}</strong> in {categoryFilter}.</>}</p><button type="button" onClick={()=>setCategoryFilter("all")}>Clear filter</button></div>:null}
       {view==="pipeline"?<div className="pipeline-board">{stages.map((stage)=>{
       const cards=filteredByCategory.filter((script)=>script.pipelineStage===stage.id);
       const isDropTarget=Boolean(dragged&&dropStage===stage.id);
