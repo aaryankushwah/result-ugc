@@ -29,6 +29,10 @@
   box-shadow: 0 0 0 4px rgb(79 189 107 / 14%);
 }
 
+.roster :global(.creator-tree-table .creator-parent-row > td[data-column="discord"]) {
+  text-align: center;
+}
+
 .roster :global(.relationship-provider[data-provider="launchpoint"] .state-badge) {
   border-color: rgb(169 149 255 / 52%);
   background: rgb(169 149 255 / 13%);

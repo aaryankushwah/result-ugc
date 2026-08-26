@@ -1,4 +1,5 @@
-import { activityEvents, discordOperations, scriptAssignments, scripts, scriptVersions } from "@result/db";
+import { activityEvents, discordOperations, scriptAssignments, scriptAssets, scripts, scriptVersions } from "@result/db";
+import { del } from "@vercel/blob";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
@@ -82,6 +83,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     let assignmentCount = 0;
     let canceledNotificationCount = 0;
     let canceledNotificationIds: string[] = [];
+    let blobUrls: string[] = [];
 
     await context.db.transaction(async (transaction) => {
       const script = (await transaction
@@ -92,6 +94,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
         .for("update"))[0];
       if (!script) throw new MutationError(404, "Script not found");
       title = script.title;
+      const assets = await transaction.select({ sourceUrl:scriptAssets.sourceUrl,metadata:scriptAssets.metadata }).from(scriptAssets).where(and(eq(scriptAssets.scriptId,id),eq(scriptAssets.organizationId,context.organization.id)));
+      blobUrls = assets.filter((asset)=>asset.metadata.storage==="vercel_blob").map((asset)=>asset.sourceUrl).filter((value):value is string=>Boolean(value&&isVercelBlobUrl(value)));
 
       const assignments = await transaction
         .select({ discordOperationId: scriptAssignments.discordOperationId })
@@ -144,9 +148,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
       if (!deleted.length) throw new MutationError(404, "Script not found");
     });
 
+    if (blobUrls.length) {
+      try { await del(blobUrls); } catch (error) { console.error("Could not delete script asset blobs",error); }
+    }
+
     invalidatePortalData();
     return Response.json({ ok: true, title, assignmentCount, canceledNotificationCount, canceledNotificationIds });
   } catch (error) {
     return mutationErrorResponse(error);
   }
+}
+
+function isVercelBlobUrl(value:string):boolean {
+  try { return new URL(value).hostname.endsWith(".blob.vercel-storage.com"); } catch { return false; }
 }

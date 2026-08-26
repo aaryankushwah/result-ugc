@@ -691,6 +691,19 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .asset-dialog-form label { display: flex; flex-direction: column; gap: 5px; color: var(--muted-foreground); font-size: 10px; font-weight: 650; }
 .asset-dialog-form :is(input,select) { width: 100%; height: 42px; padding: 0 11px; border: 1px solid var(--border); outline: 0; background: #121212; color: var(--foreground); font-size: 13px; }
 .asset-dialog-form :is(input,select):focus { border-color: var(--primary); }
+.asset-entry-tabs { padding: 3px; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; border: 1px solid var(--border); background: #111; }
+.asset-entry-tabs button { height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: var(--text-muted); font-size: 11px; font-weight: 650; }
+.asset-entry-tabs button.active { background: #242424; color: var(--text-primary); }
+.asset-entry-tabs svg { width: 14px; }
+.asset-dialog-form .asset-upload-drop { min-height: 176px; padding: 24px; align-items: center; justify-content: center; border: 1px dashed var(--border-strong); background: color-mix(in srgb,var(--foreground) 2%,transparent); text-align: center; cursor: pointer; }
+.asset-upload-drop:hover { border-color: color-mix(in srgb,var(--primary) 55%,var(--border)); background: color-mix(in srgb,var(--primary) 4%,transparent); }
+.asset-upload-drop input { position: absolute; width: 1px !important; height: 1px !important; padding: 0 !important; opacity: 0; pointer-events: none; }
+.asset-upload-drop > svg { width: 28px; height: 28px; margin-bottom: 4px; color: var(--primary); }
+.asset-upload-drop strong { max-width: 100%; overflow: hidden; color: var(--text-primary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.asset-upload-drop span { color: var(--text-muted); font-size: 10px; font-weight: 450; }
+.asset-upload-progress { position: relative; height: 28px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); background: #111; }
+.asset-upload-progress i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb,var(--primary) 22%,transparent); transition: width .15s ease; }
+.asset-upload-progress span { position: relative; z-index: 1; color: var(--text-secondary); font: 600 10px/1 var(--font-geist-mono); }
 .new-script-form { display: flex; flex-direction: column; gap: 8px; }
 .new-script-form > input,.new-script-form textarea,.new-script-form > div input { width: 100%; border: 1px solid var(--border); outline: 0; background: #121212; color: var(--foreground); font-size: 14px; }
 .new-script-form > input,.new-script-form > div input { height: 42px; padding: 0 11px; }
@@ -700,6 +713,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .light .simple-script-writer { background: #fff; }
 .light .new-script-form > input,.light .new-script-form textarea,.light .new-script-form > div input { background: #f8f9fb; color: #1c2026; }
 .light .asset-dialog-form :is(input,select) { background: #f8f9fb; color: #1c2026; }
+.light .asset-entry-tabs,.light .asset-upload-progress { background: #f5f6f8; }
+.light .asset-entry-tabs button.active { background: #fff; }
 @media (max-width: 700px) {
   .simple-script-writer { width: 100%; padding: 32px 20px; border: 0; }
   .simple-script-toolbar { align-items: flex-start; flex-wrap: wrap; }
@@ -2307,7 +2322,9 @@ body,
 .writer-rail-list svg:last-child,.writer-rail-row > button svg,.writer-resource-card button svg { width: 12px; height: 12px; }
 .writer-rail-row > button,.writer-resource-card button { width: 28px; height: 28px; display: grid; place-items: center; color: var(--text-muted); }
 .writer-rail-row > button:hover,.writer-resource-card button:hover { color: var(--destructive); }
-.writer-resource-preview { height: 150px; display: block; background-position: center; background-size: cover; border-bottom: 1px solid var(--border); }
+.writer-resource-preview { height: 150px; display: block; overflow: hidden; border-bottom: 1px solid var(--border); background: #090909; }
+.writer-resource-preview img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.writer-resource-video { width: 100%; max-height: 240px; display: block; border-bottom: 1px solid var(--border); background: #090909; }
 .writer-resource-card audio { width: calc(100% - 22px); height: 32px; margin: 0 11px 10px; }
 
 .light .simple-script-writer { background: #fff; }
@@ -2347,6 +2364,16 @@ body,
 .shared-script-resources > section > a span { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .shared-script-resources > section > a strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-script-resources > section > a small { color: var(--text-muted); font-size: 9px; text-transform: capitalize; }
+.shared-resource-card + .shared-resource-card { border-top: 1px solid var(--border); }
+.shared-resource-card > a:last-child { min-height: 52px; padding: 8px 11px; display: flex; align-items: center; gap: 8px; }
+.shared-resource-card > a:last-child > svg:first-child { width: 27px; height: 27px; padding: 6px; border: 1px solid var(--border); color: var(--text-muted); }
+.shared-resource-card > a:last-child > svg:last-child { width: 12px; color: var(--text-muted); }
+.shared-resource-card > a:last-child span { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.shared-resource-card > a:last-child strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.shared-resource-card > a:last-child small { color: var(--text-muted); font-size: 9px; text-transform: capitalize; }
+.shared-resource-preview { height: 180px; display: block; overflow: hidden; border-bottom: 1px solid var(--border); background: #090909; }
+.shared-resource-preview img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.shared-resource-card > video { width: 100%; max-height: 300px; display: block; border-bottom: 1px solid var(--border); background: #090909; }
 .shared-script-resources .reference-embed iframe,.shared-script-resources .reference-embed video { max-height: 460px; }
 .shared-resource-empty { margin: 0; padding: 20px 12px; color: var(--text-muted); font-size: 11px; }
 

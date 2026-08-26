@@ -25,7 +25,7 @@ const transcriptSectionSchema = z.object({
 
 const assetSchema = z.object({
   label: z.string().trim().min(1).max(160),
-  kind: z.enum(["reference_video", "image", "audio", "file"]),
+  kind: z.enum(["reference_video", "image", "video", "audio", "file"]),
   sourceUrl: z.url().max(2_000),
 });
 

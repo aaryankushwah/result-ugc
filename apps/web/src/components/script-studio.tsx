@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- script resources can be arbitrary external URLs and animated GIFs */
 
 import {
   ArrowLeft,
@@ -25,9 +26,11 @@ import {
   Trash2,
   TriangleAlert,
   Trophy,
+  UploadCloud,
   UserRoundCheck,
   Video,
 } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -42,6 +45,7 @@ import { diffWords, preservedRatio } from "@/lib/script-diff";
 import { parseReferenceUrl } from "@/lib/reference-url";
 import { cleanScriptTitle } from "@/lib/script-title";
 import { filterScriptsByCategory, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript, UNCATEGORIZED_SCRIPT_CATEGORY } from "@/lib/script-studio-state";
+import { assetLabelFromFileName, safeAssetFileName, SCRIPT_ASSET_MAX_BYTES, scriptAssetKindFromContentType } from "@/lib/script-asset-upload";
 import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
 type StudioScreen = "bank" | "writer";
@@ -282,6 +286,19 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
     }
   };
 
+  const ensureActivePersisted = async ():Promise<string> => {
+    if (!active || !canManage) throw new Error("Open an editable script before adding files");
+    if (isUuid(active.id)) return active.id;
+    setSaving(true);
+    try {
+      const result = await persistScript(active,"Saved before file upload");
+      updateActive((script) => ({ ...script,id:result.id,latestVersion:result.version,assets:result.assets ?? script.assets,updatedAt:new Date().toISOString() }));
+      return result.id;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteScript = async () => {
     if (!deleteTarget || !canManage) return;
     const target = deleteTarget;
@@ -351,7 +368,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canWrite} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canWrite} /> : null}
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canWrite} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} ensurePersisted={ensureActivePersisted} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canWrite} /> : null}
     <ImportDialog open={importOpen} setOpen={setImportOpen} onImport={importReel} onCreate={createDraft} importing={importing} />
     <BrandDialog key={brandOpen ? "brand-open" : "brand-closed"} open={brandOpen} setOpen={setBrandOpen} brand={brand} setBrand={setBrand} notify={notify} canManage={canManage} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
@@ -437,7 +454,7 @@ function ScriptBank({ scripts, allScripts, query, setQuery, categoryFilter, setC
   </div>;
 }
 
-function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, assigning, generating, generate, generation, dismissGeneration, openDelete, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; deleting:boolean; assigning:boolean; generating:boolean; generate:()=>void; generation:GenerationOutcome|null; dismissGeneration:()=>void; openDelete:()=>void; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
+function ScriptWriter({ script, updateScript, ensurePersisted, goBack, save, saving, deleting, assigning, generating, generate, generation, dismissGeneration, openDelete, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; ensurePersisted:()=>Promise<string>; goBack:()=>void; save:()=>void; saving:boolean; deleting:boolean; assigning:boolean; generating:boolean; generate:()=>void; generation:GenerationOutcome|null; dismissGeneration:()=>void; openDelete:()=>void; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(true);
   const [assetDialog, setAssetDialog] = useState<"reference_video"|"resource"|null>(null);
@@ -451,7 +468,7 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
     return { ...current, hook:scriptHookFromSections(sections), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
   });
   const copyScript = async () => { await navigator.clipboard.writeText(scriptClipboardText(script.title,script.sections)); setCopied(true); notify("Script copied with formatting"); window.setTimeout(() => setCopied(false), 1800); };
-  const addAsset = async (input:{label:string;kind:"reference_video"|"image"|"audio"|"file";sourceUrl:string}) => {
+  const addAsset = async (input:{label:string;kind:"reference_video"|"image"|"video"|"audio"|"file";sourceUrl:string}) => {
     setAssetPending(true);
     try {
       if (!isUuid(script.id)) {
@@ -467,6 +484,46 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
       return true;
     } catch (error) {
       notify(error instanceof Error ? error.message : "Resource could not be added");
+      return false;
+    } finally {
+      setAssetPending(false);
+    }
+  };
+  const uploadAsset = async (file:File,label:string,onProgress:(percentage:number)=>void):Promise<boolean> => {
+    const detectedKind = scriptAssetKindFromContentType(file.type);
+    if (!detectedKind) { notify("Choose an image, GIF, MP4, MOV, or WebM file"); return false; }
+    if (file.size > SCRIPT_ASSET_MAX_BYTES) { notify("Files must be 250 MB or smaller"); return false; }
+    setAssetPending(true);
+    try {
+      const scriptId = await ensurePersisted();
+      const kind = assetDialog === "reference_video" ? "reference_video" : detectedKind;
+      const pathname = `script-assets/${scriptId}/${safeAssetFileName(file.name)}`;
+      const blob = await upload(pathname,file,{
+        access:"public",
+        handleUploadUrl:`/api/scripts/${scriptId}/assets/upload`,
+        clientPayload:JSON.stringify({scriptId}),
+        multipart:file.size > 5 * 1024 * 1024,
+        onUploadProgress:({percentage})=>onProgress(Math.round(percentage)),
+      });
+      const response = await fetch(`/api/scripts/${scriptId}/assets`,{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          label:label.trim() || assetLabelFromFileName(file.name),
+          kind,
+          sourceUrl:blob.url,
+          downloadUrl:blob.downloadUrl,
+          metadata:{ storage:"vercel_blob",pathname:blob.pathname,fileName:file.name,contentType:file.type,size:file.size },
+        }),
+      });
+      const result = await response.json() as { asset?:StudioAsset;error?:string };
+      if (!response.ok || !result.asset) throw new Error(result.error ?? "Uploaded file could not be attached");
+      updateScript((current)=>({...current,id:scriptId,assets:[...current.assets,result.asset!],updatedAt:new Date().toISOString()}));
+      notify(`${detectedKind === "video" ? "Video" : file.type === "image/gif" ? "GIF" : "Image"} attached`);
+      setAssetDialog(null);
+      return true;
+    } catch(error) {
+      notify(error instanceof Error ? error.message : "File could not be uploaded");
       return false;
     } finally {
       setAssetPending(false);
@@ -515,7 +572,7 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
       </main>
       <WriterResourceRail script={script} references={references} resources={resources} canManage={canManage} pending={assetPending} onAddReference={()=>setAssetDialog("reference_video")} onAddResource={()=>setAssetDialog("resource")} onRemove={removeAsset}/>
     </div>
-    <AssetDialog mode={assetDialog} open={assetDialog!==null} setOpen={(open)=>{if(!open)setAssetDialog(null);}} pending={assetPending} onAdd={addAsset}/>
+    <AssetDialog mode={assetDialog} open={assetDialog!==null} setOpen={(open)=>{if(!open)setAssetDialog(null);}} pending={assetPending} onAdd={addAsset} onUpload={uploadAsset}/>
   </div>;
 }
 
@@ -547,9 +604,19 @@ function WriterResourceRail({ script,references,resources,canManage,pending,onAd
     </div>
     <div className="writer-rail-section">
       <header><div><ImageIcon/><span><strong>Editing resources</strong><small>Images, audio and files</small></span></div>{canManage?<button type="button" onClick={onAddResource}><Plus/>Add</button>:null}</header>
-      <div className="writer-resource-list">{resources.map((asset)=><div className="writer-resource-card" key={asset.id}>{asset.kind==="image"&&asset.sourceUrl?<a className="writer-resource-preview" href={asset.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${asset.label}`} style={{backgroundImage:`url("${asset.sourceUrl.replaceAll('"','%22')}")`}}/>:null}<div>{assetIcon(asset.kind)}<a href={asset.sourceUrl ?? asset.downloadUrl ?? "#"} target="_blank" rel="noreferrer"><strong>{asset.label}</strong><small>{asset.sourceUrl?sourceHost(asset.sourceUrl):asset.kind}</small></a>{canManage?<button type="button" aria-label={`Remove ${asset.label}`} disabled={pending} onClick={()=>onRemove(asset)}><Trash2/></button>:<ExternalLink/>}</div>{asset.kind==="audio"&&(asset.sourceUrl||asset.downloadUrl)?<audio controls preload="metadata" src={asset.downloadUrl ?? asset.sourceUrl ?? undefined}/>:null}</div>)}{!resources.length?<div className="writer-rail-empty compact"><ImageIcon/><strong>No resources yet</strong><span>Add B-roll, product shots, music or an edit brief.</span></div>:null}</div>
+      <div className="writer-resource-list">{resources.map((asset)=><WriterResourceCard key={asset.id} asset={asset} canManage={canManage} pending={pending} onRemove={onRemove}/>)}{!resources.length?<div className="writer-rail-empty compact"><ImageIcon/><strong>No resources yet</strong><span>Add B-roll, product shots, GIFs, or edit footage.</span></div>:null}</div>
     </div>
   </aside>;
+}
+
+function WriterResourceCard({asset,canManage,pending,onRemove}:{asset:StudioAsset;canManage:boolean;pending:boolean;onRemove:(asset:StudioAsset)=>void}) {
+  const url=asset.sourceUrl??asset.downloadUrl;
+  return <div className="writer-resource-card">
+    {asset.kind==="image"&&url?<a className="writer-resource-preview" href={url} target="_blank" rel="noreferrer" aria-label={`Open ${asset.label}`}><img src={url} alt={asset.label} loading="lazy"/></a>:null}
+    {asset.kind==="video"&&url?<video className="writer-resource-video" controls playsInline preload="metadata" src={url}/>:null}
+    <div>{assetIcon(asset.kind)}<a href={url??"#"} target="_blank" rel="noreferrer"><strong>{asset.label}</strong><small>{asset.sourceUrl?sourceHost(asset.sourceUrl):asset.kind}</small></a>{canManage?<button type="button" aria-label={`Remove ${asset.label}`} disabled={pending} onClick={()=>onRemove(asset)}><Trash2/></button>:<ExternalLink/>}</div>
+    {asset.kind==="audio"&&url?<audio controls preload="metadata" src={url}/>:null}
+  </div>;
 }
 
 function FailedNotificationStrip({ items, notify }:{ items:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void }) {
@@ -671,13 +738,23 @@ function BrandDialog({ open, setOpen, brand, setBrand, notify, canManage }:{ ope
   </DialogContent></Dialog>;
 }
 
-function AssetDialog({ mode, open, setOpen, pending, onAdd }:{ mode:"reference_video"|"resource"|null; open:boolean; setOpen:(open:boolean)=>void; pending:boolean; onAdd:(input:{label:string;kind:"reference_video"|"image"|"audio"|"file";sourceUrl:string})=>Promise<boolean> }) {
+function AssetDialog({ mode, open, setOpen, pending, onAdd, onUpload }:{ mode:"reference_video"|"resource"|null; open:boolean; setOpen:(open:boolean)=>void; pending:boolean; onAdd:(input:{label:string;kind:"reference_video"|"image"|"video"|"audio"|"file";sourceUrl:string})=>Promise<boolean>; onUpload:(file:File,label:string,onProgress:(percentage:number)=>void)=>Promise<boolean> }) {
+  const [entryMode,setEntryMode]=useState<"upload"|"link">("upload");
   const [label,setLabel]=useState("");
   const [url,setUrl]=useState("");
-  const [kind,setKind]=useState<"image"|"audio"|"file">("image");
+  const [kind,setKind]=useState<"image"|"video"|"audio"|"file">("image");
+  const [file,setFile]=useState<File|null>(null);
+  const [progress,setProgress]=useState(0);
   const selectedKind = mode === "reference_video" ? "reference_video" : kind;
-  const submit = async () => { if(await onAdd({label:label.trim(),kind:selectedKind,sourceUrl:url.trim()})){setLabel("");setUrl("");setKind("image");} };
-  return <Dialog open={open} onOpenChange={setOpen}><DialogContent className="asset-dialog sm:max-w-lg"><DialogHeader><DialogTitle>{mode==="reference_video"?"Add reference video":"Add editing resource"}</DialogTitle></DialogHeader><div className="asset-dialog-form">{mode==="resource"?<label><span>Type</span><select value={kind} onChange={(event)=>setKind(event.target.value as typeof kind)}><option value="image">Image</option><option value="audio">Audio</option><option value="file">File</option></select></label>:null}<label><span>Name</span><input value={label} onChange={(event)=>setLabel(event.target.value)} placeholder={mode==="reference_video"?"Reference name":"Resource name"} autoFocus/></label><label><span>URL</span><input type="url" value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="https://…"/></label></div><DialogFooter><Button className="studio-primary" disabled={!label.trim()||!validHttpUrl(url)||pending} onClick={submit}>{pending?"Adding…":"Add"}</Button></DialogFooter></DialogContent></Dialog>;
+  const reset = () => { setLabel("");setUrl("");setKind("image");setFile(null);setProgress(0); };
+  const submitLink = async () => { if(await onAdd({label:label.trim(),kind:selectedKind,sourceUrl:url.trim()}))reset(); };
+  const submitUpload = async () => { if(file && await onUpload(file,label,setProgress))reset(); };
+  const chooseFile = (next:File|null) => { setFile(next);setProgress(0);if(next&&!label.trim())setLabel(assetLabelFromFileName(next.name)); };
+  return <Dialog open={open} onOpenChange={(next)=>{setOpen(next);if(!next&&!pending)reset();}}><DialogContent className="asset-dialog sm:max-w-lg"><DialogHeader><DialogTitle>{mode==="reference_video"?"Add reference video":"Add editing resource"}</DialogTitle><DialogDescription>Upload media from your computer or attach an existing link.</DialogDescription></DialogHeader>
+    <div className="asset-entry-tabs"><button type="button" className={entryMode==="upload"?"active":""} onClick={()=>setEntryMode("upload")}><UploadCloud/>Upload file</button><button type="button" className={entryMode==="link"?"active":""} onClick={()=>setEntryMode("link")}><Link2/>Add link</button></div>
+    {entryMode==="upload"?<div className="asset-dialog-form"><label className="asset-upload-drop"><input type="file" accept={mode==="reference_video"?"video/mp4,video/webm,video/quicktime":"image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"} disabled={pending} onChange={(event)=>chooseFile(event.target.files?.[0]??null)}/><UploadCloud/><strong>{file?file.name:mode==="reference_video"?"Choose a video":"Choose an image, GIF, or video"}</strong><span>{file?formatBytes(file.size):"MP4, MOV, WebM, JPG, PNG, WebP or GIF · up to 250 MB"}</span></label><label><span>Name</span><input value={label} onChange={(event)=>setLabel(event.target.value)} placeholder="Resource name"/></label>{pending?<div className="asset-upload-progress"><i style={{width:`${progress}%`}}/><span>{progress?`${progress}% uploaded`:"Preparing upload…"}</span></div>:null}</div>:<div className="asset-dialog-form">{mode==="resource"?<label><span>Type</span><select value={kind} onChange={(event)=>setKind(event.target.value as typeof kind)}><option value="image">Image or GIF</option><option value="video">Video</option><option value="audio">Audio</option><option value="file">File</option></select></label>:null}<label><span>Name</span><input value={label} onChange={(event)=>setLabel(event.target.value)} placeholder={mode==="reference_video"?"Reference name":"Resource name"}/></label><label><span>URL</span><input type="url" value={url} onChange={(event)=>setUrl(event.target.value)} placeholder="https://…"/></label></div>}
+    <DialogFooter><Button className="studio-primary" disabled={entryMode==="upload"?(!file||!label.trim()||pending):(!label.trim()||!validHttpUrl(url)||pending)} onClick={entryMode==="upload"?submitUpload:submitLink}>{pending?progress?`Uploading ${progress}%…`:"Uploading…":"Add to script"}</Button></DialogFooter>
+  </DialogContent></Dialog>;
 }
 
 function AssignDialog({ open,setOpen,script,creators,assigning,onAssign }:{ open:boolean;setOpen:(open:boolean)=>void;script:StudioScript|null;creators:StudioCreator[];assigning:boolean;onAssign:(ids:string[],dueAt:string,message:string,notifyCreator:boolean)=>void }) {
@@ -693,6 +770,7 @@ function isUuid(value:string):boolean { return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0
 function timeAgo(value:string):string { const minutes=Math.floor((Date.now()-new Date(value).getTime())/60_000); if(minutes<1)return"Just now"; if(minutes<60)return`${minutes}m ago`; const hours=Math.floor(minutes/60); if(hours<24)return`${hours}h ago`; return`${Math.floor(hours/24)}d ago`; }
 function compactNumber(value:number):string { return new Intl.NumberFormat("en",{notation:value>=10_000?"compact":"standard",maximumFractionDigits:1}).format(value); }
 function plainScriptSection(copy:string,id?:string) { return { id:id??crypto.randomUUID(),label:"Script",timecode:"",delivery:"",copy,visualDirection:"",assetIds:[] as string[] }; }
-function assetIcon(kind:string):ReactNode { if(kind==="reference_video")return <Video/>; if(kind==="audio")return <Music2/>; if(kind==="image")return <ImageIcon/>; return <File/>; }
+function assetIcon(kind:string):ReactNode { if(kind==="reference_video"||kind==="video")return <Video/>; if(kind==="audio")return <Music2/>; if(kind==="image")return <ImageIcon/>; return <File/>; }
 function sourceHost(value:string):string { try { return new URL(value).hostname.replace(/^www\./,""); } catch { return value; } }
 function validHttpUrl(value:string):boolean { try { const url=new URL(value.trim()); return url.protocol==="http:"||url.protocol==="https:"; } catch { return false; } }
+function formatBytes(value:number):string { if(value<1024)return`${value} B`;if(value<1024*1024)return`${Math.round(value/1024)} KB`;return`${(value/(1024*1024)).toFixed(value<10*1024*1024?1:0)} MB`; }

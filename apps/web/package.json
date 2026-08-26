@@ -13,6 +13,7 @@
     "@result/db": "workspace:*",
     "@result/domain": "workspace:*",
     "@tanstack/react-table": "^8.21.3",
+    "@vercel/blob": "^2.8.0",
     "ai": "^7.0.77",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

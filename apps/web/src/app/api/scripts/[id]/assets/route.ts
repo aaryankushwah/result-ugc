@@ -6,8 +6,10 @@ import { invalidatePortalData } from "@/lib/portal-cache";
 
 const createAssetSchema = z.object({
   label: z.string().trim().min(1).max(160),
-  kind: z.enum(["reference_video", "image", "audio", "file"]),
+  kind: z.enum(["reference_video", "image", "video", "audio", "file"]),
   sourceUrl: z.url().max(2_000),
+  downloadUrl: z.url().max(2_000).nullable().optional(),
+  metadata: z.record(z.string(),z.unknown()).optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -25,6 +27,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         label: parsed.data.label,
         kind: parsed.data.kind,
         sourceUrl: parsed.data.sourceUrl,
+        downloadUrl: parsed.data.downloadUrl ?? null,
+        metadata: parsed.data.metadata ?? {},
         createdByUserId: context.internalUser?.id ?? null,
       }).returning({ id: scriptAssets.id, label: scriptAssets.label, kind: scriptAssets.kind, sourceUrl: scriptAssets.sourceUrl, downloadUrl: scriptAssets.downloadUrl });
       if (!created) throw new Error("Resource was not created");

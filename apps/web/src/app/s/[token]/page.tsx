@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { ExternalLink, File, Image as ImageIcon, Music2, Video } from "lucide-react";
 import { ReferenceEmbed } from "@/components/reference-embed";
 import { scriptBlockType } from "@/lib/script-blocks";
+/* eslint-disable @next/next/no-img-element -- script resources can be arbitrary external URLs and animated GIFs */
 
 // A capability URL: anyone holding the token can read this one script.
 // Deliberately unauthenticated, because creators are not portal users.
@@ -88,7 +89,10 @@ export default async function SharedScriptPage({ params }: { params: Promise<{ t
         </section>
         <aside className="shared-script-resources">
           <section><header><Video/><span><strong>Reference video</strong><small>Watch while you film</small></span></header>{primaryReference?<ReferenceEmbed url={primaryReference.url} title={primaryReference.label} compact/>:<p className="shared-resource-empty">No reference video attached.</p>}{referenceAssets.map((asset)=><a key={asset.id} href={asset.sourceUrl!} target="_blank" rel="noreferrer"><Video/><span><strong>{asset.label}</strong><small>Reference</small></span><ExternalLink/></a>)}</section>
-          <section><header><ImageIcon/><span><strong>Editing resources</strong><small>Everything needed for the edit</small></span></header>{editingAssets.map((asset)=><a key={asset.id} href={asset.sourceUrl ?? asset.downloadUrl ?? "#"} target="_blank" rel="noreferrer">{asset.kind==="audio"?<Music2/>:asset.kind==="image"?<ImageIcon/>:<File/>}<span><strong>{asset.label}</strong><small>{asset.kind}</small></span><ExternalLink/></a>)}{!editingAssets.length?<p className="shared-resource-empty">No editing resources attached.</p>:null}</section>
+          <section><header><ImageIcon/><span><strong>Editing resources</strong><small>Everything needed for the edit</small></span></header>{editingAssets.map((asset)=>{
+            const url=asset.sourceUrl??asset.downloadUrl;
+            return <div className="shared-resource-card" key={asset.id}>{asset.kind==="image"&&url?<a className="shared-resource-preview" href={url} target="_blank" rel="noreferrer"><img src={url} alt={asset.label} loading="lazy"/></a>:null}{asset.kind==="video"&&url?<video controls playsInline preload="metadata" src={url}/>:null}<a href={url??"#"} target="_blank" rel="noreferrer">{asset.kind==="audio"?<Music2/>:asset.kind==="image"?<ImageIcon/>:asset.kind==="video"?<Video/>:<File/>}<span><strong>{asset.label}</strong><small>{asset.kind==="image"?"Image or GIF":asset.kind}</small></span><ExternalLink/></a></div>;
+          })}{!editingAssets.length?<p className="shared-resource-empty">No editing resources attached.</p>:null}</section>
         </aside>
       </div>
 
