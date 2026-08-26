@@ -85,14 +85,23 @@
   width: 24px;
   height: 24px;
   position: relative;
-  margin-left: -7px;
+  margin-left: -4px;
   border-radius: 6px;
   background: var(--card);
-  box-shadow: 0 0 0 2px var(--card);
+  box-shadow: -5px 0 10px rgba(0, 0, 0, .42), 0 0 0 2px var(--card);
 }
 
 .roster :global(.account-platform-icons > span:first-child) {
   margin-left: 0;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+:global(.light) .roster :global(.account-platform-icons > span) {
+  box-shadow: -5px 0 10px rgba(31, 41, 55, .14), 0 0 0 2px var(--card);
+}
+
+:global(.light) .roster :global(.account-platform-icons > span:first-child) {
+  box-shadow: 0 0 0 2px var(--card);
 }
 
 .roster :global(.nested-account-header-row > td[data-nested-column="displayName"]) {
