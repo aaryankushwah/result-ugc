@@ -1773,28 +1773,6 @@ body,
   color: #b8b8b8;
 }
 
-.dark :is(.panel,.data-panel) {
-  border-color: #343438;
-  background: radial-gradient(140% 170% at 96% 0%,rgba(255,255,255,.028),transparent 56%),#151516;
-  box-shadow: inset 0 .5px 1px rgba(255,255,255,.075),inset 0 -1px 1.2px #0d0d0e,0 12px 32px rgba(0,0,0,.18);
-}
-
-.dark .panel-header {
-  background: radial-gradient(140% 170% at 96% 0%,rgba(255,255,255,.065),transparent 56%),#1a1a1c;
-  box-shadow: inset 0 .5px 1px rgba(255,255,255,.1),inset 0 -1px 1.2px #111113,0 8px 18px -14px rgba(0,0,0,.82);
-}
-
-.dark .overview-metric-grid {
-  border-color: #343438;
-  background: #343438;
-  box-shadow: inset 0 .5px 1px rgba(255,255,255,.075),inset 0 -1px 1.2px #0d0d0e,0 12px 32px rgba(0,0,0,.16);
-}
-
-.dark .overview-metric-card.metric-card {
-  background: radial-gradient(140% 170% at 96% 0%,rgba(255,255,255,.045),transparent 56%),#161618;
-  box-shadow: inset 0 .5px 1px rgba(255,255,255,.07),inset 0 -1px 1.2px #101012;
-}
-
 .dark .dense-table th { color: #a8a8a8; }
 .dark .nested-account-header-row > td { color: #a8a8a8; }
 .dark .creator-parent-row > td { color: #c8c8c8; }
