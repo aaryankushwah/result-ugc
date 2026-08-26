@@ -10,11 +10,20 @@
   overflow: hidden;
 }
 
+.directoryPanel :global(.panel-header) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--foreground) 2.5%, transparent), transparent);
+}
+
 .compactRankList > a {
   min-height: 58px;
   padding: 7px 10px;
   grid-template-columns: 19px 30px minmax(0, 1fr) auto auto;
   gap: 7px;
+  border-radius: 10px;
+}
+
+.compactRankList {
+  padding: 6px;
 }
 
 .compactRankList :global(.account-avatar),
@@ -53,6 +62,7 @@
 .creatorList {
   min-height: 0;
   max-height: 330px;
+  padding: 6px;
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -65,6 +75,7 @@
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .creatorList > a:last-child {
@@ -88,6 +99,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
+  border-radius: 9px;
   background: var(--muted);
   color: var(--muted-foreground);
   font-size: 12px;
@@ -135,6 +147,7 @@
   flex: none;
   padding: 1px 5px;
   border: 1px solid transparent;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--alert) 12%, transparent);
   color: var(--alert);
   font-family: var(--font-geist-mono);
@@ -187,6 +200,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--muted);
   color: var(--muted-foreground);
   font-family: var(--font-geist-mono);
