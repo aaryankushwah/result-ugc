@@ -28,7 +28,7 @@ import {
   UserRoundCheck,
   Video,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -501,7 +501,7 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
     <div className="script-writer-layout">
       <main className="simple-script-writer">
         <div className="script-document-kicker"><span>CREATOR SCRIPT</span><span>{wordCount} words · ~{script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</span></div>
-        <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
+        <ScriptTitleEditor value={script.title} onChange={(title) => updateScript((current) => ({...current,title,updatedAt:new Date().toISOString()}))}/>
         <div className="simple-script-toolbar">
           <StatusLabel status={script.status}/>
           <label>Stage<select value={script.pipelineStage} onChange={(event)=>updateScript((current)=>({...current,pipelineStage:event.target.value as StudioScript["pipelineStage"]}))}><option value="not_started">Not started</option><option value="testing">Testing</option><option value="iterate">Keep testing</option><option value="winner">Double down</option><option value="retired">Retired</option></select></label>
@@ -516,6 +516,21 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
     </div>
     <AssetDialog mode={assetDialog} open={assetDialog!==null} setOpen={(open)=>{if(!open)setAssetDialog(null);}} pending={assetPending} onAdd={addAsset}/>
   </div>;
+}
+
+function ScriptTitleEditor({ value,onChange }:{ value:string;onChange:(value:string)=>void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const resize = () => {
+      if (!ref.current) return;
+      ref.current.style.height = "0px";
+      ref.current.style.height = `${ref.current.scrollHeight}px`;
+    };
+    resize();
+    window.addEventListener("resize",resize);
+    return () => window.removeEventListener("resize",resize);
+  },[value]);
+  return <textarea ref={ref} rows={1} className="simple-script-title" aria-label="Script title" value={value} placeholder="Untitled script" onChange={(event)=>onChange(event.target.value.replace(/[\r\n]+/g," "))} onKeyDown={(event)=>{if(event.key==="Enter")event.preventDefault();}}/>;
 }
 
 function WriterResourceRail({ script,references,resources,canManage,pending,onAddReference,onAddResource,onRemove }:{ script:StudioScript;references:StudioAsset[];resources:StudioAsset[];canManage:boolean;pending:boolean;onAddReference:()=>void;onAddResource:()=>void;onRemove:(asset:StudioAsset)=>void }) {
