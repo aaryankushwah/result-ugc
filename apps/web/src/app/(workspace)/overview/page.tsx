@@ -1,14 +1,15 @@
-import { AlertTriangle, ArrowUpRight, CheckCircle2, ChevronRight, Circle, FileVideo2, Radio } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CalendarClock, ChevronRight, FileVideo2, MessageCircleMore, Radio, ShieldAlert, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { CopyOverviewViewButton, OverviewMetricGrid, OverviewMetricPicker, type OverviewMetric } from "@/components/overview-metrics";
 import { PerformanceChart } from "@/components/performance-chart";
 import { SourceImage } from "@/components/source-image";
 import { Card } from "@/components/ui/card";
-import { formatNumber, formatPercent, PageTitle, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
+import { formatNumber, formatPercent, PageTitle, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
 import { creatorPostActivity } from "@/lib/table-metrics";
-import { formatCpm } from "@/lib/launchpoint-cpm";
+import { formatConfiguredCpm, formatCpm } from "@/lib/launchpoint-cpm";
+import { buildOverviewSignals } from "@/lib/overview-signals";
 import styles from "./overview.module.css";
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string; series?: string; stats?: string }> }) {
@@ -20,27 +21,26 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   if (params.stats) preservedView.set("stats", params.stats);
   const performance = data.performance.slice(-range);
   const includedVideos = data.videos.filter((video) => video.included);
+  const launchpoint = data.launchpointAnalytics;
   const totals = {
     active: data.creators.filter((creator) => creator.lifecycle === "active").length,
     applicants: data.creators.filter((creator) => creator.lifecycle === "request").length,
     accounts: data.accounts.length,
-    videos: includedVideos.length,
-    views: includedVideos.reduce((sum, video) => sum + video.views, 0),
-    likes: includedVideos.reduce((sum, video) => sum + video.likes, 0),
-    comments: includedVideos.reduce((sum, video) => sum + video.comments, 0),
-    shares: includedVideos.reduce((sum, video) => sum + video.shares, 0),
-    bookmarks: includedVideos.reduce((sum, video) => sum + video.bookmarks, 0),
-    engagement: includedVideos.reduce((sum, video) => sum + video.likes + video.comments + video.shares + video.bookmarks, 0) / Math.max(1, includedVideos.reduce((sum, video) => sum + video.views, 0)),
+    videos: launchpoint?.totalPosts ?? includedVideos.length,
+    views: launchpoint?.totalViews ?? includedVideos.reduce((sum, video) => sum + video.views, 0),
+    likes: launchpoint?.totalLikes ?? includedVideos.reduce((sum, video) => sum + video.likes, 0),
+    comments: launchpoint?.totalComments ?? includedVideos.reduce((sum, video) => sum + video.comments, 0),
+    shares: launchpoint?.totalShares ?? includedVideos.reduce((sum, video) => sum + video.shares, 0),
+    bookmarks: launchpoint?.totalBookmarks ?? includedVideos.reduce((sum, video) => sum + video.bookmarks, 0),
+    engagement: 0,
   };
+  totals.engagement = (totals.likes + totals.comments + totals.shares + totals.bookmarks) / Math.max(1, totals.views);
   const attention = data.creators.filter((creator) => creator.attentionState || creator.discord.state !== "connected" || creator.relationships.length === 0).length;
-  const exceptions = [
-    { label: "Account awaiting creator match", count: data.accounts.filter((account) => account.linkState !== "confirmed").length, href: "/creators?tab=requests", tone: "attention" as const },
-    { label: "Discord access not reconciled", count: data.creators.filter((creator) => creator.discord.state !== "connected").length, href: "/creators?discord=missing_access", tone: "attention" as const },
-    { label: "No signing relationship", count: data.creators.filter((creator) => creator.relationships.length === 0).length, href: "/creators?provider=unlinked", tone: "neutral" as const },
-    { label: "Tracking stale or failed", count: data.accounts.filter((account) => account.trackingState === "stale" || account.trackingState === "failed").length, href: "/accounts?health=stale", tone: "neutral" as const },
-  ];
+  const signals = buildOverviewSignals({ creators: data.creators, accounts: data.accounts, videos: data.videos });
   const metricCards: OverviewMetric[] = [
     { id: "cpm", label: "Realized CPM", value: formatCpm(data.launchpointAnalytics?.realizedCpm), icon: "cpm" },
+    { id: "configuredCpm", label: "Configured CPM", value: formatConfiguredCpm(launchpoint?.configuredCpmMin, launchpoint?.configuredCpmMax), icon: "cpm" },
+    { id: "maxCpmEarnable", label: "Max CPM payout", value: formatCpm(launchpoint?.maxCpmEarnable), icon: "cpm" },
     { id: "views", label: "Views", value: formatNumber(totals.views), icon: "eye" },
     { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), icon: "activity" },
     { id: "likes", label: "Likes", value: formatNumber(totals.likes), icon: "heart" },
@@ -72,7 +72,18 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         next.set("range", String(days));
         return <Link key={days} href={`/overview?${next.toString()}`} className={range === days ? "active" : ""}>{days}d</Link>;
       })}</div></div><PerformanceChart data={performance} /></Card>
-      <article className="panel todo-panel"><div className="panel-header"><h2>To do</h2><StateBadge label={`${exceptions.reduce((sum, item) => sum + item.count, 0)} open`} tone="attention" /></div><div className="todo-list">{exceptions.map((item) => <Link key={item.label} href={item.href} data-complete={item.count === 0}><span className="todo-state">{item.count === 0 ? <CheckCircle2 /> : <Circle />}</span><strong>{item.label}</strong><span className={`todo-count ${item.tone}`}>{item.count}</span><ArrowUpRight /></Link>)}</div></article>
+      <article className={`panel ${styles.signalsPanel}`}>
+        <div className="panel-header"><div><h2>Signals</h2><p>Unusual movement worth a look</p></div><span className={styles.signalCount}>{signals.length} live</span></div>
+        {signals.length ? <div className={styles.signalList}>{signals.map((signal) => {
+          const Icon = signal.kind === "breakout" ? TrendingUp : signal.kind === "comments" ? MessageCircleMore : signal.kind === "cadence" ? CalendarClock : ShieldAlert;
+          return <Link href={signal.href} className={styles.signalRow} data-kind={signal.kind} key={signal.id}>
+            <span className={styles.signalIcon}><Icon /></span>
+            <span className={styles.signalCopy}><strong>{signal.title}</strong><small>{signal.detail}</small></span>
+            <span className={styles.signalMetric}>{signal.metric}</span>
+            <ChevronRight />
+          </Link>;
+        })}</div> : <div className={styles.signalEmpty}><TrendingUp /><strong>No unusual movement right now</strong><p>Breakouts, comment spikes, cadence gaps, and at-risk accounts will appear here.</p></div>}
+      </article>
     </section>
     <section className={styles.directoryGrid}>
       <article className={`panel table-panel ${styles.directoryPanel}`}><div className="panel-header"><h2>Top accounts</h2><Link href="/accounts" className="text-link">View all <ArrowUpRight /></Link></div><div className={`rank-list ${styles.compactRankList}`}>{topAccounts.map((account, index) => <Link href={`/accounts/${encodeURIComponent(account.id)}`} key={account.id}><span className="rank">{String(index + 1).padStart(2, "0")}</span><span className="account-avatar">{account.avatarUrl ? <SourceImage src={account.avatarUrl} width={30} height={30} /> : account.username.slice(0, 1).toUpperCase()}</span><span className="rank-copy"><strong>@{account.username}</strong><small>{account.platform} · {formatNumber(account.followers ?? 0)} followers</small></span><b>{formatNumber(account.views)}</b><TrackingBadge state={account.trackingState} /></Link>)}</div></article>

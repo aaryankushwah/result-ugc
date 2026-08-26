@@ -189,6 +189,14 @@ export type PortalData = {
     snapshotCpm: number | null;
     totalEarnings: number;
     totalViews: number;
+    totalPosts: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    totalBookmarks: number;
+    configuredCpmMin: number | null;
+    configuredCpmMax: number | null;
+    maxCpmEarnable: number | null;
     refreshedAt: string;
   } | null;
 };

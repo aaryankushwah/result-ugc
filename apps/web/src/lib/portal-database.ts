@@ -21,7 +21,7 @@ import { aggregateTrackingState, deriveAccountPerformanceHealth } from "@result/
 import type { PortalAccount, PortalActivity, PortalAttributionPoint, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
 import { engagementTotals, totalInteractions } from "./engagement";
 import { buildPerformance } from "./performance";
-import { accountAnalyticsByIdentity, creatorCpmMetrics, launchpointAccountKey } from "./launchpoint-cpm";
+import { accountAnalyticsByIdentity, companyConfiguredCpm, creatorCpmMetrics, launchpointAccountKey } from "./launchpoint-cpm";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
 const PROVIDER_STALE_AFTER_MS = 20 * 60 * 1_000;
@@ -88,6 +88,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   ]);
 
   const launchpointSnapshot = launchpointSnapshotRows[0] ?? null;
+  const configuredCompanyCpm = companyConfiguredCpm(launchpointSnapshot?.payStructures ?? [], launchpointSnapshot?.accounts ?? []);
   const launchpointAccountAnalytics = accountAnalyticsByIdentity(launchpointSnapshot?.accounts ?? []);
   const launchpointVideoAnalytics = new Map((launchpointSnapshot?.videos ?? []).map((video) => [video.id, video]));
 
@@ -326,6 +327,22 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   }
   const attribution = { links: attributionLinks, series: [...attributionByDate.values()] };
 
+  const launchpointPerformance = launchpointSnapshot?.videos.map((video) => {
+    const uploadedAt = typeof video.uploadedAt === "number"
+      ? new Date(video.uploadedAt < 1_000_000_000_000 ? video.uploadedAt * 1_000 : video.uploadedAt).toISOString()
+      : null;
+    return {
+      accountId: `${video.platform ?? "unknown"}:${video.contractorName ?? "unknown"}`,
+      included: true,
+      publishedAt: uploadedAt,
+      views: video.views ?? 0,
+      likes: video.likes ?? 0,
+      comments: video.comments ?? 0,
+      shares: video.shares ?? 0,
+      bookmarks: video.bookmarks ?? 0,
+    };
+  }) ?? [];
+
   const freshnessFor = (source: "viral" | "discord" | "launchpoint" | "dub", staleAfter: number): PortalData["freshness"][number] => {
     const runs = runRows.filter((run) => run.source === source);
     const latestAttempt = runs[0];
@@ -353,7 +370,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     accounts,
     videos,
     activities,
-    performance: buildPerformance(videos),
+    performance: buildPerformance(launchpointSnapshot ? launchpointPerformance : videos),
     attribution,
     freshness,
     providerErrors: latestFailedBySource,
@@ -363,6 +380,14 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       snapshotCpm: launchpointSnapshot.snapshotSummary.cpm ?? null,
       totalEarnings: launchpointSnapshot.summary.totalEarnings ?? 0,
       totalViews: launchpointSnapshot.summary.totalViews ?? 0,
+      totalPosts: launchpointSnapshot.summary.totalPosts ?? 0,
+      totalLikes: launchpointSnapshot.summary.totalLikes ?? 0,
+      totalComments: launchpointSnapshot.summary.totalComments ?? 0,
+      totalShares: launchpointSnapshot.summary.totalShares ?? 0,
+      totalBookmarks: launchpointSnapshot.summary.totalBookmarks ?? 0,
+      configuredCpmMin: configuredCompanyCpm.configuredCpmMin,
+      configuredCpmMax: configuredCompanyCpm.configuredCpmMax,
+      maxCpmEarnable: configuredCompanyCpm.maxCpmEarnable,
       refreshedAt: launchpointSnapshot.sourceRefreshedAt.toISOString(),
     } : null,
   };

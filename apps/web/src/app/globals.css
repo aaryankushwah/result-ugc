@@ -1596,15 +1596,16 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .overview-stats-button { gap: 7px; }
 .overview-stats-button > span { min-width: 20px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 6px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; line-height: 18px; }
 .overview-metric-grid { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--border); box-shadow: 0 1px 0 rgba(255,255,255,.025),0 12px 32px rgba(0,0,0,.1); scrollbar-width: thin; }
-.overview-metric-card.metric-card { min-width: 172px; min-height: 78px; flex: 1 0 172px; padding: 14px 26px 14px 12px; overflow: hidden; position: relative; display: grid; grid-template-columns: 26px minmax(0,1fr); align-items: center; gap: 11px; isolation: isolate; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: var(--card); box-shadow: none; user-select: none; }
+.overview-metric-card.metric-card { min-width: 172px; min-height: 78px; flex: 1 0 172px; padding: 14px 26px 14px 12px; overflow: hidden; position: relative; display: grid; grid-template-columns: 26px minmax(0,1fr); align-items: center; gap: 11px; isolation: isolate; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: var(--card); box-shadow: none; cursor: grab; touch-action: pan-y; user-select: none; }
 .overview-metric-card.metric-card:last-child { border-right: 0; }
-.overview-metric-card.metric-card[data-dragging="true"] { opacity: .45; }
-.overview-metric-card.metric-card[data-drop-target="true"]::after { content: ""; position: absolute; inset: 3px; z-index: 3; border: 2px dotted var(--primary); background: color-mix(in srgb,var(--primary) 4%,transparent); pointer-events: none; }
+.overview-metric-card.metric-card[data-dragging="true"] { z-index: 2; opacity: .42; cursor: grabbing; }
+.overview-metric-card.metric-card[data-drop-edge]::after { content: ""; position: absolute; top: 8px; bottom: 8px; z-index: 3; border-left: 3px solid var(--primary); border-radius: 2px; box-shadow: 0 0 12px color-mix(in srgb,var(--primary) 52%,transparent); pointer-events: none; }
+.overview-metric-card.metric-card[data-drop-edge="before"]::after { left: 0; }
+.overview-metric-card.metric-card[data-drop-edge="after"]::after { right: 0; }
 .overview-metric-card.metric-card:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.overview-metric-grip { position: absolute !important; top: 50%; right: 2px; width: 22px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); cursor: grab; touch-action: none; opacity: .42; transform: translateY(-50%); }
+.overview-metric-grip { position: absolute !important; top: 50%; right: 2px; width: 22px; height: 34px; padding: 0; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted-foreground); pointer-events: none; opacity: .42; transform: translateY(-50%); }
 .overview-metric-card:hover .overview-metric-grip,
-.overview-metric-grip:focus-visible { opacity: .85; }
-.overview-metric-grip:active { cursor: grabbing; }
+.overview-metric-card:focus-visible .overview-metric-grip { opacity: .85; }
 .overview-metric-grip > svg { width: 14px; height: 14px; }
 .overview-metric-card > * { position: relative; z-index: 1; }
 .overview-metric-card .metric-icon { width: 26px; height: 26px; border: 0; border-radius: 0; background: transparent; }

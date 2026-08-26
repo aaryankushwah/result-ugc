@@ -130,6 +130,8 @@ export async function getLaunchpointDataset(): Promise<{
     return identity ? [identity] : [];
   });
   const overview = overviewResult.data ?? overviewResult;
+  const trackedCreatorIds = new Set(accountAnalytics.map((row) => row.contractorId).filter(Boolean));
+  const trackedPayStructures = payStructures.filter((row) => trackedCreatorIds.has(row.creatorId));
   return {
     creators,
     relationships,
@@ -139,7 +141,7 @@ export async function getLaunchpointDataset(): Promise<{
       snapshotSummary: overview.snapshotSummary ?? {},
       accounts: accountAnalytics,
       videos: videoAnalytics,
-      payStructures,
+      payStructures: trackedPayStructures,
       refreshedAt: new Date().toISOString(),
     },
   };

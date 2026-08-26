@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountAnalyticsByIdentity, creatorCpmMetrics, formatConfiguredCpm } from "./launchpoint-cpm";
+import { accountAnalyticsByIdentity, companyConfiguredCpm, creatorCpmMetrics, formatConfiguredCpm } from "./launchpoint-cpm";
 
 describe("Launchpoint CPM", () => {
   it("matches account analytics only by normalized platform and handle", () => {
@@ -22,5 +22,22 @@ describe("Launchpoint CPM", () => {
       { creatorId: "creator-1", money: { cpmCents: 650 } },
     ]);
     expect(formatConfiguredCpm(result.configuredCpmMin, result.configuredCpmMax)).toBe("$4.00–$6.50");
+  });
+
+  it("keeps configured CPM and its aggregate earning cap separate from realized CPM", () => {
+    expect(companyConfiguredCpm([
+      { creatorId: "one", money: { cpmCents: 400, maxCpmEarnableCents: 25_000 } },
+      { creatorId: "two", money: { cpmCents: 650, maxCpmEarnableCents: 50_000 } },
+      { creatorId: "unrelated", money: { cpmCents: 99_900, maxCpmEarnableCents: 9_999_900 } },
+    ], [
+      { handle: "one", platform: "instagram", contractorId: "one" },
+      { handle: "two", platform: "tiktok", contractorId: "two" },
+    ])).toEqual({ configuredCpmMin: 4, configuredCpmMax: 6.5, maxCpmEarnable: 750 });
+  });
+
+  it("does not treat campaign defaults for untracked creators as company payout", () => {
+    expect(companyConfiguredCpm([
+      { creatorId: "unrelated", money: { cpmCents: 400, maxCpmEarnableCents: 25_000 } },
+    ], [])).toEqual({ configuredCpmMin: null, configuredCpmMax: null, maxCpmEarnable: null });
   });
 });

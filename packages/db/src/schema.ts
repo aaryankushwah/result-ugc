@@ -426,9 +426,16 @@ export const syncRuns = pgTable("sync_runs", {
 }, (table) => [index("sync_runs_org_started_idx").on(table.organizationId, table.startedAt)]);
 
 export type LaunchpointAnalyticsSummary = {
+  totalPosts?: number;
   totalViews?: number;
+  totalLikes?: number;
+  totalComments?: number;
+  totalShares?: number;
+  totalBookmarks?: number;
   totalEarnings?: number;
   cpm?: number | null;
+  engagementRate?: number;
+  uniqueCreators?: number;
 };
 
 export type LaunchpointAccountAnalytics = {
@@ -446,6 +453,10 @@ export type LaunchpointVideoAnalytics = {
   title?: string;
   platform?: string;
   views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  bookmarks?: number;
   earnings?: number;
   cpm?: number | null;
   paid?: boolean;

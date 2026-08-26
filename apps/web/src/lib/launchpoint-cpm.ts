@@ -8,6 +8,12 @@ export type CreatorCpmMetrics = {
   configuredCpmMax: number | null;
 };
 
+export type CompanyConfiguredCpm = {
+  configuredCpmMin: number | null;
+  configuredCpmMax: number | null;
+  maxCpmEarnable: number | null;
+};
+
 export function launchpointAccountKey(platform: string | null | undefined, handle: string | null | undefined): string | null {
   const normalizedPlatform = platform?.trim().toLowerCase();
   const normalizedHandle = handle?.trim().replace(/^@/, "").toLowerCase();
@@ -42,6 +48,27 @@ export function creatorCpmMetrics(
     totalViews,
     configuredCpmMin: configuredRates.length ? Math.min(...configuredRates) : null,
     configuredCpmMax: configuredRates.length ? Math.max(...configuredRates) : null,
+  };
+}
+
+export function companyConfiguredCpm(
+  payStructures: LaunchpointPayStructure[],
+  accountRows: LaunchpointAccountAnalytics[],
+): CompanyConfiguredCpm {
+  const trackedCreatorIds = new Set(accountRows.map((row) => row.contractorId).filter(Boolean));
+  const trackedStructures = payStructures.filter((row) => trackedCreatorIds.has(row.creatorId));
+  const rates = trackedStructures
+    .map((row) => row.money?.cpmCents)
+    .filter((value): value is number => typeof value === "number")
+    .map((value) => value / 100);
+  const caps = trackedStructures
+    .map((row) => row.money?.maxCpmEarnableCents)
+    .filter((value): value is number => typeof value === "number")
+    .map((value) => value / 100);
+  return {
+    configuredCpmMin: rates.length ? Math.min(...rates) : null,
+    configuredCpmMax: rates.length ? Math.max(...rates) : null,
+    maxCpmEarnable: caps.length ? caps.reduce((sum, value) => sum + value, 0) : null,
   };
 }
 

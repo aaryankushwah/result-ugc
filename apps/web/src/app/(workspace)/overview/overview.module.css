@@ -1,3 +1,158 @@
+.signalsPanel {
+  min-height: 355px;
+}
+
+.signalsPanel :global(.panel-header) {
+  min-height: 52px;
+  padding: 10px 14px;
+}
+
+.signalsPanel :global(.panel-header h2) {
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.signalsPanel :global(.panel-header p) {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.signalCount {
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--foreground);
+  font-family: var(--font-geist-mono);
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.signalList {
+  padding: 6px;
+}
+
+.signalRow {
+  min-height: 58px;
+  padding: 7px 8px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 12px;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.signalRow:last-child {
+  border-bottom: 0;
+}
+
+.signalRow:hover {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.signalRow > svg {
+  width: 12px;
+  color: var(--muted-foreground);
+}
+
+.signalIcon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.signalIcon svg {
+  width: 13px;
+}
+
+.signalRow[data-kind="breakout"] .signalIcon {
+  border-color: color-mix(in srgb, #55bd75 35%, var(--border));
+  background: color-mix(in srgb, #55bd75 10%, var(--card));
+  color: #64c982;
+}
+
+.signalRow[data-kind="comments"] .signalIcon {
+  border-color: color-mix(in srgb, #6ca6ff 35%, var(--border));
+  background: color-mix(in srgb, #6ca6ff 9%, var(--card));
+  color: #8bb8ff;
+}
+
+.signalRow[data-kind="cadence"] .signalIcon,
+.signalRow[data-kind="risk"] .signalIcon {
+  border-color: color-mix(in srgb, var(--alert) 34%, var(--border));
+  background: color-mix(in srgb, var(--alert) 8%, var(--card));
+  color: var(--alert);
+}
+
+.signalCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.signalCopy strong,
+.signalCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signalCopy strong {
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.signalCopy small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+
+.signalMetric {
+  max-width: 70px;
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: var(--font-geist-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signalEmpty {
+  min-height: 285px;
+  padding: 28px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.signalEmpty > svg {
+  width: 22px;
+  color: var(--muted-foreground);
+}
+
+.signalEmpty p {
+  max-width: 250px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .directoryGrid {
   display: grid;
   grid-template-columns: minmax(250px, .78fr) minmax(310px, 1fr) minmax(430px, 1.28fr);
