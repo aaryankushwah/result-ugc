@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterScriptsByCategory, isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "./script-studio-state";
+import { filterScriptsByCategory, isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript, unavailableScriptStudioData } from "./script-studio-state";
 
 describe("script studio state", () => {
   it("filters the script bank by its persisted category", () => {
@@ -35,6 +35,18 @@ describe("script studio state", () => {
   it("keeps preview and unmatched social candidates out of assignment targets", () => {
     expect(isPersistedCreatorId("afbb8360-0b8c-4b04-95e8-d6533191b6ac")).toBe(true);
     expect(isPersistedCreatorId("viral-orgacc_123")).toBe(false);
+  });
+
+  it("never invents scripts when the Script Studio database is unavailable", () => {
+    const creators = [{ id:"creator-1", name:"Real creator", username:null, avatarUrl:null, specialties:[], activeAssignments:0 }];
+    const brand = { name:"Result", productDescription:"", audience:"", voice:[], bannedPhrases:[], proofPoints:[] };
+    expect(unavailableScriptStudioData(creators, brand)).toEqual({
+      sourceMode:"unavailable",
+      failedNotifications:[],
+      brand,
+      creators,
+      scripts:[],
+    });
   });
 
   it("separates reference videos from editing resources", () => {

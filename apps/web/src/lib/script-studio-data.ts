@@ -19,8 +19,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { PORTAL_DATA_CACHE_TAG } from "./portal-cache";
 import { getPortalData } from "./portal-data";
-import { adaptReferenceForResult, segmentTranscript } from "./script-writing";
-import { isPersistedCreatorId } from "./script-studio-state";
+import { isPersistedCreatorId, unavailableScriptStudioData } from "./script-studio-state";
 
 export type StudioCreator = {
   id: string;
@@ -75,7 +74,7 @@ type FailedNotification = {
 };
 
 export type ScriptStudioData = {
-  sourceMode: "database" | "preview";
+  sourceMode: "database" | "unavailable";
   failedNotifications: FailedNotification[];
   brand: { name: string; productDescription: string; audience: string; voice: string[]; bannedPhrases: string[]; proofPoints: string[] };
   scripts: StudioScript[];
@@ -208,14 +207,15 @@ async function loadStudioRecords(): Promise<StudioRecords | null> {
         };
       }),
     };
-  } catch {
+  } catch (error) {
+    console.error("Script Studio records unavailable", error);
     return null;
   }
 }
 
 const getCachedStudioRecords = unstable_cache(
   loadStudioRecords,
-  ["result-script-studio-v1"],
+  ["result-script-studio-v2"],
   { revalidate: 30, tags: [PORTAL_DATA_CACHE_TAG] },
 );
 
@@ -232,7 +232,7 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
     activeAssignments: 0,
   }));
 
-  if (!records) return previewData(studioCreators);
+  if (!records) return unavailableScriptStudioData(studioCreators, defaultBrand);
 
   const activeByCreator = new Map(records.activeByCreator);
   return {
@@ -252,48 +252,3 @@ const defaultBrand = {
   bannedPhrases: ["Revolutionary", "Game-changing", "Unlock magic"],
   proofPoints: ["One connected creator workflow", "Faster review and handoff", "Source-backed creative decisions"],
 };
-
-function previewData(liveCreators: StudioCreator[]): ScriptStudioData {
-  const transcript = "Your team is not slow. They are losing hours to work that should happen automatically. We had briefs in docs, feedback in messages, and no idea what was ready to post. Then we moved the whole workflow into one place.";
-  const sections = adaptReferenceForResult(transcript);
-  const creators = liveCreators.length ? liveCreators : [
-    { id: "preview-maya", name: "Maya Chen", username: "mayamakes", avatarUrl: null, specialties: ["Instagram", "SaaS"], activeAssignments: 3 },
-    { id: "preview-sofia", name: "Sofia Reed", username: "sofiafilms", avatarUrl: null, specialties: ["TikTok", "Lifestyle"], activeAssignments: 2 },
-    { id: "preview-jordan", name: "Jordan Lee", username: "byjordanlee", avatarUrl: null, specialties: ["YouTube", "Tech"], activeAssignments: 1 },
-    { id: "preview-eli", name: "Eli Brooks", username: "eliframes", avatarUrl: null, specialties: ["Instagram", "Fitness"], activeAssignments: 2 },
-  ];
-  const samples = [
-    ["The workflow problem nobody talks about", "draft", "not_started", "Pain point", "Talking head", "high", "instagram", [], 0, null],
-    ["3 signs you have outgrown spreadsheets", "ready", "testing", "Listicle", "Green screen", "high", "tiktok", [creators[0]?.id], 182400, .41],
-    ["POV: the brief finally makes sense", "assigned", "testing", "POV", "Talking head", "medium", "instagram", [creators[1]?.id], 48600, .34],
-    ["Why your best hooks die in Docs", "in_review", "iterate", "Education", "Screen demo", "medium", "youtube", [creators[2]?.id], 312000, .46],
-    ["Founder reaction: first 100 videos", "published", "winner", "Founder story", "Talking head", "high", "instagram", [creators[0]?.id, creators[3]?.id], 2400000, .58],
-    ["Stop sending creators blank briefs", "archived", "retired", "Contrarian", "Talking head", "low", "tiktok", [], 12400, .18],
-  ] as const;
-  return {
-    sourceMode: "preview",
-    failedNotifications: [],
-    brand: defaultBrand,
-    creators,
-    scripts: samples.map(([title, status, pipelineStage, category, format, priority, platform, creatorIds, views, hookRate], index) => ({
-      id: `preview-script-${index + 1}`,
-      latestVersion: 1,
-      title,
-      status,
-      pipelineStage,
-      priority,
-      category,
-      format,
-      tags: [category, format],
-      targetPlatform: platform,
-      durationSeconds: 24 + index * 3,
-      hook: index === 0 ? sections[0]?.copy ?? null : ["If your content calendar still looks like this, we need to talk.", "POV: you open a creator brief and know exactly what to film.", "You wrote the winning hook. Now try finding it.", "We just shipped our 100th creator video. Here is what changed.", "A blank page is not creative freedom. It is a bad brief."][index - 1] ?? null,
-      sections,
-      reference: index === 0 ? { id: "preview-reference", sourcePlatform: "instagram", sourceUrl: "https://www.instagram.com/reel/reference", sourceCreator: "@buildwithmaya", transcript, transcriptSections: segmentTranscript(transcript) } : null,
-      assignments: creatorIds.filter(Boolean).map((creatorId, assignmentIndex) => ({ id: `preview-assignment-${index}-${assignmentIndex}`, creatorId: creatorId!, creatorName: creators.find((creator) => creator.id === creatorId)?.name ?? "Creator", state: status === "published" ? "approved" : "assigned", dueAt: null })),
-      assets: [],
-      performance: { tests:index === 0 ? 0 : index === 4 ? 6 : 2, liveTests:pipelineStage === "testing" ? 2 : 0, views, hookRate, averageWatchTimeSeconds:hookRate ? 5.2 + index : null },
-      updatedAt: new Date(Date.now() - index * 7_200_000).toISOString(),
-    })),
-  };
-}

@@ -55,6 +55,7 @@ type GenerationOutcome = {
 
 
 export function ScriptStudio({ initialData, canManage }: { initialData: ScriptStudioData; canManage: boolean }) {
+  const canWrite = canManage && initialData.sourceMode === "database";
   const [screen, setScreen] = useState<StudioScreen>("bank");
   const [scripts, setScripts] = useState(initialData.scripts);
   const [failedNotifications, setFailedNotifications] = useState(initialData.failedNotifications);
@@ -275,8 +276,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
       updateActive((script) => ({ ...script, id: result.id, latestVersion: result.version, assets:result.assets ?? script.assets, updatedAt: new Date().toISOString() }));
       notify("Saved to the script bank");
     } catch (error) {
-      if (initialData.sourceMode === "preview") notify("Saved in this preview session · connect the database to persist it");
-      else notify(error instanceof Error ? error.message : "Script could not be saved");
+      notify(error instanceof Error ? error.message : "Script could not be saved");
     } finally {
       setSaving(false);
     }
@@ -351,7 +351,7 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canWrite} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canWrite} /> : null}
     <ImportDialog open={importOpen} setOpen={setImportOpen} onImport={importReel} onCreate={createDraft} importing={importing} />
     <BrandDialog key={brandOpen ? "brand-open" : "brand-closed"} open={brandOpen} setOpen={setBrandOpen} brand={brand} setBrand={setBrand} notify={notify} canManage={canManage} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
@@ -397,7 +397,7 @@ function ScriptBank({ scripts, allScripts, query, setQuery, categoryFilter, setC
   const move=(stage:StudioScript["pipelineStage"])=>{const script=allScripts.find((item)=>item.id===dragged);if(script&&script.pipelineStage!==stage)updateMetadata(script,{pipelineStage:stage});setDragged(null);setDropStage(null);};
   return <div className="script-bank pipeline-home">
     <div className="pipeline-titlebar"><div><p className="eyebrow">CREATIVE TESTING SYSTEM</p><h1>Script pipeline</h1><p>Every concept moves from reference to test, iteration, and a measurable winner.</p></div><div className="pipeline-title-actions">{sourceMode==="database"?<span className="neon-live"><i/>Neon live</span>:null}{canManage?<><button className="studio-secondary" onClick={openBrand}><Building2/>Brand</button><Button className="studio-primary" onClick={openImport}><Plus/>New script</Button></>:null}</div></div>
-    {sourceMode==="preview"?<div className="studio-preview-banner"><Sparkles/><div><strong>Preview data</strong><span>Neon is connected. Create the first real script to replace these example cards.</span></div></div>:null}
+    {sourceMode==="unavailable"?<div className="studio-preview-banner"><TriangleAlert/><div><strong>Scripts unavailable</strong><span>The database is not connected. No sample or placeholder scripts are being shown.</span></div></div>:null}
     {failedNotifications.length?<FailedNotificationStrip items={failedNotifications} notify={notify}/>:null}
     <section className="overview-metric-grid script-overview-metrics" aria-label="Script performance summary">
       {[

@@ -2145,6 +2145,55 @@ body,
 }
 .pipeline-add:hover { color: var(--text-primary) !important; background: transparent !important; }
 
+/* Canonical pipeline card layout. Keep stage colour as a small accent instead
+   of tinting the whole card, and constrain every child to the card width. */
+.pipeline-card,
+.light .pipeline-card,
+.dark .pipeline-card,
+.light .tone-winner .pipeline-card,
+.dark .tone-winner .pipeline-card,
+.light .tone-retired .pipeline-card,
+.dark .tone-retired .pipeline-card {
+  min-width: 0;
+  min-height: 206px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+.light .pipeline-card,
+.light .tone-winner .pipeline-card,
+.light .tone-retired .pipeline-card { background: #fff; box-shadow: 0 5px 16px rgba(30,37,49,.07); }
+.pipeline-card::before { display: block; width: 3px; }
+.pipeline-card:hover,
+.light .pipeline-card:hover,
+.dark .pipeline-card:hover { background: var(--surface-2); border-color: color-mix(in srgb,var(--pipeline-stage) 45%,var(--border)); box-shadow: 0 9px 24px rgba(0,0,0,.16); transform: translateY(-1px); }
+.light .pipeline-card:hover { background: #fff; }
+.pipeline-card-title { min-width: 0; margin-top: 10px; }
+.pipeline-card-title strong { overflow-wrap: anywhere; }
+.pipeline-card-tags { min-width: 0; }
+.pipeline-card-tags select { max-width: min(132px,60%); text-overflow: ellipsis; }
+.pipeline-card-tags span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pipeline-card .pipeline-card-stats {
+  width: auto;
+  margin: 12px -14px 0 !important;
+  padding: 10px 14px !important;
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 0;
+  border-top: 1px solid var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: color-mix(in srgb,var(--surface-3) 62%,transparent) !important;
+}
+.pipeline-card .pipeline-card-stats div { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px !important; border-right: 1px solid var(--border); }
+.pipeline-card .pipeline-card-stats div:first-child { padding-left: 0 !important; }
+.pipeline-card .pipeline-card-stats div:last-child { padding-right: 0 !important; border-right: 0; }
+.pipeline-card .pipeline-card-stats strong { font-size: 16px; line-height: 1.15; }
+.pipeline-card .pipeline-card-stats span { font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
+.pipeline-card footer { margin-top: 10px; }
+
 /* Script writer — document-first block editor with a persistent creator brief rail. */
 .writer-frame { background: var(--color-canvas-deep,#0e0e0e); }
 .writer-header { position: sticky; top: 0; z-index: 40; min-height: 62px; padding: 10px 20px; backdrop-filter: blur(18px); }

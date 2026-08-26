@@ -1,4 +1,4 @@
-import type { StudioAsset, StudioScript } from "./script-studio-data";
+import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "./script-studio-data";
 
 export type StudioAssignment = StudioScript["assignments"][number];
 
@@ -10,6 +10,19 @@ export function filterScriptsByCategory<T extends { category: string }>(scripts:
 
 export function isPersistedCreatorId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function unavailableScriptStudioData(
+  creators: StudioCreator[],
+  brand: ScriptStudioData["brand"],
+): ScriptStudioData {
+  return {
+    sourceMode: "unavailable",
+    failedNotifications: [],
+    brand,
+    creators,
+    scripts: [],
+  };
 }
 
 export function mergeScriptAssignments(current: StudioAssignment[], incoming: StudioAssignment[]): StudioAssignment[] {
