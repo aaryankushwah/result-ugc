@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { creatorAccountTotals, creatorBaselineViews, creatorDailySeries, creatorRecentPosts, foldAccountTail } from "./creator-series";
+import { creatorAccountTotals, creatorBaselineViews, creatorDailySeries, creatorRecentPosts, creatorWeeklySeries, foldAccountTail } from "./creator-series";
 import type { PortalCreator, PortalVideo } from "./portal-types";
 
 const now = new Date("2026-08-25T12:00:00Z");
@@ -51,6 +51,35 @@ describe("creator daily series", () => {
     ], 7, now);
     // 105 engagements over 10,010 views ≈ 1.05%, not the 27.5% a naive mean gives.
     expect(rows.at(-1)!.engagementRate).toBeCloseTo(1.049, 2);
+  });
+});
+
+describe("creator weekly series", () => {
+  it("emits Monday-to-Sunday buckets and aggregates the creator's counted posts", () => {
+    const rows = creatorWeeklySeries(creator(), [
+      video({ id: "mon", platformVideoId: "mon", publishedAt: "2026-08-17T09:00:00Z", views: 100 }),
+      video({ id: "sun", platformVideoId: "sun", publishedAt: "2026-08-23T23:59:00Z", views: 200 }),
+      video({ id: "next", platformVideoId: "next", publishedAt: "2026-08-24T00:00:00Z", views: 400 }),
+    ], 2, now);
+
+    expect(rows.map(({ date, endDate }) => ({ date, endDate }))).toEqual([
+      { date: "2026-08-17", endDate: "2026-08-23" },
+      { date: "2026-08-24", endDate: "2026-08-30" },
+    ]);
+    expect(rows.map(({ posts, views }) => ({ posts, views }))).toEqual([
+      { posts: 2, views: 300 },
+      { posts: 1, views: 400 },
+    ]);
+  });
+
+  it("uses the weekly totals for engagement and excludes warm-up posts", () => {
+    const rows = creatorWeeklySeries(creator(), [
+      video({ id: "big", platformVideoId: "big", views: 10_000, likes: 100 }),
+      video({ id: "tiny", platformVideoId: "tiny", views: 10, likes: 5 }),
+      video({ id: "excluded", platformVideoId: "excluded", views: 999, likes: 999, included: false }),
+    ], 1, now);
+    expect(rows[0]).toMatchObject({ posts: 2, views: 10_010 });
+    expect(rows[0]!.engagementRate).toBeCloseTo(1.149, 2);
   });
 });
 

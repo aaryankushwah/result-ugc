@@ -43,12 +43,18 @@
 
 .roster :global(.creator-tree-table th[data-column="accounts"]),
 .roster :global(.creator-tree-table .creator-parent-row > td[data-column="accounts"]) {
-  width: 104px;
-  min-width: 104px;
-  max-width: 104px;
-  padding-right: 8px;
+  width: 132px;
+  min-width: 132px;
+  max-width: 132px;
+  padding-right: 16px;
   padding-left: 8px;
   text-align: center;
+}
+
+.roster :global(.creator-tree-table th[data-column="weeklyActivity"]),
+.roster :global(.creator-tree-table .creator-parent-row > td[data-column="weeklyActivity"]),
+.roster :global(.creator-tree-table td[data-nested-column="weeklyActivity"]) {
+  padding-left: 18px;
 }
 
 .roster :global(.creator-tree-table th[data-column="accounts"] .sort-button) {
@@ -102,6 +108,74 @@
 
 :global(.light) .roster :global(.account-platform-icons > span:first-child) {
   box-shadow: 0 0 0 2px var(--card);
+}
+
+.roster :global(.calendar-week-picker) {
+  min-width: max-content;
+  margin-left: auto;
+  padding: 4px 5px 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+
+.roster :global(.calendar-week-picker > span) {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.roster :global(.calendar-week-picker > span strong) {
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.roster :global(.calendar-week-picker > span small) {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.roster :global(.calendar-week-picker > div) {
+  padding: 2px;
+  display: flex;
+  gap: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.roster :global(.calendar-week-picker button) {
+  height: 25px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.roster :global(.calendar-week-picker button:hover) {
+  color: var(--foreground);
+}
+
+.roster :global(.calendar-week-picker button.active) {
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 20%);
+}
+
+:global(.light) .roster :global(.calendar-week-picker) {
+  background: #f6f7f9;
+}
+
+:global(.light) .roster :global(.calendar-week-picker button.active) {
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(31 41 55 / 12%);
 }
 
 .roster :global(.nested-account-header-row > td[data-nested-column="displayName"]) {
@@ -168,6 +242,10 @@
     max-width: none;
     flex: 1 0 100%;
   }
+
+  .roster :global(.calendar-week-picker) {
+    margin-left: 0;
+  }
 }
 
 @media (max-width: 700px) {
@@ -181,6 +259,11 @@
 
   .roster :global(.toolbar-button) {
     flex: 1 1 auto;
+  }
+
+  .roster :global(.calendar-week-picker) {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .roster :global(.nested-account-header-row > td[data-nested-column="displayName"]) {

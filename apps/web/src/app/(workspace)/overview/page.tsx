@@ -56,7 +56,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const topVideos = [...includedVideos].sort((a, b) => b.views - a.views).slice(0, 5);
   const activityByCreator = new Map(creatorPostActivity(data.creators, data.videos).map((row) => [row.creatorId, row]));
   const creatorActivity = data.creators.map((creator) => ({ creator, activity: activityByCreator.get(creator.id)! }))
-    .sort((a, b) => b.activity.posts7d - a.activity.posts7d || b.activity.posts - a.activity.posts || a.creator.displayName.localeCompare(b.creator.displayName));
+    .sort((a, b) => b.activity.postsThisWeek - a.activity.postsThisWeek || b.activity.posts - a.activity.posts || a.creator.displayName.localeCompare(b.creator.displayName));
 
   const degraded = data.freshness.filter((item) => item.state === "failed" || item.state === "stale");
   return <div className="page-stack">
@@ -92,7 +92,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
             </span>
             <small>{handle === "No account linked" ? handle : `@${handle}`} · {activity.posts} posts</small>
           </span>
-          <span className={styles.postActivity} aria-label={`${activity.posts7d} posts in the last seven days`}>{activity.activity.map((day) => <span key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><b data-active={day.count > 0}>{day.count}</b></span>)}</span>
+          <span className={styles.postActivity} aria-label={`${activity.postsThisWeek} posts this Monday-to-Sunday week`}>{activity.activity.map((day) => <span key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><b data-active={day.count > 0}>{day.count}</b></span>)}</span>
           <ChevronRight />
         </Link>;
       })}</div></article>

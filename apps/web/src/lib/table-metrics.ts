@@ -1,3 +1,5 @@
+import { calendarWeek } from "./calendar-week";
+
 type PublishedRecord = { accountId: string; publishedAt: string | null };
 
 type CreatorAccountRecord = {
@@ -11,17 +13,17 @@ export type PostActivityDay = {
   count: number;
 };
 
-export function sevenDayPostActivity(
+export function calendarWeekPostActivity(
   videos: PublishedRecord[],
   accountIds: Iterable<string>,
+  weekOffset = 0,
   now = new Date(),
 ): PostActivityDay[] {
   const includedAccounts = new Set(accountIds);
-  const end = new Date(now);
-  end.setUTCHours(0, 0, 0, 0);
+  const week = calendarWeek(weekOffset, now);
   const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(end);
-    date.setUTCDate(end.getUTCDate() - (6 - index));
+    const date = new Date(week.start);
+    date.setUTCDate(week.start.getUTCDate() + index);
     return {
       date: date.toISOString().slice(0, 10),
       label: date.toLocaleDateString("en-US", { weekday: "narrow", timeZone: "UTC" }),
@@ -45,7 +47,7 @@ export function creatorPostActivity(
   return creators.map((creator) => {
     const connectedAccounts = creator.accounts.filter((account) => account.linkState === "confirmed");
     const accountIds = new Set(connectedAccounts.map((account) => account.id));
-    const activity = sevenDayPostActivity(videos, accountIds, now);
+    const activity = calendarWeekPostActivity(videos, accountIds, 0, now);
     const activityDates = new Set(activity.map((day) => day.date));
     const completedAccountDays = new Set<string>();
     for (const video of videos) {
@@ -56,7 +58,7 @@ export function creatorPostActivity(
       creatorId: creator.id,
       activity,
       posts: connectedAccounts.reduce((sum, account) => sum + account.posts, 0),
-      posts7d: activity.reduce((sum, day) => sum + day.count, 0),
+      postsThisWeek: activity.reduce((sum, day) => sum + day.count, 0),
       goalsHit: completedAccountDays.size,
       goalsTotal: connectedAccounts.length * activity.length,
     };
