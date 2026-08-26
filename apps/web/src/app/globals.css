@@ -757,6 +757,7 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .panel { overflow: hidden; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg,color-mix(in srgb,var(--foreground) 2.5%,transparent),transparent); }
 .table-panel > .panel-header { position: relative; z-index: 2; box-shadow: 0 8px 18px -14px rgba(0,0,0,.82),inset 0 -1px rgba(255,255,255,.035); }
+.dashboard-main-grid > .panel > .panel-header { position: relative; z-index: 2; box-shadow: 0 8px 18px -14px rgba(0,0,0,.82),inset 0 -1px rgba(255,255,255,.035); }
 .panel-header h2 { margin: 0; letter-spacing: -.02em; }
 .panel-header p { margin: 4px 0 0; color: #656565; }
 .chart-panel { position: relative; min-height: 355px; }
@@ -1430,6 +1431,8 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .light :is(.panel,.data-panel,.overview-metric-grid) { box-shadow: none; }
 .light .panel-header { background: #fff; }
 .light .table-panel > .panel-header { box-shadow: 0 8px 18px -14px rgba(31,41,55,.42),inset 0 -1px #d9dde3; }
+.light .dashboard-main-grid > .panel > .panel-header { background: #f8fafc; box-shadow: 0 8px 18px -14px rgba(31,41,55,.42),inset 0 -1px #d9dde3; }
+.light .dashboard-main-grid > .panel > .panel-header h2 { color: #384250 !important; }
 .light :is(.table-toolbar,.table-pagination) { background: #fafbfc; }
 .light :is(.todo-list a,.rank-list > a) { border-bottom-color: #e7eaee; }
 .light .funnel-rail { background: var(--border); }
