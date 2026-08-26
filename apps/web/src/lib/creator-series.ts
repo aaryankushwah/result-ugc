@@ -1,4 +1,5 @@
-import type { PortalCreator, PortalVideo } from "@/lib/portal-types";
+import { calendarWeek, calendarWeekLabel } from "./calendar-week";
+import type { PortalCreator, PortalVideo } from "./portal-types";
 
 /**
  * Chart series for one creator, derived from the video snapshot.
@@ -8,6 +9,7 @@ import type { PortalCreator, PortalVideo } from "@/lib/portal-types";
  */
 
 export type CreatorDailyPoint = { date: string; views: number; posts: number; engagementRate: number };
+export type CreatorWeeklyPoint = CreatorDailyPoint & { label: string; endDate: string };
 export type CreatorPostPoint = { label: string; views: number; multiplier: number; publishedAt: string | null };
 export type CreatorAccountPoint = { account: string; views: number; posts: number };
 
@@ -46,6 +48,44 @@ export function creatorDailySeries(creator: PortalCreator, videos: PortalVideo[]
   // must not swing the day as hard as a 10,000-view one.
   for (const row of rows) {
     const totals = engagementByDate.get(row.date);
+    row.engagementRate = totals && totals.views ? (totals.engagements / totals.views) * 100 : 0;
+  }
+  return rows;
+}
+
+/** Calendar-week performance, oldest first. Every bucket is Monday–Sunday. */
+export function creatorWeeklySeries(creator: PortalCreator, videos: PortalVideo[], weeks = 12, now = new Date()): CreatorWeeklyPoint[] {
+  const rows = Array.from({ length: weeks }, (_, index) => {
+    const week = calendarWeek(weeks - 1 - index, now);
+    return {
+      date: week.startDate,
+      endDate: week.endDate,
+      label: calendarWeekLabel(week, false),
+      views: 0,
+      posts: 0,
+      engagementRate: 0,
+    };
+  });
+  const byStart = new Map(rows.map((row) => [row.date, row]));
+  const engagementByStart = new Map<string, { engagements: number; views: number }>();
+  const firstDate = rows[0]?.date;
+  const lastDate = rows.at(-1)?.endDate;
+  for (const video of countedVideos(videos, creator)) {
+    const publishedDate = video.publishedAt?.slice(0, 10);
+    if (!publishedDate || !firstDate || !lastDate || publishedDate < firstDate || publishedDate > lastDate) continue;
+    const publishedAt = new Date(`${publishedDate}T00:00:00Z`);
+    const weekStart = calendarWeek(0, publishedAt).startDate;
+    const row = byStart.get(weekStart);
+    if (!row) continue;
+    row.views += video.views;
+    row.posts += 1;
+    const totals = engagementByStart.get(weekStart) ?? { engagements: 0, views: 0 };
+    totals.engagements += video.likes + video.comments + video.shares + video.bookmarks;
+    totals.views += video.views;
+    engagementByStart.set(weekStart, totals);
+  }
+  for (const row of rows) {
+    const totals = engagementByStart.get(row.date);
     row.engagementRate = totals && totals.views ? (totals.engagements / totals.views) * 100 : 0;
   }
   return rows;

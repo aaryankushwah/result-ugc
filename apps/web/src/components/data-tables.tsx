@@ -19,8 +19,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PortalAccount, PortalCreator, PortalVideo } from "@/lib/portal-types";
+import { calendarWeek, calendarWeekLabel } from "@/lib/calendar-week";
 import { creatorMatchesFilters } from "@/lib/creator-filters";
-import { sevenDayPostActivity, type PostActivityDay } from "@/lib/table-metrics";
+import { calendarWeekPostActivity, type PostActivityDay } from "@/lib/table-metrics";
 import { useColumnVisibility } from "@/lib/use-column-visibility";
 import { buildVideoVisibilityRequests, countVideosChanging, videoVisibilityFailureMessage, videoVisibilityResultMessage } from "@/lib/video-visibility";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
@@ -74,7 +75,22 @@ function AccountPlatformIcons({ accounts }: { accounts: PortalAccount[] }) {
   );
 }
 function PostActivity({ days }: { days: PostActivityDay[] }) {
-  return <div className="post-activity" aria-label={`Posts in the last seven days: ${days.map((day) => `${day.date} ${day.count}`).join(", ")}`}>{days.map((day) => <span className="post-activity-day" data-active={day.count > 0 || undefined} key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><strong>{day.count}</strong></span>)}</div>;
+  return <div className="post-activity" aria-label={`Posts from Monday through Sunday: ${days.map((day) => `${day.date} ${day.count}`).join(", ")}`}>{days.map((day) => <span className="post-activity-day" data-active={day.count > 0 || undefined} key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><strong>{day.count}</strong></span>)}</div>;
+}
+
+function CalendarWeekPicker({ weekOffset, onChange, anchor }: { weekOffset: number; onChange: (offset: number) => void; anchor: Date }) {
+  const selected = calendarWeek(weekOffset, anchor);
+  return (
+    <div className="calendar-week-picker">
+      <span><strong>Weekly posts</strong><small>{calendarWeekLabel(selected)}</small></span>
+      <div role="group" aria-label="Choose calendar week">
+        {[0, 1, 2].map((offset) => {
+          const week = calendarWeek(offset, anchor);
+          return <button type="button" className={weekOffset === offset ? "active" : ""} aria-pressed={weekOffset === offset} title={calendarWeekLabel(week)} onClick={() => onChange(offset)} key={offset}>Week {offset + 1}</button>;
+        })}
+      </div>
+    </div>
+  );
 }
 
 type VideoVisibilityControl = { apply: (videos: PortalVideo[], included: boolean) => void; pending: boolean };
@@ -126,6 +142,8 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]);
   const [visibility, setVisibility] = useColumnVisibility("creator-accounts-roster", creatorEngagementHidden);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekAnchor] = useState(() => new Date());
   const discordFilter = params.get("discord");
   const providerFilter = params.get("provider");
   const healthFilter = params.get("health");
@@ -145,8 +163,8 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   }, [params, pathname, router]);
   const peeked = creators.find((candidate) => candidate.id === peekId) ?? null;
   const assignmentCreators = useMemo(() => creators.filter((creator) => creator.source === "result" && creator.lifecycle !== "offboarded").map((creator) => ({ id: creator.id, displayName: creator.displayName, discordUsername: creator.discord.username })), [creators]);
-  const accountActivity = useMemo(() => new Map(creators.flatMap((creator) => creator.accounts.map((account) => [account.id, sevenDayPostActivity(videos, [account.id])] as const))), [creators, videos]);
-  const creatorActivity = useMemo(() => new Map(creators.map((creator) => [creator.id, sevenDayPostActivity(videos, creator.accounts.map((account) => account.id))] as const)), [creators, videos]);
+  const accountActivity = useMemo(() => new Map(creators.flatMap((creator) => creator.accounts.map((account) => [account.id, calendarWeekPostActivity(videos, [account.id], weekOffset, weekAnchor)] as const))), [creators, videos, weekOffset, weekAnchor]);
+  const creatorActivity = useMemo(() => new Map(creators.map((creator) => [creator.id, calendarWeekPostActivity(videos, creator.accounts.map((account) => account.id), weekOffset, weekAnchor)] as const)), [creators, videos, weekOffset, weekAnchor]);
 
   const filtered = useMemo(() => creators.filter((creator) => creatorMatchesFilters(creator, {
     lifecycle: creatorTabLifecycle[tab], search, discord: discordFilter, provider: providerFilter, health: healthFilter,
@@ -185,9 +203,9 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} />,
     },
     {
-      id: "activity7d",
+      id: "weeklyActivity",
       accessorFn: (row) => creatorActivity.get(row.id)?.reduce((total, day) => total + day.count, 0) ?? 0,
-      header: "Last 7 days",
+      header: `Week ${weekOffset + 1} · Mon–Sun`,
       cell: ({ row }) => <PostActivity days={creatorActivity.get(row.original.id) ?? []} />,
     },
     {
@@ -223,7 +241,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
     { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> },
     { accessorKey: "lastActivityAt", header: "Updated", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
-  ], [creatorActivity, expanded, openPeek]);
+  ], [creatorActivity, expanded, openPeek, weekOffset]);
 
   // TanStack Table intentionally exposes unstable callbacks; React Compiler must not memoize this hook.
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -264,6 +282,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
         columns={table.getAllLeafColumns().map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))}
         toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}
       >
+        <CalendarWeekPicker weekOffset={weekOffset} onChange={setWeekOffset} anchor={weekAnchor} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Filter /> Filters{filterCount ? <span className="filter-count">{filterCount}</span> : null}</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-56">
@@ -308,7 +327,7 @@ function CreatorAccountsTable({
   const nestedHeaders: Record<string, string> = {
     displayName: "Account",
     accounts: "Platform",
-    activity7d: "Post activity",
+    weeklyActivity: "Post activity",
     discord: "Followers",
     relationships: "Posts",
     posts30d: "Views",
@@ -330,7 +349,7 @@ function CreatorAccountsTable({
     const accountIdentity = <><span className="nested-branch" aria-hidden="true" /><Avatar src={account.avatarUrl} name={account.username} /><span className="nested-account-copy"><span className="nested-account-handle"><strong>@{account.username}</strong><ExternalLink /></span><small>{account.displayName || creator.displayName}</small></span></>;
     if (columnId === "displayName") return account.sourceUrl ? <a href={account.sourceUrl} target="_blank" rel="noreferrer" className="nested-account-identity" aria-label={`Open @${account.username} on ${account.platform}`}>{accountIdentity}</a> : <Link href={`/accounts/${encodeURIComponent(account.id)}`} className="nested-account-identity">{accountIdentity}</Link>;
     if (columnId === "accounts") return <StateBadge label={account.platform} tone="info" />;
-    if (columnId === "activity7d") return <PostActivity days={accountActivity.get(account.id) ?? []} />;
+    if (columnId === "weeklyActivity") return <PostActivity days={accountActivity.get(account.id) ?? []} />;
     if (columnId === "discord") return formatNumber(account.followers ?? 0);
     if (columnId === "relationships") return formatNumber(account.posts);
     if (columnId === "posts30d") return <strong>{formatNumber(account.views)}</strong>;

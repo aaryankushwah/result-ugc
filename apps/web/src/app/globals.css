@@ -1592,6 +1592,17 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .script-overview-metrics .overview-metric-card.metric-card { min-width: 190px; flex-basis: 190px; }
 
 /* Creator performance charts — one question per frame, one y-axis each. */
+.creator-performance-section { display: flex; flex-direction: column; gap: 12px; }
+.creator-performance-header { min-height: 42px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.creator-performance-header h2,.creator-performance-header p { margin: 0; }
+.creator-performance-header h2 { font-size: 18px; font-weight: 650; letter-spacing: -.025em; }
+.creator-performance-header p { margin-top: 3px; color: var(--muted-foreground); font-size: 11px; }
+.creator-performance-toggle { padding: 3px; display: inline-flex; gap: 2px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb,var(--foreground) 4%,transparent); }
+.creator-performance-toggle button { height: 28px; padding: 0 11px; border: 0; border-radius: 6px; color: var(--muted-foreground); font-size: 10px; font-weight: 650; }
+.creator-performance-toggle button:hover { color: var(--foreground); }
+.creator-performance-toggle button.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 5px rgb(0 0 0 / 22%); }
+.light .creator-performance-toggle { background: #f0f2f5; }
+.light .creator-performance-toggle button.active { background: #fff; box-shadow: 0 1px 4px rgb(31 41 55 / 12%); }
 .creator-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .creator-chart-grid > .creator-chart-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .creator-chart-card { min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: var(--card); }
@@ -1623,6 +1634,7 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 .creator-peek-trigger { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 
 @media (max-width: 900px) {
+  .creator-performance-header { align-items: flex-start; flex-direction: column; }
   .creator-chart-grid { grid-template-columns: 1fr; }
   .creator-peek-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
