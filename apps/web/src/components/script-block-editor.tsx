@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, TextareaHTMLAttributes } from "react";
-import { createScriptBlock, scriptBlockType, type ScriptBlockType } from "@/lib/script-blocks";
+import { createScriptBlock, scriptBlockType, scriptCommandPlaceholder, type ScriptBlockType } from "@/lib/script-blocks";
 
 type Command = {
   id: ScriptBlockType | "reference" | "resource";
@@ -53,6 +53,7 @@ export function ScriptBlockEditor({ sections, onChange, canEdit, onAddReference,
 }) {
   const [menu, setMenu] = useState<{ index:number; query:string; mode:"insert"|"transform" } | null>(null);
   const [selected, setSelected] = useState(0);
+  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
   const editorSections = sections.length ? sections : [createScriptBlock("text", crypto.randomUUID())];
   const visibleCommands = useMemo(() => {
     const query = menu?.query.trim().toLowerCase() ?? "";
@@ -144,14 +145,14 @@ export function ScriptBlockEditor({ sections, onChange, canEdit, onAddReference,
         <BlockHandle onOpen={()=>openMenu(index,"","insert")} onRemove={()=>remove(index)} canEdit={canEdit}/>
         <div className="notion-beat-heading"><AutoTextarea value={section.label} onChange={(event)=>patch(index,{label:event.target.value})} placeholder="Hook" aria-label={`Beat ${index+1} label`} disabled={!canEdit}/><AutoTextarea value={section.timecode} onChange={(event)=>patch(index,{timecode:event.target.value})} placeholder="0:00 to 0:06" aria-label={`Beat ${index+1} timecode`} disabled={!canEdit}/></div>
         <AutoTextarea className="notion-beat-direction" value={section.visualDirection} onChange={(event)=>patch(index,{visualDirection:event.target.value})} placeholder="Describe the shot, setting or edit…" aria-label={`Beat ${index+1} visual direction`} disabled={!canEdit}/>
-        <AutoTextarea className="notion-beat-copy" data-script-block-id={section.id} value={section.copy} onChange={(event)=>handleCopyChange(index,event.target.value)} onKeyDown={(event)=>handleKey(event,index)} placeholder="What the creator says… Type / for commands" aria-label={`Beat ${index+1} dialogue`} disabled={!canEdit}/>
+        <AutoTextarea className="notion-beat-copy" data-script-block-id={section.id} value={section.copy} onChange={(event)=>handleCopyChange(index,event.target.value)} onKeyDown={(event)=>handleKey(event,index)} placeholder="What the creator says…" aria-label={`Beat ${index+1} dialogue`} disabled={!canEdit}/>
         {blockMenu(index)}
       </article>;
-      const placeholder = type==="direction" ? "Describe the shot, action or edit…" : type==="dialogue" ? "What the creator says…" : "Type / for commands";
+      const placeholder = type==="direction" ? "Describe the shot, action or edit…" : type==="dialogue" ? "What the creator says…" : scriptCommandPlaceholder(section.id,focusedBlockId,editorSections.length);
       return <div className={`notion-block notion-${type}`} key={section.id}>
         <BlockHandle onOpen={()=>openMenu(index,"","insert")} onRemove={()=>remove(index)} canEdit={canEdit}/>
         {type==="bullet"?<span className="notion-bullet-dot">•</span>:null}
-        <AutoTextarea data-script-block-id={section.id} value={section.copy} onChange={(event)=>handleCopyChange(index,event.target.value)} onKeyDown={(event)=>handleKey(event,index)} placeholder={placeholder} aria-label={`${commands.find((command)=>command.id===type)?.label ?? "Text"} block ${index+1}`} disabled={!canEdit}/>
+        <AutoTextarea data-script-block-id={section.id} value={section.copy} onChange={(event)=>handleCopyChange(index,event.target.value)} onKeyDown={(event)=>handleKey(event,index)} onFocus={()=>setFocusedBlockId(section.id)} onBlur={()=>setFocusedBlockId((current)=>current===section.id?null:current)} placeholder={placeholder} aria-label={`${commands.find((command)=>command.id===type)?.label ?? "Text"} block ${index+1}`} disabled={!canEdit}/>
         {blockMenu(index)}
       </div>;
     })}

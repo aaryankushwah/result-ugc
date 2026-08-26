@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createScriptBlock, scriptBlockType, scriptClipboardText, scriptPlainText } from "./script-blocks";
+import { createScriptBlock, scriptBlockType, scriptClipboardText, scriptCommandPlaceholder, scriptPlainText } from "./script-blocks";
 
 describe("script blocks", () => {
   it("keeps legacy freeform and beat sections readable", () => {
@@ -12,5 +12,12 @@ describe("script blocks", () => {
     const divider = createScriptBlock("divider", "2");
     expect(scriptPlainText([dialogue, divider])).toBe("Say this out loud.");
     expect(scriptClipboardText("Draft", [dialogue, divider])).toContain("──────────");
+  });
+
+  it("only shows the slash-command hint on the active empty block", () => {
+    expect(scriptCommandPlaceholder("first", "second", 3)).toBe("");
+    expect(scriptCommandPlaceholder("second", "second", 3)).toBe("Type / for commands");
+    expect(scriptCommandPlaceholder("only", null, 1)).toBe("Type / for commands");
+    expect(scriptCommandPlaceholder("first", null, 3)).toBe("");
   });
 });

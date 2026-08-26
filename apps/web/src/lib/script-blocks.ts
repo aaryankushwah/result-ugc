@@ -47,6 +47,12 @@ export function createScriptBlock(type: ScriptBlockType, id: string): ScriptSect
   };
 }
 
+export function scriptCommandPlaceholder(blockId: string, focusedBlockId: string | null, blockCount: number): string {
+  return focusedBlockId === blockId || (blockCount === 1 && focusedBlockId === null)
+    ? "Type / for commands"
+    : "";
+}
+
 export function scriptPlainText(sections: ScriptSection[]): string {
   return sections
     .filter((section) => scriptBlockType(section) !== "divider")
