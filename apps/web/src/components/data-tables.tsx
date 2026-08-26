@@ -125,7 +125,6 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]);
   const [visibility, setVisibility] = useColumnVisibility("creator-accounts-roster", creatorEngagementHidden);
-  const [selection, setSelection] = useState<RowSelectionState>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const discordFilter = params.get("discord");
   const providerFilter = params.get("provider");
@@ -142,7 +141,6 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-    setSelection({});
     setExpanded({});
   }, [params, pathname, router]);
   const peeked = creators.find((candidate) => candidate.id === peekId) ?? null;
@@ -155,12 +153,6 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   })), [creators, tab, search, discordFilter, providerFilter, healthFilter]);
 
   const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
-    {
-      id: "select",
-      header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />,
-      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.displayName}`} />,
-      enableSorting: false,
-    },
     {
       accessorKey: "displayName",
       header: "Creator",
@@ -238,10 +230,9 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
   const table = useReactTable({
     data: filtered,
     columns,
-    state: { sorting, columnVisibility: visibility, rowSelection: selection },
+    state: { sorting, columnVisibility: visibility },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setVisibility,
-    onRowSelectionChange: setSelection,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -253,7 +244,6 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     const next = new URLSearchParams(params.toString());
     next.set("tab", value);
     router.replace(`${pathname}?${next.toString()}`);
-    setSelection({});
     setExpanded({});
   };
   const pageCreators = table.getRowModel().rows.map((row) => row.original);
@@ -271,7 +261,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
         search={search}
         setSearch={setSearch}
         placeholder="Search creators, Discord, accounts, or signing…"
-        columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))}
+        columns={table.getAllLeafColumns().map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))}
         toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}
       >
         <DropdownMenu>
@@ -290,11 +280,10 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
             <DropdownMenuCheckboxItem checked={healthFilter === "healthy"} onCheckedChange={(checked) => setFilterParam("health", checked ? "healthy" : null)}>Healthy</DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem checked={healthFilter === "stale"} onCheckedChange={(checked) => setFilterParam("health", checked ? "stale" : null)}>Stale or failed</DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem checked={healthFilter === "untracked"} onCheckedChange={(checked) => setFilterParam("health", checked ? "untracked" : null)}>Untracked</DropdownMenuCheckboxItem>
-            {filterCount ? <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { const next = new URLSearchParams(params.toString()); next.delete("discord"); next.delete("provider"); next.delete("health"); router.replace(`${pathname}?${next.toString()}`, { scroll: false }); setSelection({}); setExpanded({}); }}>Clear filters</DropdownMenuItem></> : null}
+            {filterCount ? <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => { const next = new URLSearchParams(params.toString()); next.delete("discord"); next.delete("provider"); next.delete("health"); router.replace(`${pathname}?${next.toString()}`, { scroll: false }); setExpanded({}); }}>Clear filters</DropdownMenuItem></> : null}
           </DropdownMenuContent>
         </DropdownMenu>
         <Button variant="outline" size="sm" className="toolbar-button" onClick={toggleAll}><ChevronsUpDown /> {allExpanded ? "Collapse all" : "Expand all"}</Button>
-        {Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}
       </TableToolbar>
       <CreatorAccountsTable table={table} expanded={expanded} assignmentCreators={assignmentCreators} accountActivity={accountActivity} />
       <Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} />
@@ -317,7 +306,6 @@ function CreatorAccountsTable({
   const rows = table.getRowModel().rows;
   const visibleColumns = table.getVisibleLeafColumns();
   const nestedHeaders: Record<string, string> = {
-    select: "",
     displayName: "Account",
     accounts: "Platform",
     activity7d: "Post activity",
@@ -370,7 +358,7 @@ function CreatorAccountsTable({
         <TableBody>
           {rows.length ? rows.map((row) => (
             <Fragment key={row.id}>
-              <TableRow className="creator-parent-row" data-state={row.getIsSelected() ? "selected" : undefined}>
+              <TableRow className="creator-parent-row">
                 {row.getVisibleCells().map((cell) => <TableCell data-column={cell.column.id} key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
               </TableRow>
               {expanded[row.original.id] ? <>
