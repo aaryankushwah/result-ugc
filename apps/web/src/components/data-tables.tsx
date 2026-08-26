@@ -202,7 +202,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       id: "discord",
       accessorFn: (row) => row.discord.state,
       header: "Discord",
-      cell: ({ row }) => <div className="stack-cell"><StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} /><small>{row.original.discord.username ? `@${row.original.discord.username}` : "Not reconciled"}</small></div>,
+      cell: ({ row }) => <StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} />,
     },
     {
       id: "relationships",
