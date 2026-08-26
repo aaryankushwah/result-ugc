@@ -65,7 +65,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     {degraded.length ? <div className="source-banner source-warning"><AlertTriangle /><div><strong>Showing the last successful snapshot.</strong><span>{degraded.map((item) => `${item.source}: ${item.message ?? item.state}`).join(" · ")}</span></div><Link href="/integrations">View sources <ArrowUpRight /></Link></div> : null}
     <OverviewMetricGrid metrics={metricCards} />
     <section className="dashboard-grid dashboard-main-grid">
-      <Card className="panel chart-panel"><div className="panel-header"><h2>Performance</h2><div className="range-tabs">{[7, 14, 30].map((days) => {
+      <Card className="panel chart-panel"><div className="panel-header"><h2 className="font-result performance-heading">Performance</h2><div className="range-tabs">{[7, 14, 30].map((days) => {
         const next = new URLSearchParams(preservedView);
         next.set("range", String(days));
         return <Link key={days} href={`/overview?${next.toString()}`} className={range === days ? "active" : ""}>{days}d</Link>;
