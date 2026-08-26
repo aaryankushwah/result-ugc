@@ -59,6 +59,27 @@ export function requiresGuildReconciliation(type: string): boolean {
   return (identityChangingDiscordOperationTypes as readonly string[]).includes(type);
 }
 
+export type Creator360PromotionReason = "discord_connected" | "provider_account_confirmed";
+
+/**
+ * Promotes only system-created requests when Creator 360 already has durable
+ * evidence that the person belongs in the operating roster. This is deliberately
+ * one-way: Discord departures never downgrade or offboard a canonical creator,
+ * and an explicit manager lifecycle choice always wins.
+ */
+export function creator360PromotionReason(input: {
+  lifecycle: CreatorLifecycle;
+  managerLifecycleOverridden: boolean;
+  discordState: DiscordState | null;
+  hasLaunchpointMapping: boolean;
+  hasConfirmedAccount: boolean;
+}): Creator360PromotionReason | null {
+  if (input.lifecycle !== "request" || input.managerLifecycleOverridden) return null;
+  if (input.discordState === "connected") return "discord_connected";
+  if (input.hasLaunchpointMapping && input.hasConfirmedAccount) return "provider_account_confirmed";
+  return null;
+}
+
 export const transcriptStates = ["provided", "pending", "transcribing", "transcribed", "failed"] as const;
 export type TranscriptState = (typeof transcriptStates)[number];
 

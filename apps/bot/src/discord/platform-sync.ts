@@ -15,7 +15,7 @@ import {
   discordOperations,
   getDatabase,
   organizations,
-  reconcileCreatorAccountLinks,
+  reconcileCreator360,
   signingRelationships,
   syncRuns,
 } from "@result/db";
@@ -64,6 +64,13 @@ export function reconciliationUserIds(input: {
     ...input.connectionUserIds,
     ...input.roleUserIds,
   ]);
+}
+
+export type DiscordIdentitySnapshot = { username: string | null; displayName: string | null; avatarUrl: string | null };
+
+/** Discord departure changes membership state, not the canonical identity history. */
+export function reconciledDiscordIdentity(current: DiscordIdentitySnapshot, observed: DiscordIdentitySnapshot | null): DiscordIdentitySnapshot {
+  return observed ?? current;
 }
 
 export async function reconcileGuild(guild: Guild, seedUserIds: string[] = [], mode: ReconciliationMode = "full"): Promise<void> {
@@ -144,7 +151,8 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = [], m
         changed += 1;
       } else if (current) {
         const didChange = current.state !== state || current.privateChannelId !== (channel?.id ?? null);
-        await getDatabase().update(creatorDiscord).set({ username: member?.user.username ?? null, displayName: member?.displayName ?? null, avatarUrl: member?.displayAvatarURL({ size: 128 }) ?? null, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date(), updatedAt: new Date() }).where(and(
+        const identity = reconciledDiscordIdentity(current, member ? { username: member.user.username, displayName: member.displayName, avatarUrl: member.displayAvatarURL({ size: 128 }) } : null);
+        await getDatabase().update(creatorDiscord).set({ ...identity, state, roleIds: member ? [...member.roles.cache.keys()] : [], privateChannelId: channel?.id ?? null, lastReconciledAt: new Date(), updatedAt: new Date() }).where(and(
           eq(creatorDiscord.organizationId, orgId),
           eq(creatorDiscord.guildId, guild.id),
           eq(creatorDiscord.creatorId, creatorId),
@@ -155,7 +163,7 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = [], m
         }
       }
     }
-    changed += await reconcileCreatorAccountLinks(orgId);
+    changed += await reconcileCreator360(orgId);
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsChanged: changed }).where(eq(syncRuns.id, run[0].id));
   } catch (error) {
     if (run[0]) await getDatabase().update(syncRuns).set({ state: "failed", finishedAt: new Date(), recordsChanged: changed, error: error instanceof Error ? error.message : String(error) }).where(eq(syncRuns.id, run[0].id));
@@ -163,7 +171,7 @@ export async function reconcileGuild(guild: Guild, seedUserIds: string[] = [], m
   }
 }
 
-export const suggestExactAccountLinks = reconcileCreatorAccountLinks;
+export const suggestExactAccountLinks = reconcileCreator360;
 
 export async function reconcileMember(member: GuildMember): Promise<void> {
   await reconcileGuild(member.guild, [member.id], "targeted");

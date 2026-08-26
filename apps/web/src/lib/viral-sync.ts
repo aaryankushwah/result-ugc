@@ -1,6 +1,6 @@
 import "server-only";
 
-import { creatorIdentityKey, getDatabase, organizations, reconcileCreatorAccountLinks, signingRelationships, socialAccounts, syncRuns, videos } from "@result/db";
+import { creatorIdentityKey, getDatabase, organizations, reconcileCreator360, signingRelationships, socialAccounts, syncRuns, videos } from "@result/db";
 import { eq } from "drizzle-orm";
 import { getLiveViralData, trackViralAccounts } from "./viral";
 
@@ -54,7 +54,7 @@ export async function syncViralSnapshots(): Promise<{ accounts: number; videos: 
       if (!accountId) return Promise.resolve();
       return db.insert(videos).values({ organizationId: organization.id, accountId, viralVideoId: video.id, platformVideoId: video.platformVideoId, caption: video.caption, thumbnailUrl: video.thumbnailUrl, durationSeconds: video.durationSeconds, publishedAt: video.publishedAt ? new Date(video.publishedAt) : null, views: video.views, likes: video.likes, comments: video.comments, shares: video.shares, bookmarks: video.bookmarks, engagementRate: video.engagementRate, baselineMultiplier: video.baselineMultiplier, included: video.included, trackingState: video.trackingState, sourceRefreshedAt: video.refreshedAt ? new Date(video.refreshedAt) : null, lastError: video.error, raw: video }).onConflictDoUpdate({ target: [videos.organizationId, videos.viralVideoId], set: { accountId, caption: video.caption, thumbnailUrl: video.thumbnailUrl, durationSeconds: video.durationSeconds, publishedAt: video.publishedAt ? new Date(video.publishedAt) : null, views: video.views, likes: video.likes, comments: video.comments, shares: video.shares, bookmarks: video.bookmarks, engagementRate: video.engagementRate, baselineMultiplier: video.baselineMultiplier, included: video.included, trackingState: video.trackingState, sourceRefreshedAt: video.refreshedAt ? new Date(video.refreshedAt) : null, lastError: video.error, raw: video, updatedAt: new Date() } });
     }));
-    const linked = await reconcileCreatorAccountLinks(organization.id);
+    const linked = await reconcileCreator360(organization.id);
     if (run) await db.update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsSeen: live.accounts.length + live.videos.length, recordsChanged: live.accounts.length + live.videos.length + linked + tracked, error: trackingError }).where(eq(syncRuns.id, run.id));
     return { accounts: live.accounts.length, videos: live.videos.length, tracked, linked };
   } catch (error) {

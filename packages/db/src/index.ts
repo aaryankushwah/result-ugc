@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import postgres from "postgres";
-import type { ProviderCreator, ProviderRelationship, RelationshipState } from "@result/domain";
+import { creator360PromotionReason, type ProviderCreator, type ProviderRelationship, type RelationshipState } from "@result/domain";
 import * as schema from "./schema.js";
 
 export * from "./schema.js";
@@ -51,17 +51,18 @@ function stringValue(value: unknown): string | null {
 }
 
 /**
- * Rebuilds the cross-provider identity suggestions around canonical Result creators.
- * Confirmed manager mappings are never changed. Exact matches remain suggestions
- * until a manager confirms ownership in the portal.
+ * Reconciles provider identities around canonical Creator 360 records.
+ * Confirmed manager mappings and lifecycle choices are never changed. Exact
+ * account matches remain suggestions until a manager confirms ownership.
  */
-export async function reconcileCreatorAccountLinks(organizationId: string): Promise<number> {
+export async function reconcileCreator360(organizationId: string): Promise<number> {
   const db = getDatabase();
-  const [creatorRows, discordRows, relationshipRows, accountRows] = await Promise.all([
-    db.select({ id: schema.creators.id, displayName: schema.creators.displayName, email: schema.creators.email }).from(schema.creators).where(eq(schema.creators.organizationId, organizationId)),
-    db.select({ creatorId: schema.creatorDiscord.creatorId, username: schema.creatorDiscord.username, displayName: schema.creatorDiscord.displayName }).from(schema.creatorDiscord).where(eq(schema.creatorDiscord.organizationId, organizationId)),
+  const [creatorRows, discordRows, relationshipRows, accountRows, lifecycleEventRows] = await Promise.all([
+    db.select({ id: schema.creators.id, displayName: schema.creators.displayName, email: schema.creators.email, lifecycle: schema.creators.lifecycle }).from(schema.creators).where(eq(schema.creators.organizationId, organizationId)),
+    db.select({ creatorId: schema.creatorDiscord.creatorId, username: schema.creatorDiscord.username, displayName: schema.creatorDiscord.displayName, state: schema.creatorDiscord.state }).from(schema.creatorDiscord).where(eq(schema.creatorDiscord.organizationId, organizationId)),
     db.select({ creatorId: schema.signingRelationships.creatorId, provider: schema.signingRelationships.provider, raw: schema.signingRelationships.raw }).from(schema.signingRelationships).where(eq(schema.signingRelationships.organizationId, organizationId)),
     db.select().from(schema.socialAccounts).where(eq(schema.socialAccounts.organizationId, organizationId)),
+    db.select({ creatorId: schema.activityEvents.creatorId, metadata: schema.activityEvents.metadata }).from(schema.activityEvents).where(and(eq(schema.activityEvents.organizationId, organizationId), eq(schema.activityEvents.type, "creator.updated"))),
   ]);
 
   const creatorIdsByKey = new Map<string, Set<string>>();
@@ -127,8 +128,50 @@ export async function reconcileCreatorAccountLinks(organizationId: string): Prom
     }
     changed += 1;
   }
+
+  const managerLifecycleOverrides = new Set(lifecycleEventRows.flatMap((event) => {
+    const metadata = objectValue(event.metadata);
+    if (!event.creatorId || typeof metadata?.lifecycle !== "string") return [];
+    return [event.creatorId];
+  }));
+  const launchpointCreatorIds = new Set(relationshipRows.filter((relationship) => relationship.provider === "launchpoint").map((relationship) => relationship.creatorId));
+  const confirmedAccountCreatorIds = new Set(accountRows.flatMap((account) => account.creatorId && account.linkState === "confirmed" ? [account.creatorId] : []));
+  const discordStateByCreatorId = new Map(discordRows.map((connection) => [connection.creatorId, connection.state]));
+
+  for (const creator of creatorRows) {
+    const discordState = discordStateByCreatorId.get(creator.id) ?? null;
+    const hasConfirmedAccount = confirmedAccountCreatorIds.has(creator.id);
+    const reason = creator360PromotionReason({
+      lifecycle: creator.lifecycle,
+      managerLifecycleOverridden: managerLifecycleOverrides.has(creator.id),
+      discordState,
+      hasLaunchpointMapping: launchpointCreatorIds.has(creator.id),
+      hasConfirmedAccount,
+    });
+    if (!reason) continue;
+
+    const attentionState = discordState === "connected"
+      ? hasConfirmedAccount ? null : "Tracked social accounts need confirmation"
+      : discordState === "left" ? "Creator left the Discord guild" : "Discord identity is not connected";
+    const nextStep = discordState === "connected"
+      ? hasConfirmedAccount ? null : "Confirm this creator's tracked social accounts"
+      : discordState === "left" ? "Re-invite this creator or offboard them in Creator 360" : "Connect Discord or offboard this creator in Creator 360";
+    const [promoted] = await db.update(schema.creators).set({ lifecycle: "active", attentionState, nextStep, updatedAt: new Date() }).where(and(eq(schema.creators.organizationId, organizationId), eq(schema.creators.id, creator.id), eq(schema.creators.lifecycle, "request"))).returning({ id: schema.creators.id });
+    if (!promoted) continue;
+    await db.insert(schema.activityEvents).values({
+      organizationId,
+      creatorId: creator.id,
+      type: "creator.lifecycle_reconciled",
+      summary: reason === "discord_connected" ? "Creator 360 moved this connected Discord creator into Active." : "Creator 360 moved this provider-linked account owner into Active.",
+      metadata: { previousLifecycle: creator.lifecycle, lifecycle: "active", reason },
+    });
+    changed += 1;
+  }
   return changed;
 }
+
+/** @deprecated Use reconcileCreator360 so call sites reflect the source-of-truth boundary. */
+export const reconcileCreatorAccountLinks = reconcileCreator360;
 
 export type LaunchpointRelationshipInput = ProviderRelationship & { creatorExternalId: string };
 export type LaunchpointSocialIdentityInput = { creatorExternalId: string; platform: string; username: string; url?: string | null };
@@ -251,6 +294,6 @@ export async function reconcileLaunchpointDataset(input: {
     changed += 1;
   }
 
-  changed += await reconcileCreatorAccountLinks(input.organizationId);
+  changed += await reconcileCreator360(input.organizationId);
   return { creatorsSeen: input.creators.length, changed };
 }
