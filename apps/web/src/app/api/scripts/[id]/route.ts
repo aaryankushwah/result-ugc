@@ -5,7 +5,7 @@ import { managerContext, mutationErrorResponse, MutationError } from "@/lib/muta
 import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
 import { invalidatePortalData } from "@/lib/portal-cache";
 
-const sectionSchema = z.object({ id:z.string().min(1).max(80), label:z.string().min(1).max(80), timecode:z.string().max(40), delivery:z.string().max(200), copy:z.string().min(1).max(10_000), visualDirection:z.string().max(2_000), assetIds:z.array(z.string()).max(40) });
+const sectionSchema = z.object({ id:z.string().min(1).max(80), label:z.string().max(80), timecode:z.string().max(40), delivery:z.string().max(200), copy:z.string().max(10_000), visualDirection:z.string().max(2_000), assetIds:z.array(z.string()).max(40), blockType:z.enum(["text","heading_1","heading_2","heading_3","beat","direction","dialogue","bullet","quote","divider"]).optional() });
 const updateScriptSchema = z.object({
   title: z.string().trim().min(1).max(240),
   status: z.enum(["draft", "ready", "assigned", "in_review", "approved", "published", "archived"]).optional(),
@@ -15,7 +15,7 @@ const updateScriptSchema = z.object({
   format: z.string().trim().min(1).max(100),
   tags: z.array(z.string().trim().min(1).max(60)).max(20),
   targetPlatform: z.string().trim().min(1).max(40),
-  sections: z.array(sectionSchema).min(1).max(24),
+  sections: z.array(sectionSchema).min(1).max(120),
   changeSummary: z.string().trim().max(500).optional(),
 });
 

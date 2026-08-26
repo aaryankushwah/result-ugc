@@ -1,20 +1,35 @@
 /* Script pipeline layout and light-mode contrast. Kept separate from the shared design sheet. */
 .pipeline-home,
-.pipeline-controls,
 .pipeline-board { min-width: 0; }
 
-.pipeline-controls { overflow: hidden; }
-.pipeline-views { flex: 0 0 auto; }
-.category-tabs { flex: 1 1 auto; }
+.pipeline-workspace { overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--surface-1); }
+.pipeline-category-tabs { height: 62px; padding-inline: 16px; gap: 28px; }
+.pipeline-category-tabs button { font-size: 15px; font-weight: 650; }
+.pipeline-category-tabs button span { font-size: 12px; }
+.pipeline-toolbar { min-height: 68px; padding: 12px 14px; gap: 10px; }
+.pipeline-toolbar .pipeline-search { width: min(520px,42vw); height: 44px; margin: 0; }
+.pipeline-toolbar .pipeline-search input { font-size: 15px; }
+.pipeline-view-toggle { margin-left: auto; }
+.pipeline-view-toggle button { height: 34px; font-size: 12px; font-weight: 600; }
+.pipeline-view-toggle svg { width: 13px; }
 
 .pipeline-board {
+  padding: 14px;
   grid-template-columns: repeat(3,minmax(0,1fr));
   overflow: visible;
+  background: var(--background);
 }
 
 .pipeline-column {
   min-width: 0;
   min-height: 420px;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+
+.pipeline-column .pipeline-card {
+  border-radius: 12px !important;
+  overflow: hidden;
 }
 
 .pipeline-card-tags { flex-wrap: wrap; }
@@ -24,11 +39,7 @@
 .light .pipeline-column > header strong { color: #59636e; }
 .light .pipeline-add { border-color: #d5d9df; color: #4f5863; }
 .light .pipeline-add:hover { border-color: #a995ff; background: #f3f0ff; color: #493ba8; }
-.light .pipeline-views button,
-.light .category-tabs button { color: #59636e; }
-.light .pipeline-views button:hover,
-.light .category-tabs button:hover { color: #17191d; }
-.light .category-tabs span { background: #dde1e6; color: #3f4751; }
+.light .pipeline-workspace { background: #fff; }
 
 @media (min-width: 1700px) {
   .pipeline-board { grid-template-columns: repeat(5,minmax(0,1fr)); }
@@ -39,9 +50,14 @@
 }
 
 @media (max-width: 640px) {
-  .pipeline-controls { overflow: visible; }
+  .pipeline-category-tabs { height: 54px; gap: 20px; }
+  .pipeline-category-tabs button { font-size: 13px; }
+  .pipeline-toolbar { align-items: stretch; flex-wrap: wrap; }
+  .pipeline-toolbar .pipeline-search { width: 100%; }
+  .pipeline-view-toggle { margin-left: 0; }
   .pipeline-board {
     margin-right: 0;
+    padding: 10px;
     grid-template-columns: 1fr;
   }
 }

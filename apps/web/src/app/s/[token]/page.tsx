@@ -1,7 +1,10 @@
-import { creators, getDatabase, hasDatabase, scriptAssignments, scripts } from "@result/db";
-import { eq } from "drizzle-orm";
+import { creators, getDatabase, hasDatabase, scriptAssignments, scriptAssets, scriptReferences, scripts } from "@result/db";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ExternalLink, File, Image as ImageIcon, Music2, Video } from "lucide-react";
+import { ReferenceEmbed } from "@/components/reference-embed";
+import { scriptBlockType } from "@/lib/script-blocks";
 
 // A capability URL: anyone holding the token can read this one script.
 // Deliberately unauthenticated, because creators are not portal users.
@@ -11,8 +14,11 @@ export default async function SharedScriptPage({ params }: { params: Promise<{ t
   const { token } = await params;
   if (!hasDatabase() || !token) notFound();
 
-  const row = (await getDatabase()
+  const database = getDatabase();
+  const row = (await database
     .select({
+      scriptId: scripts.id,
+      organizationId: scripts.organizationId,
       assignmentState: scriptAssignments.state,
       dueAt: scriptAssignments.dueAt,
       message: scriptAssignments.message,
@@ -24,14 +30,24 @@ export default async function SharedScriptPage({ params }: { params: Promise<{ t
       targetPlatform: scripts.targetPlatform,
       durationSeconds: scripts.durationSeconds,
       updatedAt: scripts.updatedAt,
+      referenceUrl: scriptReferences.sourceUrl,
+      referenceCreator: scriptReferences.sourceCreator,
     })
     .from(scriptAssignments)
     .innerJoin(scripts, eq(scripts.id, scriptAssignments.scriptId))
     .innerJoin(creators, eq(creators.id, scriptAssignments.creatorId))
+    .leftJoin(scriptReferences, eq(scriptReferences.id, scripts.referenceId))
     .where(eq(scriptAssignments.shareToken, token))
     .limit(1))[0];
 
   if (!row) notFound();
+
+  const assets = await database.select({ id:scriptAssets.id,label:scriptAssets.label,kind:scriptAssets.kind,sourceUrl:scriptAssets.sourceUrl,downloadUrl:scriptAssets.downloadUrl })
+    .from(scriptAssets)
+    .where(and(eq(scriptAssets.scriptId,row.scriptId),eq(scriptAssets.organizationId,row.organizationId)));
+  const referenceAssets = assets.filter((asset)=>asset.kind==="reference_video"&&asset.sourceUrl);
+  const editingAssets = assets.filter((asset)=>asset.kind!=="reference_video");
+  const primaryReference = row.referenceUrl ? {url:row.referenceUrl,label:row.referenceCreator ?? "Original reference"} : referenceAssets[0]?.sourceUrl ? {url:referenceAssets[0].sourceUrl,label:referenceAssets[0].label} : null;
 
   const due = row.dueAt ? new Date(row.dueAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null;
 
@@ -56,21 +72,25 @@ export default async function SharedScriptPage({ params }: { params: Promise<{ t
         </section>
       ) : null}
 
-      <section className="shared-script-body">
-        {row.sections.map((section) => (
-          <article key={section.id} className="shared-script-section">
-            <p className="shared-script-label">
-              {section.label}
-              {section.timecode ? <span> · {section.timecode}</span> : null}
-            </p>
-            {section.delivery ? <p className="shared-script-delivery">{section.delivery}</p> : null}
-            <p className="shared-script-copy">{section.copy}</p>
-            {section.visualDirection ? (
-              <p className="shared-script-visual"><strong>Visual:</strong> {section.visualDirection}</p>
-            ) : null}
-          </article>
-        ))}
-      </section>
+      <div className="shared-script-layout">
+        <section className="shared-script-body">
+          {row.sections.map((section) => {
+            const type = scriptBlockType(section);
+            if(type==="divider") return <hr className="shared-block-divider" key={section.id}/>;
+            if(type!=="beat") return <div key={section.id} className={`shared-block shared-block-${type}`}>{type==="bullet"?<span>•</span>:null}<p>{section.copy}</p></div>;
+            return <article key={section.id} className="shared-script-section">
+              <p className="shared-script-label">{section.label}{section.timecode ? <span> ({section.timecode})</span> : null}</p>
+              {section.delivery ? <p className="shared-script-delivery">{section.delivery}</p> : null}
+              {section.visualDirection ? <p className="shared-script-visual">{section.visualDirection}</p> : null}
+              <p className="shared-script-copy">{section.copy}</p>
+            </article>;
+          })}
+        </section>
+        <aside className="shared-script-resources">
+          <section><header><Video/><span><strong>Reference video</strong><small>Watch while you film</small></span></header>{primaryReference?<ReferenceEmbed url={primaryReference.url} title={primaryReference.label} compact/>:<p className="shared-resource-empty">No reference video attached.</p>}{referenceAssets.map((asset)=><a key={asset.id} href={asset.sourceUrl!} target="_blank" rel="noreferrer"><Video/><span><strong>{asset.label}</strong><small>Reference</small></span><ExternalLink/></a>)}</section>
+          <section><header><ImageIcon/><span><strong>Editing resources</strong><small>Everything needed for the edit</small></span></header>{editingAssets.map((asset)=><a key={asset.id} href={asset.sourceUrl ?? asset.downloadUrl ?? "#"} target="_blank" rel="noreferrer">{asset.kind==="audio"?<Music2/>:asset.kind==="image"?<ImageIcon/>:<File/>}<span><strong>{asset.label}</strong><small>{asset.kind}</small></span><ExternalLink/></a>)}{!editingAssets.length?<p className="shared-resource-empty">No editing resources attached.</p>:null}</section>
+        </aside>
+      </div>
 
       <footer className="shared-script-footer">
         <p>Last updated {new Date(row.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Questions go in your Discord channel.</p>
