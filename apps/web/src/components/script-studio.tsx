@@ -16,10 +16,8 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   Link2,
-  ListTree,
   Music2,
   Plus,
-  Rows3 as Rows,
   Search,
   Send,
   Sparkles,
@@ -36,12 +34,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ReferenceEmbed } from "@/components/reference-embed";
+import { ScriptBlockEditor } from "@/components/script-block-editor";
 import { estimateScriptDuration, scriptHookFromSections, scriptHookFromText, segmentTranscript } from "@/lib/script-writing";
+import { scriptClipboardText, scriptPlainText } from "@/lib/script-blocks";
 import { diffWords, preservedRatio } from "@/lib/script-diff";
 import { parseReferenceUrl } from "@/lib/reference-url";
 import { cleanScriptTitle } from "@/lib/script-title";
-import { ditherColorForStage } from "@/lib/pipeline-stage-color";
-import { DitherGradient } from "@/components/dither-kit/gradient";
 import { mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "@/lib/script-studio-state";
 import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
@@ -411,8 +410,10 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
         <div className="overview-metric-copy"><p>{metric.label}</p><strong>{metric.value}</strong></div>
       </article>)}
     </section>
-    <div className="pipeline-controls"><div className="pipeline-views"><button className={view==="pipeline"?"active":""} onClick={()=>setView("pipeline")}><LayoutDashboard/>Pipeline</button><button className={view==="table"?"active":""} onClick={()=>setView("table")}><Table2/>Table</button></div><div className="category-tabs">{categories.slice(0,7).map((category)=><button key={category} className={status===category?"active":""} onClick={()=>setStatus(category)}>{category==="all"?"All categories":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</div><label className="pipeline-search"><Search/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search scripts"/></label></div>
-    {view==="pipeline"?<div className="pipeline-board">{stages.map((stage)=>{
+    <section className="pipeline-workspace data-panel">
+      <nav className="roster-tabs pipeline-category-tabs" aria-label="Script categories">{categories.slice(0,7).map((category)=><button key={category} data-state={status===category?"active":"inactive"} onClick={()=>setStatus(category)}>{category==="all"?"All scripts":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</nav>
+      <div className="table-toolbar pipeline-toolbar"><label className="table-search pipeline-search"><Search/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search scripts"/></label><div className="view-toggle pipeline-view-toggle" aria-label="Script view"><button className={view==="pipeline"?"active":""} onClick={()=>setView("pipeline")}><LayoutDashboard/>Pipeline</button><button className={view==="table"?"active":""} onClick={()=>setView("table")}><Table2/>Table</button></div></div>
+      {view==="pipeline"?<div className="pipeline-board">{stages.map((stage)=>{
       const cards=filteredByCategory.filter((script)=>script.pipelineStage===stage.id);
       const isDropTarget=Boolean(dragged&&dropStage===stage.id);
       return <section
@@ -425,12 +426,13 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
       >
         <header><div><span><i/>{stage.label}</span><strong>{cards.length}</strong></div><p>{stage.description}</p></header>
         <div className="pipeline-cards">
-          {cards.map((script)=><article className="pipeline-card" key={script.id} draggable={canManage} onDragStart={(event)=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",script.id);setDragged(script.id);setDropStage(script.pipelineStage);}} onDragEnd={()=>{setDragged(null);setDropStage(null);}} data-dragging={dragged===script.id||undefined}><DitherGradient className="pipeline-card-wash" from={ditherColorForStage(script.pipelineStage)} direction="up" cell={5} /><div className="pipeline-card-top"><span className="pipeline-platform" title={script.targetPlatform}><i aria-hidden="true" />{script.targetPlatform}</span><select className="priority-pill" data-priority={script.priority} value={script.priority} onChange={(event)=>updateMetadata(script,{priority:event.target.value as StudioScript["priority"]})} onClick={(event)=>event.stopPropagation()} aria-label={`${script.title} priority`}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>{canManage?<button type="button" className="pipeline-card-delete" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} onPointerDown={(event)=>event.stopPropagation()} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button>:null}</div><button className="pipeline-card-title" onClick={()=>openWriter(script)}><strong>{cleanScriptTitle(script.title)}</strong></button><div className="pipeline-card-tags"><select value={script.category} onChange={(event)=>updateMetadata(script,{category:event.target.value})} aria-label={`${script.title} category`}><option>{script.category}</option>{["Pain point","Listicle","POV","Education","Founder story","Contrarian","Product demo","Trend remix"].filter((item)=>item!==script.category).map((item)=><option key={item}>{item}</option>)}</select><span>{script.format}</span></div><div className="pipeline-card-stats"><div><strong>{compactNumber(script.performance.views)}</strong><span>views</span></div><div><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>hook rate</span></div><div><strong>{script.performance.tests}</strong><span>tests</span></div></div><footer><div className="assignment-faces">{script.assignments.length?script.assignments.slice(0,3).map((assignment)=><span key={assignment.id} title={assignment.creatorName}>{initials(assignment.creatorName)}</span>):<em>Unassigned</em>}</div><time>{timeAgo(script.updatedAt)}</time><button onClick={()=>openWriter(script)} aria-label={`Open ${script.title}`}><ArrowUpRight/></button></footer></article>)}
+          {cards.map((script)=><article className="pipeline-card" key={script.id} draggable={canManage} onDragStart={(event)=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",script.id);setDragged(script.id);setDropStage(script.pipelineStage);}} onDragEnd={()=>{setDragged(null);setDropStage(null);}} data-dragging={dragged===script.id||undefined}><div className="pipeline-card-top"><select className="priority-pill" data-priority={script.priority} value={script.priority} onChange={(event)=>updateMetadata(script,{priority:event.target.value as StudioScript["priority"]})} onClick={(event)=>event.stopPropagation()} aria-label={`${script.title} priority`}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>{canManage?<button type="button" className="pipeline-card-delete" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} onPointerDown={(event)=>event.stopPropagation()} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button>:null}</div><button className="pipeline-card-title" onClick={()=>openWriter(script)}><strong>{cleanScriptTitle(script.title)}</strong></button><div className="pipeline-card-tags"><select value={script.category} onChange={(event)=>updateMetadata(script,{category:event.target.value})} aria-label={`${script.title} category`}><option>{script.category}</option>{["Pain point","Listicle","POV","Education","Founder story","Contrarian","Product demo","Trend remix"].filter((item)=>item!==script.category).map((item)=><option key={item}>{item}</option>)}</select><span>{script.format}</span></div><div className="pipeline-card-stats"><div><strong>{compactNumber(script.performance.views)}</strong><span>views</span></div><div><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>hook rate</span></div><div><strong>{script.performance.tests}</strong><span>tests</span></div></div><footer><div className="assignment-faces">{script.assignments.length?script.assignments.slice(0,3).map((assignment)=><span key={assignment.id} title={assignment.creatorName}>{initials(assignment.creatorName)}</span>):<em>Unassigned</em>}</div><time>{timeAgo(script.updatedAt)}</time><button onClick={()=>openWriter(script)} aria-label={`Open ${script.title}`}><ArrowUpRight/></button></footer></article>)}
           {isDropTarget?<div className="pipeline-drop-preview" aria-hidden="true"><span>Drop script here</span></div>:null}
           {canManage&&stage.id!=="retired"?<button className="pipeline-add" onClick={openImport}><Plus/>Add script</button>:null}
         </div>
       </section>;
-    })}</div>:<div className="pipeline-table"><div className="pipeline-table-head"><span>Script</span><span>Stage</span><span>Category</span><span>Views</span><span>Hook rate</span><span>Tests</span><span/></div>{filteredByCategory.map((script)=><div className="pipeline-table-row" key={script.id} role="button" tabIndex={0} onClick={()=>openWriter(script)} onKeyDown={(event)=>{if((event.target as HTMLElement).closest("button"))return;if(event.key==="Enter"||event.key===" "){event.preventDefault();openWriter(script);}}}><div><strong>{cleanScriptTitle(script.title)}</strong><span>{script.format}</span></div><span>{stages.find((stage)=>stage.id===script.pipelineStage)?.label}</span><span>{script.category}</span><strong>{compactNumber(script.performance.views)}</strong><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>{script.performance.tests}</span><div className="pipeline-table-actions"><button type="button" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button><ArrowUpRight/></div></div>)}</div>}
+      })}</div>:<div className="pipeline-table"><div className="pipeline-table-head"><span>Script</span><span>Stage</span><span>Category</span><span>Views</span><span>Hook rate</span><span>Tests</span><span/></div>{filteredByCategory.map((script)=><div className="pipeline-table-row" key={script.id} role="button" tabIndex={0} onClick={()=>openWriter(script)} onKeyDown={(event)=>{if((event.target as HTMLElement).closest("button"))return;if(event.key==="Enter"||event.key===" "){event.preventDefault();openWriter(script);}}}><div><strong>{cleanScriptTitle(script.title)}</strong><span>{script.format}</span></div><span>{stages.find((stage)=>stage.id===script.pipelineStage)?.label}</span><span>{script.category}</span><strong>{compactNumber(script.performance.views)}</strong><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>{script.performance.tests}</span><div className="pipeline-table-actions"><button type="button" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button><ArrowUpRight/></div></div>)}</div>}
+    </section>
   </div>;
 }
 
@@ -439,37 +441,15 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
   const [showDiff, setShowDiff] = useState(true);
   const [assetDialog, setAssetDialog] = useState<"reference_video"|"resource"|null>(null);
   const [assetPending, setAssetPending] = useState(false);
-  const scriptText = script.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n");
+  const scriptText = scriptPlainText(script.sections);
   const wordCount = scriptText.split(/\s+/).filter(Boolean).length;
   const { references, resources } = partitionScriptAssets(script.assets);
   const canSave = canManage && Boolean(script.title.trim() && scriptText.trim()) && !saving && !assigning;
-  const structured = script.sections.length > 1 || Boolean(script.sections[0]?.label && script.sections[0].label !== "Script");
   const canGenerate = canManage && Boolean(scriptText.trim()) && !generating && !saving && !assigning;
-  /** Promote the freeform block into labelled beats. Freeform stays the default. */
-  const splitIntoBeats = () => updateScript((current) => {
-    const beats = segmentTranscript(scriptText);
-    if (!beats.length) return current;
-    const sections = beats.map((beat) => ({ id: beat.id, label: beat.label, timecode: beat.timecode, delivery: "", copy: beat.text, visualDirection: "", assetIds: [] as string[] }));
-    return { ...current, sections, durationSeconds: estimateScriptDuration(sections), updatedAt: new Date().toISOString() };
-  });
-  const mergeToFreeform = () => updateScript((current) => {
-    const merged = [plainScriptSection(current.sections.map((section) => section.copy.trim()).filter(Boolean).join("\n\n"))];
-    return { ...current, sections: merged, durationSeconds: estimateScriptDuration(merged), updatedAt: new Date().toISOString() };
-  });
-  const updateBody = (body:string) => updateScript((current) => {
-    const sections = [plainScriptSection(body, current.sections[0]?.id)];
-    return { ...current, hook:scriptHookFromText(body), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
-  });
-  const updateSection = (index:number, patch:Partial<StudioScript["sections"][number]>) => updateScript((current) => {
-    const sections = current.sections.map((section,position) => position===index ? { ...section, ...patch } : section);
+  const updateSections = (sections:StudioScript["sections"]) => updateScript((current) => {
     return { ...current, hook:scriptHookFromSections(sections), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
   });
-  const removeSection = (index:number) => updateScript((current) => {
-    const sections = current.sections.filter((_,position) => position!==index);
-    if (!sections.length) return current;
-    return { ...current, hook:scriptHookFromSections(sections), sections, durationSeconds:estimateScriptDuration(sections), updatedAt:new Date().toISOString() };
-  });
-  const copyScript = async () => { await navigator.clipboard.writeText(scriptText); setCopied(true); notify("Script copied"); window.setTimeout(() => setCopied(false), 1800); };
+  const copyScript = async () => { await navigator.clipboard.writeText(scriptClipboardText(script.title,script.sections)); setCopied(true); notify("Script copied with formatting"); window.setTimeout(() => setCopied(false), 1800); };
   const addAsset = async (input:{label:string;kind:"reference_video"|"image"|"audio"|"file";sourceUrl:string}) => {
     setAssetPending(true);
     try {
@@ -518,35 +498,42 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, as
   },[canSave,save]);
   return <div className="writer-frame">
     <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button className="writer-delete" onClick={openDelete} disabled={saving || deleting || assigning || generating}><Trash2/>Delete</button><button className="writer-generate" onClick={generate} disabled={!canGenerate} title="Swap the business, keep every other word">{generating?<Clock3/>:<Sparkles/>}{generating?"Generating…":"Generate"}</button><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
-    <main className="simple-script-writer">
-      <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
-      <div className="simple-script-toolbar">
-        <StatusLabel status={script.status}/>
-        <label>Stage<select value={script.pipelineStage} onChange={(event)=>updateScript((current)=>({...current,pipelineStage:event.target.value as StudioScript["pipelineStage"]}))}><option value="not_started">Not started</option><option value="testing">Testing</option><option value="iterate">Keep testing</option><option value="winner">Double down</option><option value="retired">Retired</option></select></label>
-        <label>Platform<select value={script.targetPlatform} onChange={(event)=>updateScript((current)=>({...current,targetPlatform:event.target.value}))}><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
-        <label>Priority<select value={script.priority} onChange={(event)=>updateScript((current)=>({...current,priority:event.target.value as StudioScript["priority"]}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
-        <span>{wordCount} words · {script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</span>
-        {canManage?<button type="button" className="beats-toggle" onClick={structured?mergeToFreeform:splitIntoBeats} disabled={!scriptText.trim()}>{structured?<><Rows/>Merge to freeform</>:<><ListTree/>Split into beats</>}</button>:null}
-      </div>
-      {generation?<GenerationPanel generation={generation} showDiff={showDiff} setShowDiff={setShowDiff} dismiss={dismissGeneration}/>:null}
-      {structured
-        ? <div className="beat-editor">{script.sections.map((section,index)=><article className="beat-row" key={section.id}>
-            <div className="beat-meta">
-              <input aria-label={`Beat ${index+1} label`} value={section.label} onChange={(event)=>updateSection(index,{label:event.target.value})} placeholder="Label"/>
-              <input aria-label={`Beat ${index+1} timecode`} value={section.timecode} onChange={(event)=>updateSection(index,{timecode:event.target.value})} placeholder="0:00"/>
-              {canManage&&script.sections.length>1?<button type="button" aria-label={`Remove beat ${index+1}`} onClick={()=>removeSection(index)}><Trash2/></button>:null}
-            </div>
-            <textarea aria-label={`Beat ${index+1} copy`} spellCheck rows={3} value={section.copy} onChange={(event)=>updateSection(index,{copy:event.target.value})} placeholder="What they say…"/>
-            <input className="beat-visual" aria-label={`Beat ${index+1} visual direction`} value={section.visualDirection} onChange={(event)=>updateSection(index,{visualDirection:event.target.value})} placeholder="Visual direction · optional"/>
-          </article>)}</div>
-        : <textarea className="simple-script-body" aria-label="Script" spellCheck value={scriptText} onChange={(event)=>updateBody(event.target.value)} placeholder="Write the script here…"/>}
-      <div className="script-support-grid">
-        <ScriptAssetPanel title="Reference videos" icon={<Video/>} items={references} primaryReference={script.reference?.sourceUrl ? { url:script.reference.sourceUrl,label:script.reference.sourceCreator ?? "Original reference" } : null} empty="No reference videos" addLabel="Add reference" onAdd={canManage?()=>setAssetDialog("reference_video"):undefined} onRemove={canManage?removeAsset:undefined} pending={assetPending}/>
-        <ScriptAssetPanel title="Editing resources" icon={<ImageIcon/>} items={resources} empty="No images or audio" addLabel="Add resource" onAdd={canManage?()=>setAssetDialog("resource"):undefined} onRemove={canManage?removeAsset:undefined} pending={assetPending}/>
-      </div>
-    </main>
+    <div className="script-writer-layout">
+      <main className="simple-script-writer">
+        <div className="script-document-kicker"><span>CREATOR SCRIPT</span><span>{wordCount} words · ~{script.durationSeconds ?? estimateScriptDuration(script.sections)} sec</span></div>
+        <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
+        <div className="simple-script-toolbar">
+          <StatusLabel status={script.status}/>
+          <label>Stage<select value={script.pipelineStage} onChange={(event)=>updateScript((current)=>({...current,pipelineStage:event.target.value as StudioScript["pipelineStage"]}))}><option value="not_started">Not started</option><option value="testing">Testing</option><option value="iterate">Keep testing</option><option value="winner">Double down</option><option value="retired">Retired</option></select></label>
+          <label>Platform<select value={script.targetPlatform} onChange={(event)=>updateScript((current)=>({...current,targetPlatform:event.target.value}))}><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option></select></label>
+          <label>Priority<select value={script.priority} onChange={(event)=>updateScript((current)=>({...current,priority:event.target.value as StudioScript["priority"]}))}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          <span className="slash-hint">Type <kbd>/</kbd> for every block</span>
+        </div>
+        {generation?<GenerationPanel generation={generation} showDiff={showDiff} setShowDiff={setShowDiff} dismiss={dismissGeneration}/>:null}
+        <ScriptBlockEditor sections={script.sections} onChange={updateSections} canEdit={canManage} onAddReference={()=>setAssetDialog("reference_video")} onAddResource={()=>setAssetDialog("resource")}/>
+      </main>
+      <WriterResourceRail script={script} references={references} resources={resources} canManage={canManage} pending={assetPending} onAddReference={()=>setAssetDialog("reference_video")} onAddResource={()=>setAssetDialog("resource")} onRemove={removeAsset}/>
+    </div>
     <AssetDialog mode={assetDialog} open={assetDialog!==null} setOpen={(open)=>{if(!open)setAssetDialog(null);}} pending={assetPending} onAdd={addAsset}/>
   </div>;
+}
+
+function WriterResourceRail({ script,references,resources,canManage,pending,onAddReference,onAddResource,onRemove }:{ script:StudioScript;references:StudioAsset[];resources:StudioAsset[];canManage:boolean;pending:boolean;onAddReference:()=>void;onAddResource:()=>void;onRemove:(asset:StudioAsset)=>void }) {
+  const primaryReference = script.reference?.sourceUrl ? { url:script.reference.sourceUrl,label:script.reference.sourceCreator ?? "Original reference" } : references[0]?.sourceUrl ? { url:references[0].sourceUrl,label:references[0].label } : null;
+  return <aside className="writer-resource-rail" aria-label="References and editing resources">
+    <div className="writer-rail-section writer-reference-section">
+      <header><div><Video/><span><strong>Reference video</strong><small>Keep it visible while writing</small></span></div>{canManage?<button type="button" onClick={onAddReference}><Plus/>Add</button>:null}</header>
+      {primaryReference?<ReferenceEmbed url={primaryReference.url} title={primaryReference.label}/>:<div className="writer-rail-empty"><Video/><strong>No reference yet</strong><span>Add the reel, TikTok or YouTube video this script is based on.</span>{canManage?<button type="button" onClick={onAddReference}>Add reference</button>:null}</div>}
+      <div className="writer-rail-list">
+        {script.reference?.sourceUrl?<a href={script.reference.sourceUrl} target="_blank" rel="noreferrer"><Video/><span><strong>{script.reference.sourceCreator ?? "Original reference"}</strong><small>{sourceHost(script.reference.sourceUrl)}</small></span><ExternalLink/></a>:null}
+        {references.map((asset)=><div className="writer-rail-row" key={asset.id}><Video/><a href={asset.sourceUrl ?? "#"} target="_blank" rel="noreferrer"><strong>{asset.label}</strong><small>{asset.sourceUrl?sourceHost(asset.sourceUrl):"Reference"}</small></a>{canManage?<button type="button" aria-label={`Remove ${asset.label}`} disabled={pending} onClick={()=>onRemove(asset)}><Trash2/></button>:<ExternalLink/>}</div>)}
+      </div>
+    </div>
+    <div className="writer-rail-section">
+      <header><div><ImageIcon/><span><strong>Editing resources</strong><small>Images, audio and files</small></span></div>{canManage?<button type="button" onClick={onAddResource}><Plus/>Add</button>:null}</header>
+      <div className="writer-resource-list">{resources.map((asset)=><div className="writer-resource-card" key={asset.id}>{asset.kind==="image"&&asset.sourceUrl?<a className="writer-resource-preview" href={asset.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${asset.label}`} style={{backgroundImage:`url("${asset.sourceUrl.replaceAll('"','%22')}")`}}/>:null}<div>{assetIcon(asset.kind)}<a href={asset.sourceUrl ?? asset.downloadUrl ?? "#"} target="_blank" rel="noreferrer"><strong>{asset.label}</strong><small>{asset.sourceUrl?sourceHost(asset.sourceUrl):asset.kind}</small></a>{canManage?<button type="button" aria-label={`Remove ${asset.label}`} disabled={pending} onClick={()=>onRemove(asset)}><Trash2/></button>:<ExternalLink/>}</div>{asset.kind==="audio"&&(asset.sourceUrl||asset.downloadUrl)?<audio controls preload="metadata" src={asset.downloadUrl ?? asset.sourceUrl ?? undefined}/>:null}</div>)}{!resources.length?<div className="writer-rail-empty compact"><ImageIcon/><strong>No resources yet</strong><span>Add B-roll, product shots, music or an edit brief.</span></div>:null}</div>
+    </div>
+  </aside>;
 }
 
 function FailedNotificationStrip({ items, notify }:{ items:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void }) {
@@ -666,11 +653,6 @@ function BrandDialog({ open, setOpen, brand, setBrand, notify, canManage }:{ ope
     </div>
     <DialogFooter><Button className="studio-primary" disabled={!canManage||!draft.name.trim()||!draft.productDescription.trim()||saving} onClick={submit}>{saving?"Saving…":"Save brand"}</Button></DialogFooter>
   </DialogContent></Dialog>;
-}
-
-function ScriptAssetPanel({ title, icon, items, primaryReference, empty, addLabel, onAdd, onRemove, pending }:{ title:string; icon:ReactNode; items:StudioAsset[]; primaryReference?:{url:string;label:string}|null; empty:string; addLabel:string; onAdd?:()=>void; onRemove?:(asset:StudioAsset)=>void; pending:boolean }) {
-  const hasItems = Boolean(primaryReference || items.length);
-  return <section className="script-asset-panel"><header><div>{icon}<strong>{title}</strong><span>{items.length+(primaryReference?1:0)}</span></div>{onAdd?<button onClick={onAdd}><Plus/>{addLabel}</button>:null}</header><div className="script-asset-list">{primaryReference?<a className="script-asset-row" href={primaryReference.url} target="_blank" rel="noreferrer"><Video/><span><strong>{primaryReference.label}</strong><small>{sourceHost(primaryReference.url)}</small></span><ExternalLink/></a>:null}{items.map((asset)=><div className="script-asset-row" key={asset.id}>{assetIcon(asset.kind)}<a href={asset.sourceUrl ?? asset.downloadUrl ?? "#"} target="_blank" rel="noreferrer"><strong>{asset.label}</strong><small>{asset.sourceUrl ? sourceHost(asset.sourceUrl) : asset.kind}</small></a>{asset.kind==="audio"&&(asset.sourceUrl||asset.downloadUrl)?<audio controls preload="metadata" src={asset.downloadUrl ?? asset.sourceUrl ?? undefined}/>:null}{onRemove?<button aria-label={`Remove ${asset.label}`} disabled={pending} onClick={()=>onRemove(asset)}><Trash2/></button>:<ExternalLink/>}</div>)}{!hasItems?<p>{empty}</p>:null}</div></section>;
 }
 
 function AssetDialog({ mode, open, setOpen, pending, onAdd }:{ mode:"reference_video"|"resource"|null; open:boolean; setOpen:(open:boolean)=>void; pending:boolean; onAdd:(input:{label:string;kind:"reference_video"|"image"|"audio"|"file";sourceUrl:string})=>Promise<boolean> }) {

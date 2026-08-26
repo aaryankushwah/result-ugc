@@ -250,6 +250,7 @@ export type ScriptSection = {
   copy: string;
   visualDirection: string;
   assetIds: string[];
+  blockType?: "text" | "heading_1" | "heading_2" | "heading_3" | "beat" | "direction" | "dialogue" | "bullet" | "quote" | "divider";
 };
 
 export type TranscriptSection = {

@@ -7,12 +7,13 @@ import { invalidatePortalData } from "@/lib/portal-cache";
 
 const sectionSchema = z.object({
   id: z.string().trim().min(1).max(80),
-  label: z.string().trim().min(1).max(80),
+  label: z.string().trim().max(80),
   timecode: z.string().trim().max(40),
   delivery: z.string().trim().max(200),
-  copy: z.string().trim().min(1).max(10_000),
+  copy: z.string().max(10_000),
   visualDirection: z.string().trim().max(2_000),
   assetIds: z.array(z.string()).max(40).default([]),
+  blockType: z.enum(["text", "heading_1", "heading_2", "heading_3", "beat", "direction", "dialogue", "bullet", "quote", "divider"]).optional(),
 });
 
 const transcriptSectionSchema = z.object({
@@ -36,7 +37,7 @@ const createScriptSchema = z.object({
   format: z.string().trim().min(1).max(100).default("Talking head"),
   tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   targetPlatform: z.string().trim().min(1).max(40).default("instagram"),
-  sections: z.array(sectionSchema).min(1).max(24),
+  sections: z.array(sectionSchema).min(1).max(120),
   assets: z.array(assetSchema).max(40).default([]),
   brandSnapshot: z.record(z.string(), z.unknown()).default({}),
   referenceId: z.uuid().nullable().optional(),
