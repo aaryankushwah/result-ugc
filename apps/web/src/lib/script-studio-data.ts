@@ -67,7 +67,7 @@ export type StudioScript = {
   updatedAt: string;
 };
 
-export type FailedNotification = {
+type FailedNotification = {
   operationId: string;
   creatorName: string | null;
   scriptTitle: string;
@@ -220,7 +220,9 @@ const getCachedStudioRecords = unstable_cache(
 );
 
 export async function getScriptStudioData(): Promise<ScriptStudioData> {
-  const portalData = await getPortalData();
+  // These reads are independent. Fetching them together keeps a cold Script
+  // Studio load to the slower query instead of the sum of both query times.
+  const [portalData, records] = await Promise.all([getPortalData(), getCachedStudioRecords()]);
   const studioCreators: StudioCreator[] = portalData.creators.filter((creator) => isPersistedCreatorId(creator.id)).map((creator) => ({
     id: creator.id,
     name: creator.displayName,
@@ -230,7 +232,6 @@ export async function getScriptStudioData(): Promise<ScriptStudioData> {
     activeAssignments: 0,
   }));
 
-  const records = await getCachedStudioRecords();
   if (!records) return previewData(studioCreators);
 
   const activeByCreator = new Map(records.activeByCreator);

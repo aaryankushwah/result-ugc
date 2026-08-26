@@ -91,8 +91,3 @@ export const getPortalData = cache(async (): Promise<PortalData> => {
     };
   }
 });
-
-export async function getCreatorById(id: string): Promise<PortalCreator | null> {
-  const data = await getPortalData();
-  return data.creators.find((creator) => creator.id === id) ?? null;
-}

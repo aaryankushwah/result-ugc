@@ -12,6 +12,17 @@ export function mergeScriptAssignments(current: StudioAssignment[], incoming: St
   return Array.from(merged.values());
 }
 
+export function removeStudioScript<T extends { id: string }>(scripts: T[], scriptId: string): T[] {
+  return scripts.filter((script) => script.id !== scriptId);
+}
+
+export function restoreStudioScript<T extends { id: string }>(scripts: T[], script: T, index: number): T[] {
+  if (scripts.some((item) => item.id === script.id)) return scripts;
+  const restored = [...scripts];
+  restored.splice(Math.max(0, Math.min(index, restored.length)), 0, script);
+  return restored;
+}
+
 export function referencePlatformFromUrl(url: string): string {
   const value = url.trim().toLowerCase();
   if (value.includes("tiktok.com")) return "tiktok";

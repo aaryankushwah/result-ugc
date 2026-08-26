@@ -24,6 +24,17 @@ import { buildPerformance } from "./performance";
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
 const PROVIDER_STALE_AFTER_MS = 20 * 60 * 1_000;
 
+function groupBy<T, K>(rows: T[], keyOf: (row: T) => K): Map<K, T[]> {
+  const grouped = new Map<K, T[]>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const values = grouped.get(key);
+    if (values) values.push(row);
+    else grouped.set(key, [row]);
+  }
+  return grouped;
+}
+
 function accountSourceUrl(platform: string, username: string): string | null {
   const handle = username.replace(/^@/, "");
   switch (platform.toLowerCase()) {
@@ -130,8 +141,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
 
   // Warm-up and performance are judged from the posts a manager kept, never from
   // the account's raw platform totals, which still contain the warm-up posts.
-  const videosByAccount = new Map<string, PortalVideo[]>();
-  for (const video of videos) videosByAccount.set(video.accountId, [...(videosByAccount.get(video.accountId) ?? []), video]);
+  const videosByAccount = groupBy(videos, (video) => video.accountId);
   for (const account of accounts) {
     const health = deriveAccountPerformanceHealth({ videos: videosByAccount.get(account.id) ?? [] });
     account.performanceHealth = health.state;
@@ -146,16 +156,28 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
 
   const creatorById = new Map(creatorRows.map((creator) => [creator.id, creator]));
   const managerById = new Map(userRows.map((user) => [user.id, user.displayName]));
+  const discordByCreatorId = new Map(discordRows.map((row) => [row.creatorId, row]));
+  const relationshipsByCreatorId = groupBy(relationshipRows, (row) => row.creatorId);
+  const notesByCreatorId = groupBy(noteRows, (row) => row.creatorId);
+  const accountsByCreatorId = new Map<string, PortalAccount[]>();
+  for (const account of accounts) {
+    if (!account.creatorId) continue;
+    const creatorAccounts = accountsByCreatorId.get(account.creatorId);
+    if (creatorAccounts) creatorAccounts.push(account);
+    else accountsByCreatorId.set(account.creatorId, [account]);
+  }
   const cutoff = Date.now() - 30 * 86_400_000;
   const resultCreators: PortalCreator[] = creatorRows.map((creator) => {
-    const connection = discordRows.find((row) => row.creatorId === creator.id);
-    const creatorAccounts = accounts.filter((account) => account.creatorId === creator.id);
-    const confirmedAccountIds = new Set(creatorAccounts.filter((account) => account.linkState === "confirmed").map((account) => account.id));
-    const recentVideos = videos.filter((video) => confirmedAccountIds.has(video.accountId) && video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
+    const connection = discordByCreatorId.get(creator.id);
+    const creatorAccounts = accountsByCreatorId.get(creator.id) ?? [];
+    const confirmedAccounts = creatorAccounts.filter((account) => account.linkState === "confirmed");
+    const recentVideos = confirmedAccounts
+      .flatMap((account) => videosByAccount.get(account.id) ?? [])
+      .filter((video) => video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
     const views = recentVideos.reduce((sum, video) => sum + (video.included ? video.views : 0), 0);
     const engagement = engagementTotals(recentVideos);
     const interactions = totalInteractions(engagement);
-    const relationships: PortalRelationship[] = relationshipRows.filter((row) => row.creatorId === creator.id).map((row) => ({
+    const relationships: PortalRelationship[] = (relationshipsByCreatorId.get(creator.id) ?? []).map((row) => ({
       id: row.id,
       provider: row.provider,
       syncMode: row.syncMode,
@@ -168,7 +190,6 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
       error: row.lastError,
     }));
-    const confirmedAccounts = creatorAccounts.filter((account) => account.linkState === "confirmed");
     const trackingState = aggregateTrackingState(confirmedAccounts.map((account) => account.trackingState));
     return {
       id: creator.id,
@@ -189,7 +210,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       },
       relationships,
       accounts: creatorAccounts,
-      notes: noteRows.filter((note) => note.creatorId === creator.id).map((note) => ({ id: note.id, body: note.body, author: note.authorUserId ? managerById.get(note.authorUserId) ?? null : null, createdAt: note.createdAt.toISOString() })),
+      notes: (notesByCreatorId.get(creator.id) ?? []).map((note) => ({ id: note.id, body: note.body, author: note.authorUserId ? managerById.get(note.authorUserId) ?? null : null, createdAt: note.createdAt.toISOString() })),
       posts30d: recentVideos.filter((video) => video.included).length,
       views30d: views,
       likes30d: engagement.likes,
@@ -205,7 +226,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
 
   const assigned = new Set(accounts.filter((account) => account.creatorId).map((account) => account.id));
   const unmatched = accounts.filter((account) => !assigned.has(account.id)).map((account) => {
-    const accountVideos = videos.filter((video) => video.accountId === account.id);
+    const accountVideos = videosByAccount.get(account.id) ?? [];
     const recentVideos = accountVideos.filter((video) => video.publishedAt && new Date(video.publishedAt).getTime() >= cutoff);
     const views30d = recentVideos.reduce((sum, video) => sum + (video.included ? video.views : 0), 0);
     const engagement = engagementTotals(recentVideos);

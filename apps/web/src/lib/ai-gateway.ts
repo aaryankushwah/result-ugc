@@ -9,6 +9,3 @@ import "server-only";
 export function hasGatewayCredentials(): boolean {
   return Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN);
 }
-
-export const GATEWAY_MISSING_MESSAGE =
-  "AI Gateway is not configured. Set AI_GATEWAY_API_KEY, or run `vercel env pull` while linked to the Foundative team.";

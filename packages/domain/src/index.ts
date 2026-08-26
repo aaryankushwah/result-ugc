@@ -89,6 +89,42 @@ export type ProviderActivity = {
   occurredAt: string;
 };
 
+export type LaunchpointPostIdentity = {
+  url?: string;
+  platform?: string;
+};
+
+export type LaunchpointSocialIdentity = {
+  creatorExternalId: string;
+  platform: string;
+  username: string;
+  url: string;
+};
+
+/** Extracts the posting account encoded in a Launchpoint post URL. */
+export function launchpointSocialIdentityFromPost(
+  post: LaunchpointPostIdentity,
+  creatorExternalId: string,
+): LaunchpointSocialIdentity | null {
+  if (!post.url) return null;
+  try {
+    const url = new URL(post.url);
+    const platform = (post.platform ?? (
+      url.hostname.includes("instagram") ? "instagram"
+        : url.hostname.includes("tiktok") ? "tiktok"
+          : url.hostname.includes("youtube") || url.hostname.includes("youtu.be") ? "youtube"
+            : ""
+    )).toLowerCase();
+    const parts = url.pathname.split("/").filter(Boolean);
+    let username: string | null = null;
+    if (platform === "instagram" && parts[0] && !["p", "reel", "reels", "tv"].includes(parts[0].toLowerCase())) username = parts[0];
+    if ((platform === "tiktok" || platform === "youtube") && parts[0]?.startsWith("@")) username = parts[0].slice(1);
+    return username ? { creatorExternalId, platform, username: username.replace(/^@/, ""), url: post.url } : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface SigningProviderAdapter {
   readonly provider: SigningProvider;
   readonly syncMode: ProviderSyncMode;

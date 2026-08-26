@@ -9,7 +9,7 @@ import type { PortalCreator } from "@/lib/portal-types";
 export const onboardingStages = ["identify", "access", "signing", "tracking", "live"] as const;
 export type OnboardingStage = (typeof onboardingStages)[number];
 
-export const onboardingStageLabels: Record<OnboardingStage, string> = {
+const onboardingStageLabels: Record<OnboardingStage, string> = {
   identify: "Identify",
   access: "Discord access",
   signing: "Signing",

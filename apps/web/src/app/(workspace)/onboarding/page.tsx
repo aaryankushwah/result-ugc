@@ -1,5 +1,6 @@
 import { ArrowUpRight, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { SourceImage } from "@/components/source-image";
 import { PageTitle, StateBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { buildOnboardingFunnel, onboardingStages, summarizeOnboardingFunnel, type OnboardingStage } from "@/lib/onboarding-funnel";
@@ -52,7 +53,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
             {shown.map((entry) => (
               <Link href={`/creators/${entry.creator.id}`} key={entry.creator.id}>
                 <span className="account-avatar">
-                  {entry.creator.accounts[0]?.avatarUrl ? <img src={entry.creator.accounts[0].avatarUrl} alt="" /> : entry.creator.displayName.slice(0, 1)}
+                  {entry.creator.accounts[0]?.avatarUrl ? <SourceImage src={entry.creator.accounts[0].avatarUrl} width={30} height={30} /> : entry.creator.displayName.slice(0, 1)}
                 </span>
                 <span className="funnel-identity">
                   <strong>{entry.creator.displayName}</strong>

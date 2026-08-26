@@ -237,7 +237,10 @@ export const creatorNotes = pgTable("creator_notes", {
   authorUserId: uuid("author_user_id").references(() => internalUsers.id, { onDelete: "set null" }),
   body: text("body").notNull(),
   ...timestamps,
-}, (table) => [index("creator_notes_creator_idx").on(table.creatorId, table.createdAt)]);
+}, (table) => [
+  index("creator_notes_creator_idx").on(table.creatorId, table.createdAt),
+  index("creator_notes_org_created_idx").on(table.organizationId, table.createdAt),
+]);
 
 export type ScriptSection = {
   id: string;
@@ -419,7 +422,7 @@ export const syncRuns = pgTable("sync_runs", {
   error: text("error"),
   cursor: text("cursor"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
-});
+}, (table) => [index("sync_runs_org_started_idx").on(table.organizationId, table.startedAt)]);
 
 export const discordOperations = pgTable("discord_operations", {
   id: uuid("id").primaryKey().defaultRandom(),

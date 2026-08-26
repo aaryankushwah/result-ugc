@@ -1,7 +1,7 @@
 import "server-only";
 
 import { creatorIdentityKey, type LaunchpointRelationshipInput, type LaunchpointSocialIdentityInput } from "@result/db";
-import { deriveRelationshipState, type ProviderCreator } from "@result/domain";
+import { deriveRelationshipState, launchpointSocialIdentityFromPost, type ProviderCreator } from "@result/domain";
 
 const API_BASE = "https://dashboard.launchpointhq.com/api/v1";
 
@@ -9,6 +9,11 @@ type LaunchpointCreator = { id?: string; name?: string; email?: string; username
 type LaunchpointContract = { id?: string; contractorId?: string; contractorName?: string; programId?: string; contractName?: string; status?: string; startsAt?: string | number; expiresAt?: string | number };
 type LaunchpointPost = { id?: string; creatorId?: string; contractorName?: string; url?: string; platform?: string };
 type LaunchpointPage<T> = { data?: T[]; page?: number; total?: number; totalPages?: number };
+
+// Launchpoint rejects larger limits; /posts permits 500 while the other
+// collections cap at 100. Keeping this endpoint-specific avoids 5x requests.
+const PAGE_LIMIT: Record<string, number> = { "/creators": 100, "/contracts": 100, "/posts": 500 };
+const MAX_PAGES = 25;
 
 async function launchpointFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const key = process.env.LAUNCHPOINT_API_KEY?.trim();
@@ -26,8 +31,8 @@ async function launchpointFetch<T>(path: string, params: Record<string, string> 
 
 async function launchpointBrowse<T>(path: string, params: Record<string, string> = {}): Promise<T[]> {
   const rows: T[] = [];
-  const limit = 100;
-  for (let page = 1; page <= 100; page += 1) {
+  const limit = PAGE_LIMIT[path] ?? 100;
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
     const result = await launchpointFetch<LaunchpointPage<T>>(path, { ...params, page: String(page), limit: String(limit) });
     const batch = result.data ?? [];
     rows.push(...batch);
@@ -42,22 +47,6 @@ function timestamp(value: string | number | undefined): string | null {
   const numeric = typeof value === "number" && value < 1_000_000_000_000 ? value * 1_000 : value;
   const date = new Date(numeric);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function socialIdentity(post: LaunchpointPost, creatorExternalId: string): LaunchpointSocialIdentityInput | null {
-  if (!post.url) return null;
-  try {
-    const url = new URL(post.url);
-    const platform = (post.platform ?? (url.hostname.includes("instagram") ? "instagram" : url.hostname.includes("tiktok") ? "tiktok" : url.hostname.includes("youtube") || url.hostname.includes("youtu.be") ? "youtube" : "")).toLowerCase();
-    const parts = url.pathname.split("/").filter(Boolean);
-    let username: string | null = null;
-    if (platform === "instagram" && parts[0] && !["p", "reel", "reels", "tv"].includes(parts[0].toLowerCase())) username = parts[0];
-    if (platform === "tiktok" && parts[0]?.startsWith("@")) username = parts[0].slice(1);
-    if (platform === "youtube" && parts[0]?.startsWith("@")) username = parts[0].slice(1);
-    return username ? { creatorExternalId, platform, username: username.replace(/^@/, ""), url: post.url } : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function getLaunchpointDataset(): Promise<{
@@ -123,7 +112,7 @@ export async function getLaunchpointDataset(): Promise<{
       if (candidates?.size === 1) creatorExternalId = [...candidates][0]!;
     }
     if (!creatorExternalId) return [];
-    const identity = socialIdentity(post, creatorExternalId);
+    const identity = launchpointSocialIdentityFromPost(post, creatorExternalId);
     return identity ? [identity] : [];
   });
   return { creators, relationships, socialIdentities };

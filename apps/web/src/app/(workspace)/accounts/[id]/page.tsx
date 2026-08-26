@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountAssignmentButton } from "@/components/creator-actions";
 import { VideoTable } from "@/components/data-tables";
+import { SourceImage } from "@/components/source-image";
 import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
@@ -17,7 +18,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const accountVideos = data.videos.filter((video) => video.accountId === account.id);
   return <div className="page-stack creator-profile">
     <Link href="/accounts" className="back-link"><ArrowLeft /> All accounts</Link>
-    <header className="profile-header"><div className="profile-identity"><span className="profile-avatar">{account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.username.slice(0, 1).toUpperCase()}</span><div><div className="badge-row"><StateBadge label={account.platform} tone="info" /><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></div><h1>@{account.username}</h1><p>{account.displayName}</p></div></div><div className="profile-actions">{account.sourceUrl ? <a className="secondary-button" href={account.sourceUrl} target="_blank" rel="noreferrer">Open profile <ExternalLink /></a> : null}</div></header>
+    <header className="profile-header"><div className="profile-identity"><span className="profile-avatar">{account.avatarUrl ? <SourceImage src={account.avatarUrl} width={56} height={56} /> : account.username.slice(0, 1).toUpperCase()}</span><div><div className="badge-row"><StateBadge label={account.platform} tone="info" /><StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} /><TrackingBadge state={account.trackingState} /></div><h1>@{account.username}</h1><p>{account.displayName}</p></div></div><div className="profile-actions">{account.sourceUrl ? <a className="secondary-button" href={account.sourceUrl} target="_blank" rel="noreferrer">Open profile <ExternalLink /></a> : null}</div></header>
     <section className="metric-grid profile-metrics">{[
       { label: "Followers", value: account.followers ?? 0 }, { label: "Posts", value: account.posts }, { label: "Views", value: account.views }, { label: "Average views", value: account.averageViews }, { label: "Engagement", value: formatPercent(account.engagementRate) },
     ].map((metric) => <article className="metric-card" key={metric.label}><div><p>{metric.label}</p><strong>{typeof metric.value === "number" ? formatNumber(metric.value) : metric.value}</strong></div></article>)}</section>

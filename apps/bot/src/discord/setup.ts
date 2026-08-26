@@ -17,7 +17,6 @@ import {
   type GuildMember,
   type GuildTextBasedChannel,
   type OverwriteResolvable,
-  type Role,
   type TextChannel,
 } from "discord.js";
 import {
@@ -25,7 +24,6 @@ import {
   roles,
   type BlueprintChannelType,
   type ChannelBlueprint,
-  type RoleKey,
 } from "../config/blueprint.js";
 import { channelOverwrites, type RoleMap } from "./permissions.js";
 import { discordChannelNameMatches } from "./channel-names.js";

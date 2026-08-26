@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -16,22 +17,18 @@ import {
   type GuildTextBasedChannel,
   type Interaction,
 } from "discord.js";
-import { randomUUID } from "node:crypto";
 import { creatorDiscord, creators, getDatabase, organizations, scriptAssignments, scripts } from "@result/db";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { blueprintChannels, categories, roles } from "../config/blueprint.js";
 import {
   getGuildState,
-  removeGuildState,
   updateGuildState,
-  type SubmissionStatus,
   type CallPollRecord,
 } from "../data/store.js";
 import { createCreatorChannel, creatorIdFromChannelTopic, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
 import { discordChannelNameMatches } from "./channel-names.js";
 import { archiveCreatorChannel } from "./platform-sync.js";
 import { buildScriptChecklist } from "./script-checklist.js";
-import { scriptShareUrl } from "./script-delivery.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
 import { launchpointGet, launchpointList } from "../integrations/launchpoint.js";
@@ -316,10 +313,6 @@ function linkSlug(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 50);
-}
-
-function csvCell(value: unknown): string {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
 async function addCreator(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -613,10 +606,6 @@ async function deleteCreatorLink(interaction: ChatInputCommandInteraction): Prom
 
 type LaunchpointPage = { data?: Array<Record<string, unknown>>; total?: number };
 
-function clipDiscord(value: string): string {
-  return value.length > 1_900 ? `${value.slice(0, 1_890)}…` : value;
-}
-
 function launchpointDate(value: unknown): string {
   if (typeof value !== "number") return "";
   return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
@@ -706,173 +695,6 @@ async function autocompleteDeleteLink(interaction: import("discord.js").Autocomp
       value: link.id,
     }));
   await interaction.respond(choices);
-}
-
-async function submitWork(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => undefined);
-  const creatorRole = interaction.guild.roles.cache.find((role) => role.name === "Verified Creator");
-  if (!member || !creatorRole || !member.roles.cache.has(creatorRole.id)) {
-    await interaction.reply({ content: "Only verified creators can submit work.", flags: MessageFlags.Ephemeral });
-    return;
-  }
-  const assetUrl = interaction.options.getString("asset_url", true).trim();
-  if (!isHttpsUrl(assetUrl)) {
-    await interaction.reply({ content: "Use a valid HTTPS asset link.", flags: MessageFlags.Ephemeral });
-    return;
-  }
-  const channel = findCreatorChannel(interaction.guild, interaction.user.id);
-  if (!channel) {
-    await interaction.reply({ content: "Your private creator channel is missing. Ask staff to run `/add-creator`.", flags: MessageFlags.Ephemeral });
-    return;
-  }
-  const campaign = interaction.options.getString("campaign", true).trim();
-  const notes = interaction.options.getString("notes")?.trim() ?? "";
-  const id = randomUUID().slice(0, 8);
-  const now = new Date().toISOString();
-  await updateGuildState(interaction.guild.id, (state) => {
-    if (!state.creatorIds.includes(interaction.user.id)) state.creatorIds.push(interaction.user.id);
-    state.submissions.unshift({
-      id,
-      creatorId: interaction.user.id,
-      campaign,
-      assetUrl,
-      notes,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    });
-  });
-  const embed = new EmbedBuilder()
-    .setColor(Colors.Gold)
-    .setTitle(`Submission ${id}`)
-    .addFields(
-      { name: "Creator", value: `<@${interaction.user.id}>`, inline: true },
-      { name: "Campaign", value: campaign, inline: true },
-      { name: "Status", value: "Pending", inline: true },
-      { name: "Asset", value: assetUrl },
-      ...(notes ? [{ name: "Notes", value: notes }] : []),
-    )
-    .setTimestamp();
-  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
-  await interaction.reply({ content: `Submission **${id}** is ready for review in <#${channel.id}>.`, flags: MessageFlags.Ephemeral });
-}
-
-async function markSubmission(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const id = interaction.options.getString("submission", true).trim();
-  const status = interaction.options.getString("status", true) as SubmissionStatus;
-  const publishedUrl = interaction.options.getString("published_url")?.trim();
-  if (publishedUrl && !isHttpsUrl(publishedUrl)) {
-    await interaction.reply({ content: "The published URL must use HTTPS.", flags: MessageFlags.Ephemeral });
-    return;
-  }
-  let found = false;
-  let creatorId = "";
-  let campaign = "";
-  await updateGuildState(interaction.guild.id, (state) => {
-    const submission = state.submissions.find((candidate) => candidate.id === id);
-    if (!submission) return;
-    found = true;
-    creatorId = submission.creatorId;
-    campaign = submission.campaign;
-    submission.status = status;
-    submission.updatedAt = new Date().toISOString();
-    if (publishedUrl) submission.publishedUrl = publishedUrl;
-  });
-  if (!found) {
-    await interaction.reply({ content: `Submission **${id}** was not found.`, flags: MessageFlags.Ephemeral });
-    return;
-  }
-  const creatorChannel = findCreatorChannel(interaction.guild, creatorId);
-  await creatorChannel?.send({
-    content: `Submission **${id}** (${campaign}) is now **${status}**.${publishedUrl ? `\n${publishedUrl}` : ""}`,
-    allowedMentions: { parse: [] },
-  });
-  if (status === "approved" || status === "posted") {
-    await findTextChannel(interaction.guild, "approved-content")?.send({
-      content: `**${id}** — <@${creatorId}> — ${campaign} — **${status}**${publishedUrl ? `\n${publishedUrl}` : ""}`,
-      allowedMentions: { parse: [] },
-    });
-  }
-  await interaction.reply({ content: `Submission **${id}** marked **${status}**.`, flags: MessageFlags.Ephemeral });
-}
-
-async function listSubmissions(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const creator = interaction.options.getUser("creator");
-  const status = interaction.options.getString("status") as SubmissionStatus | null;
-  const state = await getGuildState(interaction.guild.id);
-  const matches = state.submissions
-    .filter((item) => (!creator || item.creatorId === creator.id) && (!status || item.status === status))
-    .slice(0, 15);
-  const description = matches.length
-    ? matches.map((item) => `**${item.id}** · <@${item.creatorId}> · ${item.campaign} · **${item.status}**`).join("\n")
-    : "No matching submissions.";
-  await interaction.reply({
-    embeds: [new EmbedBuilder().setColor(Colors.Blurple).setTitle("Recent submissions").setDescription(description)],
-    flags: MessageFlags.Ephemeral,
-    allowedMentions: { parse: [] },
-  });
-}
-
-async function showPostingStatus(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const state = await getGuildState(interaction.guild.id);
-  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1_000;
-  const lines = state.creatorIds.map((creatorId) => {
-    const count = state.submissions.filter(
-      (item) => item.creatorId === creatorId && new Date(item.createdAt).getTime() >= weekAgo,
-    ).length;
-    return `${count >= state.quota ? "✅" : "⚠️"} <@${creatorId}> — **${count}/${state.quota}**`;
-  });
-  await interaction.reply({
-    embeds: [new EmbedBuilder().setColor(Colors.Blurple).setTitle("Weekly posting status").setDescription(lines.join("\n") || "No creators yet.")],
-    flags: MessageFlags.Ephemeral,
-    allowedMentions: { parse: [] },
-  });
-}
-
-async function showLeaderboard(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const state = await getGuildState(interaction.guild.id);
-  const ranked = state.creatorIds
-    .map((creatorId) => ({
-      creatorId,
-      points: state.submissions.filter((item) => item.creatorId === creatorId && item.status === "posted").length * 2
-        + state.submissions.filter((item) => item.creatorId === creatorId && item.status === "approved").length,
-    }))
-    .sort((a, b) => b.points - a.points)
-    .slice(0, 10);
-  const lines = ranked.map((row, index) => `${index + 1}. <@${row.creatorId}> — **${row.points}** points`);
-  await interaction.reply({
-    embeds: [new EmbedBuilder().setColor(Colors.Gold).setTitle("Creator leaderboard").setDescription(lines.join("\n") || "No creator results yet.")],
-    allowedMentions: { parse: [] },
-  });
-}
-
-async function exportProgram(interaction: ChatInputCommandInteraction): Promise<void> {
-  if (!interaction.guild) return;
-  const state = await getGuildState(interaction.guild.id);
-  const rows = [
-    ["submission_id", "creator_id", "campaign", "status", "asset_url", "published_url", "created_at", "updated_at"],
-    ...state.submissions.map((item) => [
-      item.id,
-      item.creatorId,
-      item.campaign,
-      item.status,
-      item.assetUrl,
-      item.publishedUrl ?? "",
-      item.createdAt,
-      item.updatedAt,
-    ]),
-  ];
-  const csv = `${rows.map((row) => row.map(csvCell).join(",")).join("\n")}\n`;
-  await interaction.reply({
-    content: `${state.creatorIds.length} creators · ${state.submissions.length} submissions`,
-    files: [{ attachment: Buffer.from(csv, "utf8"), name: "ugc-submissions.csv" }],
-    flags: MessageFlags.Ephemeral,
-  });
 }
 
 function callPollEmbed(poll: CallPollRecord): EmbedBuilder {
@@ -1117,10 +939,6 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
     await resetGroupCall(interaction);
     return;
   }
-  if (interaction.commandName === "export") {
-    await exportProgram(interaction);
-    return;
-  }
   if (interaction.commandName === "health") {
     await showHealth(interaction);
     return;
@@ -1133,130 +951,10 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
     await showAssignedScripts(interaction);
     return;
   }
-  if (interaction.commandName === "leaderboard") {
-    await showLeaderboard(interaction);
-    return;
-  }
-  if (interaction.commandName === "mark") {
-    await markSubmission(interaction);
-    return;
-  }
-  if (interaction.commandName === "onboarding-sessions") {
-    const log = findTextChannel(interaction.guild, "onboarding-alerts");
-    const messages = log ? await log.messages.fetch({ limit: 20 }) : undefined;
-    const lines = messages
-      ?.filter((message) => message.author.id === interaction.client.user.id && message.content.includes("verification"))
-      .map((message) => `${message.content} · <t:${Math.floor(message.createdTimestamp / 1_000)}:R>`)
-      .slice(0, 10);
-    await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(Colors.Blurple).setTitle("Recent onboarding sessions").setDescription(lines?.join("\n") || "No verification activity yet.")],
-      flags: MessageFlags.Ephemeral,
-      allowedMentions: { parse: [] },
-    });
-    return;
-  }
-  if (interaction.commandName === "posting-status") {
-    await showPostingStatus(interaction);
-    return;
-  }
-  if (interaction.commandName === "program-remove") {
-    const confirmed = interaction.options.getBoolean("confirm", true);
-    if (!confirmed) {
-      await interaction.reply({ content: "Nothing was removed.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const removed = await removeGuildState(interaction.guild.id);
-    await interaction.reply({
-      content: removed
-        ? "Saved program data was removed. Discord roles and channels were left untouched."
-        : "There was no saved program data to remove.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  if (interaction.commandName === "programs") {
-    const state = await getGuildState(interaction.guild.id);
-    await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(Colors.Blurple).setTitle(state.programName).setDescription(
-        `${state.creatorIds.length} creators · ${state.submissions.length} submissions · weekly quota ${state.quota} · trial ${state.trialDays || "off"}${state.trialDays ? " days" : ""}`,
-      )],
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  if (interaction.commandName === "quickstart") {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const name = interaction.options.getString("name")?.trim();
-    if (name) await updateGuildState(interaction.guild.id, (state) => { state.programName = name.slice(0, 100); });
-    const result = await setupGuild(interaction.guild);
-    await interaction.editReply(setupSummary(result));
-    return;
-  }
-  if (interaction.commandName === "refresh-metrics") {
-    const state = await updateGuildState(interaction.guild.id, (current) => {
-      current.lastMetricsRefresh = new Date().toISOString();
-    });
-    const approved = state.submissions.filter((item) => item.status === "approved").length;
-    const posted = state.submissions.filter((item) => item.status === "posted").length;
-    await interaction.reply({
-      content: `Metrics refreshed: **${state.creatorIds.length}** creators, **${state.submissions.length}** submissions, **${approved}** approved, **${posted}** posted.`,
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  if (interaction.commandName === "reminders") {
-    const enabled = interaction.options.getBoolean("enabled", true);
-    await updateGuildState(interaction.guild.id, (state) => { state.remindersEnabled = enabled; });
-    await interaction.reply({ content: `Daily posting reminders are now **${enabled ? "on" : "off"}**.`, flags: MessageFlags.Ephemeral });
-    return;
-  }
-  if (interaction.commandName === "reset-onboarding") {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const user = interaction.options.getUser("member", true);
-    const member = await interaction.guild.members.fetch(user.id).catch(() => undefined);
-    if (!member) {
-      await interaction.editReply("That member is not in this server.");
-      return;
-    }
-    for (const roleName of ["Member", "Verified Creator", "Applicant"]) {
-      const role = interaction.guild.roles.cache.find((candidate) => candidate.name === roleName);
-      if (role) await member.roles.remove(role, "Reset UGC onboarding");
-    }
-    const creatorChannel = findCreatorChannel(interaction.guild, user.id);
-    if (creatorChannel) await creatorChannel.permissionOverwrites.delete(user.id, "Reset UGC onboarding");
-    await updateGuildState(interaction.guild.id, (state) => {
-      state.creatorIds = state.creatorIds.filter((id) => id !== user.id);
-    });
-    await interaction.editReply(`Onboarding reset for <@${user.id}>. Their private channel was preserved for staff records.`);
-    return;
-  }
-  if (interaction.commandName === "set-key") {
-    await interaction.reply({
-      content: "For safety, Result Clanker never accepts API keys through Discord. Add `METRICS_API_KEY=...` to the bot's local `.env`, then restart it.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-  if (interaction.commandName === "set-quota") {
-    const quota = interaction.options.getInteger("posts", true);
-    await updateGuildState(interaction.guild.id, (state) => { state.quota = quota; });
-    await interaction.reply({ content: `Weekly quota set to **${quota}** submissions per creator.`, flags: MessageFlags.Ephemeral });
-    return;
-  }
-  if (interaction.commandName === "set-trial") {
-    const days = interaction.options.getInteger("days", true);
-    await updateGuildState(interaction.guild.id, (state) => { state.trialDays = days; });
-    await interaction.reply({ content: days ? `Creator trial set to **${days} days**.` : "Creator trials are now off.", flags: MessageFlags.Ephemeral });
-    return;
-  }
-  if (interaction.commandName === "setup" || interaction.commandName === "setup-onboarding") {
+  if (interaction.commandName === "setup") {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const result = await setupGuild(interaction.guild);
     await interaction.editReply(setupSummary(result));
-    return;
-  }
-  if (interaction.commandName === "submissions") {
-    await listSubmissions(interaction);
     return;
   }
 }

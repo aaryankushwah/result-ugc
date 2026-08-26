@@ -11,7 +11,7 @@ export class TranscriptionError extends Error {}
 const MAX_BYTES = 25 * 1024 * 1024;
 
 /** Routed through the Vercel AI Gateway — no provider key of our own. */
-export const TRANSCRIPTION_MODEL = "openai/whisper-1";
+const TRANSCRIPTION_MODEL = "openai/whisper-1";
 
 export type Transcription = { transcript: string; sections: TranscriptSection[]; durationSeconds: number | null };
 

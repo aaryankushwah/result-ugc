@@ -14,7 +14,7 @@ import {
 } from "./script-prompt";
 
 /** Routed through the Vercel AI Gateway — a plain "provider/model" string, no provider key of our own. */
-export const SCRIPT_MODEL = "anthropic/claude-sonnet-5";
+const SCRIPT_MODEL = "anthropic/claude-sonnet-5";
 
 export class ScriptGenerationError extends Error {}
 

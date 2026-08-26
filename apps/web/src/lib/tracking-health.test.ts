@@ -1,4 +1,4 @@
-import { aggregateAccountPerformanceHealth, aggregateTrackingState, deriveAccountPerformanceHealth } from "../../../../packages/domain/src/index";
+import { aggregateAccountPerformanceHealth, aggregateTrackingState, deriveAccountPerformanceHealth } from "@result/domain";
 import { describe, expect, it } from "vitest";
 
 describe("creator account health", () => {

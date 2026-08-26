@@ -31,15 +31,13 @@ export async function resolveDubCreator(guildId: string, discordUserId: string):
 export async function persistDubLinkSnapshot(input: { organizationId: string; creatorId: string; snapshot: DubLinkSnapshot }): Promise<string> {
   const db = getDatabase();
   const refreshedAt = new Date();
-  const [saved] = await db.insert(creatorAttributionLinks).values({
-    organizationId: input.organizationId,
-    creatorId: input.creatorId,
+  const snapshotValues = {
     providerLinkId: input.snapshot.id,
     externalId: input.snapshot.externalId,
     shortLink: input.snapshot.shortLink,
     destinationUrl: input.snapshot.destinationUrl,
     linkKey: input.snapshot.key ?? null,
-    state: "active",
+    state: "active" as const,
     clicks: input.snapshot.clicks,
     leads: input.snapshot.leads,
     conversions: input.snapshot.conversions,
@@ -50,25 +48,15 @@ export async function persistDubLinkSnapshot(input: { organizationId: string; cr
     lastErrorAt: null,
     lastError: null,
     raw: input.snapshot.raw,
+  };
+  const [saved] = await db.insert(creatorAttributionLinks).values({
+    organizationId: input.organizationId,
+    creatorId: input.creatorId,
+    ...snapshotValues,
   }).onConflictDoUpdate({
     target: [creatorAttributionLinks.organizationId, creatorAttributionLinks.creatorId],
     set: {
-      providerLinkId: input.snapshot.id,
-      externalId: input.snapshot.externalId,
-      shortLink: input.snapshot.shortLink,
-      destinationUrl: input.snapshot.destinationUrl,
-      linkKey: input.snapshot.key ?? null,
-      state: "active",
-      clicks: input.snapshot.clicks,
-      leads: input.snapshot.leads,
-      conversions: input.snapshot.conversions,
-      sales: input.snapshot.sales,
-      saleAmount: input.snapshot.saleAmount,
-      lastClickedAt: input.snapshot.lastClickedAt ? new Date(input.snapshot.lastClickedAt) : null,
-      sourceRefreshedAt: refreshedAt,
-      lastErrorAt: null,
-      lastError: null,
-      raw: input.snapshot.raw,
+      ...snapshotValues,
       updatedAt: refreshedAt,
     },
   }).returning({ id: creatorAttributionLinks.id });
@@ -121,7 +109,7 @@ async function notifyCreator(client: Client, channelId: string | null, shortLink
   );
 }
 
-export async function syncDubAttribution(client: Client): Promise<void> {
+async function syncDubAttribution(client: Client): Promise<void> {
   const destinationUrl = process.env.DUB_DEFAULT_URL?.trim();
   if (!process.env.DATABASE_URL || !process.env.DUB_API_KEY || !destinationUrl) return;
   const db = getDatabase();

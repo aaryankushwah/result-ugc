@@ -3,9 +3,9 @@ import path from "node:path";
 import { getDatabase, legacyGuildStates, organizations } from "@result/db";
 import { and, eq } from "drizzle-orm";
 
-export type SubmissionStatus = "pending" | "approved" | "revision" | "rejected" | "posted";
+type SubmissionStatus = "pending" | "approved" | "revision" | "rejected" | "posted";
 
-export interface SubmissionRecord {
+interface SubmissionRecord {
   id: string;
   creatorId: string;
   campaign: string;
@@ -17,7 +17,7 @@ export interface SubmissionRecord {
   updatedAt: string;
 }
 
-export interface CreatorLinkRecord {
+interface CreatorLinkRecord {
   id: string;
   creatorId: string;
   creatorName: string;
@@ -39,7 +39,7 @@ export interface CallPollRecord {
   responses: Record<string, { timezone: "est" | "pst" | "ist"; slotIds: string[] }>;
 }
 
-export interface CreatorReviewRecord {
+interface CreatorReviewRecord {
   creatorId: string;
   launchpointCreatorId?: string;
   notes: string[];
@@ -169,22 +169,4 @@ export async function updateGuildState(
   });
   await writeQueue;
   return result;
-}
-
-export async function removeGuildState(guildId: string): Promise<boolean> {
-  let removed = false;
-  writeQueue = writeQueue.then(async () => {
-    if (process.env.DATABASE_URL) {
-      const organizationId = await resultOrganizationId();
-      const deleted = await getDatabase().delete(legacyGuildStates).where(and(eq(legacyGuildStates.guildId, guildId), eq(legacyGuildStates.organizationId, organizationId))).returning({ guildId: legacyGuildStates.guildId });
-      removed = deleted.length > 0;
-      return;
-    }
-    const store = await readStore();
-    removed = Boolean(store.guilds[guildId]);
-    delete store.guilds[guildId];
-    await writeStore(store);
-  });
-  await writeQueue;
-  return removed;
 }

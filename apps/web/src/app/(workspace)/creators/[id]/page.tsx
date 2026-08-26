@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CreatorCharts } from "@/components/creator-charts";
 import { VideoTable } from "@/components/data-tables";
 import { CandidateActions, CreatorQuickActions, ManualRelationshipButton, NoteButton, type DiscordConnectionCandidate } from "@/components/creator-actions";
+import { SourceImage } from "@/components/source-image";
 import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
@@ -39,7 +40,7 @@ function AccountOverview({ creator }: { creator: PortalCreator }) {
       {creator.accounts.map((account) => (
         <Link href={`/accounts/${encodeURIComponent(account.id)}`} key={account.id} className="creator-account-row">
           <span className="account-avatar creator-account-avatar">
-            {account.avatarUrl ? <img src={account.avatarUrl} alt="" /> : account.username.slice(0, 1)}
+            {account.avatarUrl ? <SourceImage src={account.avatarUrl} width={42} height={42} /> : account.username.slice(0, 1)}
           </span>
           <span className="creator-account-copy">
             <strong>@{account.username}</strong>
@@ -86,7 +87,7 @@ export default async function CreatorProfilePage({
       <header className="profile-header">
         <div className="profile-identity">
           <span className="profile-avatar">
-            {creator.accounts[0]?.avatarUrl ? <img src={creator.accounts[0].avatarUrl} alt="" /> : creator.displayName.slice(0, 1)}
+            {creator.accounts[0]?.avatarUrl ? <SourceImage src={creator.accounts[0].avatarUrl} width={56} height={56} /> : creator.displayName.slice(0, 1)}
           </span>
           <div>
             <div className="badge-row">

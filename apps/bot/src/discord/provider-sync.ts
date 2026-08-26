@@ -8,11 +8,11 @@ import {
   reconcileLaunchpointDataset,
   signingRelationships,
   syncRuns,
-  type LaunchpointSocialIdentityInput,
 } from "@result/db";
+import { launchpointSocialIdentityFromPost } from "@result/domain";
 import { and, eq } from "drizzle-orm";
 import { getGuildState } from "../data/store.js";
-import { LaunchpointAdapter, type LaunchpointPost } from "../integrations/launchpoint.js";
+import { LaunchpointAdapter } from "../integrations/launchpoint.js";
 
 const adapter = new LaunchpointAdapter();
 
@@ -97,22 +97,6 @@ export async function persistLaunchpointAssignment(input: {
   return "synced";
 }
 
-function socialIdentityFromPost(post: LaunchpointPost, creatorExternalId: string): LaunchpointSocialIdentityInput | null {
-  if (!post.url) return null;
-  try {
-    const url = new URL(post.url);
-    const platform = (post.platform ?? (url.hostname.includes("instagram") ? "instagram" : url.hostname.includes("tiktok") ? "tiktok" : url.hostname.includes("youtube") || url.hostname.includes("youtu.be") ? "youtube" : "")).toLowerCase();
-    const parts = url.pathname.split("/").filter(Boolean);
-    let username: string | null = null;
-    if (platform === "instagram" && parts[0] && !["p", "reel", "reels", "tv"].includes(parts[0].toLowerCase())) username = parts[0];
-    if (platform === "tiktok" && parts[0]?.startsWith("@")) username = parts[0].slice(1);
-    if (platform === "youtube" && parts[0]?.startsWith("@")) username = parts[0].slice(1);
-    return username ? { creatorExternalId, platform, username: username.replace(/^@/, ""), url: post.url } : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function syncLaunchpointRelationships(client: Client): Promise<void> {
   if (!process.env.DATABASE_URL || !process.env.LAUNCHPOINT_API_KEY) return;
   for (const guild of client.guilds.cache.values()) {
@@ -170,7 +154,7 @@ export async function syncLaunchpointRelationships(client: Client): Promise<void
           if (candidates?.size === 1) creatorExternalId = [...candidates][0]!;
         }
         if (!creatorExternalId) return [];
-        const identity = socialIdentityFromPost(post, creatorExternalId);
+        const identity = launchpointSocialIdentityFromPost(post, creatorExternalId);
         return identity ? [identity] : [];
       });
       const result = await reconcileLaunchpointDataset({ organizationId: org.id, creators: providerCreators, relationships, socialIdentities });

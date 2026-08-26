@@ -1,4 +1,5 @@
 "use client";
+"use no memo";
 
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, type ColumnDef, type RowSelectionState, type SortingState, useReactTable } from "@tanstack/react-table";
 import { aggregateAccountPerformanceHealth } from "@result/domain";
@@ -10,6 +11,7 @@ import rosterStyles from "./creator-accounts-roster.module.css";
 import { Button } from "@/components/ui/button";
 import { AccountAssignmentButton } from "@/components/creator-actions";
 import { CreatorPeek } from "@/components/creator-peek";
+import { SourceImage } from "@/components/source-image";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -26,7 +28,7 @@ import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingB
 function SortButton({ label, sorted, toggle }: { label: string; sorted: false | "asc" | "desc"; toggle: () => void }) { return <Button variant="ghost" size="xs" className="sort-button" onClick={toggle}>{label}{sorted === "asc" ? <ArrowUp /> : sorted === "desc" ? <ArrowDown /> : <ArrowUpDown />}</Button>; }
 function TableToolbar({ search, setSearch, placeholder, children, columns, toggleColumn }: { search: string; setSearch: (value: string) => void; placeholder: string; children?: React.ReactNode; columns: Array<{ id: string; label: string; visible: boolean }>; toggleColumn: (id: string) => void }) { return <div className="table-toolbar"><div className="table-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} />{search ? <Button variant="ghost" size="icon-xs" onClick={() => setSearch("")} aria-label="Clear search"><X /></Button> : null}</div>{children}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Columns3 /> Columns</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-44">{columns.map((column) => <DropdownMenuCheckboxItem key={column.id} checked={column.visible} onCheckedChange={() => toggleColumn(column.id)}>{column.label}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu></div>; }
 function Pagination({ page, pages, rows, previous, next, canPrevious, canNext }: { page: number; pages: number; rows: number; previous: () => void; next: () => void; canPrevious: boolean; canNext: boolean }) { return <div className="table-pagination"><span>{formatNumber(rows)} rows</span><div><span>Page {page} of {Math.max(1, pages)}</span><Button variant="outline" size="icon-sm" disabled={!canPrevious} onClick={previous}><ChevronLeft /></Button><Button variant="outline" size="icon-sm" disabled={!canNext} onClick={next}><ChevronRight /></Button></div></div>; }
-function Avatar({ src, name }: { src: string | null; name: string }) { return <span className="table-avatar">{src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}</span>; }
+function Avatar({ src, name }: { src: string | null; name: string }) { return <span className="table-avatar">{src ? <SourceImage src={src} width={29} height={29} /> : name.slice(0, 1).toUpperCase()}</span>; }
 function AccountHealthDot({ creator }: { creator: PortalCreator }) {
   const healthAccounts = creator.source === "viral_candidate"
     ? creator.accounts
@@ -107,35 +109,6 @@ const creatorEngagementColumns: ColumnDef<PortalCreator>[] = [
   { accessorKey: "bookmarks30d", header: "30d saves", cell: ({ getValue }) => formatNumber(Number(getValue())) },
 ];
 const creatorEngagementHidden = { likes30d: false, shares30d: false, bookmarks30d: false };
-
-const accountEngagementColumns: ColumnDef<PortalAccount>[] = [
-  { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) },
-  { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) },
-  { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) },
-  { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) },
-];
-const accountEngagementHidden = { likes: false, shares: false, bookmarks: false };
-
-export function CreatorRoster({ creators }: { creators: PortalCreator[] }) {
-  const params = useSearchParams(); const pathname = usePathname(); const router = useRouter(); const tab = params.get("tab") ?? "active";
-  const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views30d", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("creator-roster", creatorEngagementHidden); const [selection, setSelection] = useState<RowSelectionState>({});
-  const filtered = useMemo(() => creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[tab] && `${creator.displayName} ${creator.discord.username ?? ""} ${creator.accounts.map((account) => account.username).join(" ")} ${creator.nextStep ?? ""}`.toLowerCase().includes(search.toLowerCase())), [creators, tab, search]);
-  const columns = useMemo<ColumnDef<PortalCreator>[]>(() => [
-    { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.displayName}`} />, enableSorting: false },
-    { accessorKey: "displayName", header: "Creator", cell: ({ row }) => <Link className="creator-cell" href={`/creators/${row.original.id}`}><Avatar src={row.original.discord.avatarUrl ?? row.original.accounts[0]?.avatarUrl ?? null} name={row.original.displayName} /><span><span className="creator-name-health"><strong>{row.original.displayName}</strong><AccountHealthDot creator={row.original} /></span><small>{row.original.source === "viral_candidate" ? `@${row.original.accounts[0]?.username ?? "unknown"} · unconfirmed match` : row.original.email ?? row.original.discord.username ?? "No contact"}</small></span></Link> },
-    { accessorKey: "lifecycle", header: "Lifecycle", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone={getValue() === "active" ? "success" : getValue() === "watch" ? "attention" : "neutral"} /> },
-    { id: "discord", accessorFn: (row) => row.discord.state, header: "Discord", cell: ({ row }) => <div className="stack-cell"><StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} /><small>{row.original.discord.username ? `@${row.original.discord.username}` : "Not reconciled"}</small></div> },
-    { id: "relationships", accessorFn: (row) => row.relationships.length, header: "Signing", cell: ({ row }) => row.original.relationships.length ? <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div> : <span className="muted-cell">No relationship</span> },
-    { id: "accounts", accessorFn: (row) => row.accounts.length, header: "Accounts", cell: ({ row }) => <AccountPlatformIcons accounts={row.original.accounts} /> },
-    { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "views30d", header: "30d views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> },
-    ...creatorEngagementColumns,
-    { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { id: "tracking", accessorFn: (row) => row.trackingState, header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
-    { accessorKey: "nextStep", header: "Next step", cell: ({ getValue }) => <span className="next-step-cell">{String(getValue() ?? "—")}</span> }, { accessorKey: "lastActivityAt", header: "Last activity", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
-  ], []);
-  const table = useReactTable({ data: filtered, columns, state: { sorting, columnVisibility: visibility, rowSelection: selection }, onSortingChange: setSorting, onColumnVisibilityChange: setVisibility, onRowSelectionChange: setSelection, getRowId: (row) => row.id, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(), initialState: { pagination: { pageSize: 20 } } });
-  const setTab = (value: string) => { const next = new URLSearchParams(params.toString()); next.set("tab", value); router.replace(`${pathname}?${next.toString()}`); setSelection({}); };
-  return <section className="data-panel"><Tabs value={tab} onValueChange={setTab}><TabsList className="roster-tabs">{["requests", "active", "watch", "offboarded"].map((item) => <TabsTrigger key={item} value={item}>{item}<span>{creators.filter((creator) => creator.lifecycle === creatorTabLifecycle[item]).length}</span></TabsTrigger>)}</TabsList></Tabs><TableToolbar search={search} setSearch={setSearch} placeholder="Search name, Discord, social account, provider, or notes…" columns={table.getAllLeafColumns().filter((column) => column.id !== "select").map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))} toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}><Button variant="outline" size="sm" className="toolbar-button"><Filter /> Filters</Button>{Object.keys(selection).length ? <span className="selection-count">{Object.keys(selection).length} selected</span> : null}</TableToolbar><DenseTable table={table} /><Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} /></section>;
-}
 
 export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCreator[]; videos: PortalVideo[] }) {
   const params = useSearchParams();
@@ -251,6 +224,8 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     { accessorKey: "lastActivityAt", header: "Updated", cell: ({ getValue }) => timeAgo(getValue() as string | null) },
   ], [creatorActivity, expanded, openPeek]);
 
+  // TanStack Table intentionally exposes unstable callbacks; React Compiler must not memoize this hook.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: filtered,
     columns,
@@ -407,19 +382,6 @@ function CreatorAccountsTable({
   );
 }
 
-export function AccountTable({ accounts }: { accounts: PortalAccount[] }) {
-  const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "views", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("accounts", accountEngagementHidden);
-  const filtered = useMemo(() => accounts.filter((account) => `${account.username} ${account.displayName} ${account.platform}`.toLowerCase().includes(search.toLowerCase())), [accounts, search]);
-  const columns = useMemo<ColumnDef<PortalAccount>[]>(() => [
-    { accessorKey: "username", header: "Account", cell: ({ row }) => <Link href={`/accounts/${encodeURIComponent(row.original.id)}`} className="creator-cell"><Avatar src={row.original.avatarUrl} name={row.original.username} /><span><strong>@{row.original.username}</strong><small>{row.original.displayName}</small></span></Link> }, { accessorKey: "platform", header: "Platform", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone="info" /> },
-    { accessorKey: "followers", header: "Followers", cell: ({ getValue }) => formatNumber(Number(getValue() ?? 0)) }, { accessorKey: "posts", header: "Posts", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "averageViews", header: "Avg. views", cell: ({ getValue }) => formatNumber(Number(getValue())) },
-    ...accountEngagementColumns,
-    { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "latestPostAt", header: "Latest post", cell: ({ getValue }) => timeAgo(getValue() as string | null) }, { accessorKey: "linkState", header: "Creator link", cell: ({ getValue }) => <StateBadge label={String(getValue())} tone={getValue() === "confirmed" ? "success" : "attention"} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <div className="stack-cell"><TrackingBadge state={row.original.trackingState} /><small>{timeAgo(row.original.refreshedAt)}</small></div> },
-  ], []);
-  const table = useReactTable({ data: filtered, columns, state: { sorting, columnVisibility: visibility }, onSortingChange: setSorting, onColumnVisibilityChange: setVisibility, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(), initialState: { pagination: { pageSize: 20 } } });
-  return <section className="data-panel"><TableToolbar search={search} setSearch={setSearch} placeholder="Search username, creator, or platform…" columns={table.getAllLeafColumns().map((column) => ({ id: column.id, label: typeof column.columnDef.header === "string" ? column.columnDef.header : column.id, visible: column.getIsVisible() }))} toggleColumn={(id) => table.getColumn(id)?.toggleVisibility()}><Button variant="outline" size="sm" className="toolbar-button"><Filter /> Platform</Button></TableToolbar><DenseTable table={table} /><Pagination page={table.getState().pagination.pageIndex + 1} pages={table.getPageCount()} rows={filtered.length} previous={table.previousPage} next={table.nextPage} canPrevious={table.getCanPreviousPage()} canNext={table.getCanNextPage()} /></section>;
-}
-
 export function VideoTable({ videos, visibility: initialVisibilityMode = "included" }: { videos: PortalVideo[]; visibility?: "included" | "excluded" }) {
   const router = useRouter();
   const params = useSearchParams(); const [search, setSearch] = useState(params.get("q") ?? ""); const [sorting, setSorting] = useState<SortingState>([{ id: "publishedAt", desc: true }]); const [visibility, setVisibility] = useColumnVisibility("videos", { bookmarks: false }); const [selection, setSelection] = useState<RowSelectionState>({}); const [pending, setPending] = useState(false); const [message, setMessage] = useState<string | null>(null);
@@ -428,9 +390,11 @@ export function VideoTable({ videos, visibility: initialVisibilityMode = "includ
   const filtered = useMemo(() => videos.filter((video) => video.included === (visibilityMode === "included") && `${video.caption} ${video.accountUsername} ${video.platform}`.toLowerCase().includes(search.toLowerCase())), [videos, search, visibilityMode]);
   const columns = useMemo<ColumnDef<PortalVideo>[]>(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.caption}`} /> },
-    { accessorKey: "caption", header: "Video", cell: ({ row }) => <Link href={`/videos/${encodeURIComponent(row.original.id)}`} className="video-cell"><span className="video-thumb">{row.original.thumbnailUrl ? <img src={row.original.thumbnailUrl} alt="" /> : null}</span><span><strong>{row.original.caption}</strong><small>@{row.original.accountUsername} · {row.original.platform}</small></span></Link> }, { accessorKey: "publishedAt", header: "Published", cell: ({ getValue }) => formatDate(getValue() as string | null) }, { accessorKey: "durationSeconds", header: "Duration", cell: ({ getValue }) => getValue() == null ? "—" : `${getValue()}s` },
+    { accessorKey: "caption", header: "Video", cell: ({ row }) => <Link href={`/videos/${encodeURIComponent(row.original.id)}`} className="video-cell"><span className="video-thumb">{row.original.thumbnailUrl ? <SourceImage src={row.original.thumbnailUrl} width={32} height={38} /> : null}</span><span><strong>{row.original.caption}</strong><small>@{row.original.accountUsername} · {row.original.platform}</small></span></Link> }, { accessorKey: "publishedAt", header: "Published", cell: ({ getValue }) => formatDate(getValue() as string | null) }, { accessorKey: "durationSeconds", header: "Duration", cell: ({ getValue }) => getValue() == null ? "—" : `${getValue()}s` },
     { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "baselineMultiplier", header: "Baseline", cell: ({ getValue }) => `${Number(getValue()).toFixed(1)}×` }, { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "included", header: "Visibility", cell: ({ row }) => <VisibilityMenu videos={[row.original]} included={row.original.included} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
   ], []);
+  // TanStack Table intentionally exposes unstable callbacks; React Compiler must not memoize this hook.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({ data: filtered, columns, state: { sorting, columnVisibility: visibility, rowSelection: selection }, onSortingChange: setSorting, onColumnVisibilityChange: setVisibility, onRowSelectionChange: setSelection, getRowId: (row) => row.id, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getPaginationRowModel: getPaginationRowModel(), initialState: { pagination: { pageSize: 20 } } });
   const selectedVideos = table.getSelectedRowModel().rows.map((row) => row.original);
   const selectionIncluded = selectedVideos.length && selectedVideos.every((video) => video.included) ? true : selectedVideos.length && selectedVideos.every((video) => !video.included) ? false : null;

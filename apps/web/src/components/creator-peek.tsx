@@ -3,6 +3,7 @@
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { CreatorCharts } from "@/components/creator-charts";
+import { SourceImage } from "@/components/source-image";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import type { PortalCreator, PortalVideo } from "@/lib/portal-types";
@@ -22,7 +23,7 @@ export function CreatorPeek({ creator, videos, onClose }: { creator: PortalCreat
               <div className="creator-peek-identity">
                 <span className="account-avatar creator-peek-avatar">
                   {creator.discord.avatarUrl ?? creator.accounts[0]?.avatarUrl
-                    ? <img src={creator.discord.avatarUrl ?? creator.accounts[0]!.avatarUrl!} alt="" />
+                    ? <SourceImage src={creator.discord.avatarUrl ?? creator.accounts[0]!.avatarUrl!} width={46} height={46} />
                     : creator.displayName.slice(0, 1)}
                 </span>
                 <div>

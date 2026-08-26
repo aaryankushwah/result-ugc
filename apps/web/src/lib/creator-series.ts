@@ -100,7 +100,3 @@ export function foldAccountTail(rows: CreatorAccountPoint[], limit = 6): Creator
     posts: tail.reduce((sum, row) => sum + row.posts, 0),
   }];
 }
-
-export function hasCreatorSeriesData(rows: Array<{ views: number }>): boolean {
-  return rows.some((row) => row.views > 0);
-}

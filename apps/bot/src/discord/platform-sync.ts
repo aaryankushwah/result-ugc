@@ -176,17 +176,21 @@ async function logEvent(orgId: string, creatorId: string | null, type: string, s
 export async function processDiscordOperationQueue(client: Client): Promise<void> {
   if (!process.env.DATABASE_URL) return;
   const now = new Date();
+  const servedGuildIds = [...client.guilds.cache.keys()];
+  if (!servedGuildIds.length) return;
   await getDatabase().update(discordOperations).set({
     state: "queued",
     lockedAt: null,
     availableAt: now,
     lastError: "Previous Discord worker stopped before completing this operation; retrying safely.",
     updatedAt: now,
-  }).where(and(eq(discordOperations.state, "running"), lte(discordOperations.lockedAt, staleDiscordOperationCutoff(now))));
-  // Scope the claim to guilds this worker actually serves. Without the guild filter a
-  // second worker would claim another guild's operations and fail to fetch the guild.
-  const servedGuildIds = [...client.guilds.cache.keys()];
-  if (!servedGuildIds.length) return;
+  }).where(and(
+    eq(discordOperations.state, "running"),
+    lte(discordOperations.lockedAt, staleDiscordOperationCutoff(now)),
+    inArray(discordOperations.guildId, servedGuildIds),
+  ));
+  // Scope recovery and claims to guilds this worker actually serves. Without both
+  // filters, one worker can steal another guild's in-flight or queued operation.
   const [operation] = await getDatabase().select().from(discordOperations).where(and(eq(discordOperations.state, "queued"), lte(discordOperations.availableAt, now), inArray(discordOperations.guildId, servedGuildIds))).orderBy(asc(discordOperations.createdAt)).limit(1);
   if (!operation) return;
   const claimed = await getDatabase().update(discordOperations).set({ state: "running", lockedAt: new Date(), attempts: operation.attempts + 1, updatedAt: new Date() }).where(and(eq(discordOperations.id, operation.id), eq(discordOperations.state, "queued"))).returning({ id: discordOperations.id });

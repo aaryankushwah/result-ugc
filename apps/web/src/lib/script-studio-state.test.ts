@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl } from "./script-studio-state";
+import { isPersistedCreatorId, mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "./script-studio-state";
 
 describe("script studio state", () => {
   it("keeps existing creator assignments when another creator is added", () => {
@@ -33,5 +33,18 @@ describe("script studio state", () => {
       { id: "image", label: "Product shot", kind: "image", sourceUrl: "https://example.com/image", downloadUrl: null },
     ];
     expect(partitionScriptAssets(assets)).toEqual({ references: [assets[0]], resources: [assets[1], assets[2]] });
+  });
+
+  it("removes only the deleted script from the editor state", () => {
+    const scripts = [{ id: "script-a", title: "A" }, { id: "script-b", title: "B" }];
+    expect(removeStudioScript(scripts, "script-a")).toEqual([{ id: "script-b", title: "B" }]);
+    expect(scripts).toHaveLength(2);
+  });
+
+  it("restores an optimistically deleted script at its original position", () => {
+    const deleted = { id: "script-b", title: "B" };
+    const current = [{ id: "script-a", title: "A" }, { id: "script-c", title: "C" }];
+    expect(restoreStudioScript(current, deleted, 1)).toEqual([current[0], deleted, current[1]]);
+    expect(restoreStudioScript([deleted], deleted, 0)).toEqual([deleted]);
   });
 });

@@ -7,13 +7,17 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm --filter @result/domain build && pnpm --filter @result/db build && pnpm --filter @result/web build && pnpm --filter @result/discord-bot build",
-    "check": "pnpm --filter @result/domain check && pnpm --filter @result/db check && pnpm --filter @result/web lint && pnpm --filter @result/discord-bot check",
+    "build:packages": "pnpm --filter @result/domain build && pnpm --filter @result/db build",
+    "build:apps": "pnpm --filter @result/web exec next build && pnpm --filter @result/discord-bot build",
+    "build": "pnpm build:packages && pnpm build:apps",
+    "check:apps": "pnpm --filter @result/web lint && pnpm --filter @result/discord-bot check",
+    "check": "pnpm build:packages && pnpm check:apps",
     "db:generate": "pnpm --filter @result/db generate",
     "db:migrate": "pnpm --filter @result/db migrate",
     "dev:web": "pnpm --filter @result/web dev",
     "dev:bot": "pnpm --filter @result/discord-bot dev",
-    "test": "pnpm --filter @result/web test && pnpm --filter @result/discord-bot test",
-    "verify": "pnpm check && pnpm test && pnpm build"
+    "test:apps": "pnpm --filter @result/web test && pnpm --filter @result/discord-bot test",
+    "test": "pnpm build:packages && pnpm test:apps",
+    "verify": "pnpm build:packages && pnpm check:apps && pnpm test:apps && pnpm build:apps"
   }
 }

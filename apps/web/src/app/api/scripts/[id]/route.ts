@@ -1,5 +1,5 @@
-import { activityEvents, scripts, scriptVersions } from "@result/db";
-import { and, eq } from "drizzle-orm";
+import { activityEvents, discordOperations, scriptAssignments, scripts, scriptVersions } from "@result/db";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { managerContext, mutationErrorResponse, MutationError } from "@/lib/mutation-context";
 import { estimateScriptDuration, scriptHookFromSections } from "@/lib/script-writing";
@@ -69,6 +69,83 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     });
     invalidatePortalData();
     return Response.json({ ok: true, version: nextVersion });
+  } catch (error) {
+    return mutationErrorResponse(error);
+  }
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const context = await managerContext();
+    let title = "Script";
+    let assignmentCount = 0;
+    let canceledNotificationCount = 0;
+    let canceledNotificationIds: string[] = [];
+
+    await context.db.transaction(async (transaction) => {
+      const script = (await transaction
+        .select({ id: scripts.id, title: scripts.title })
+        .from(scripts)
+        .where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id)))
+        .limit(1)
+        .for("update"))[0];
+      if (!script) throw new MutationError(404, "Script not found");
+      title = script.title;
+
+      const assignments = await transaction
+        .select({ discordOperationId: scriptAssignments.discordOperationId })
+        .from(scriptAssignments)
+        .where(and(eq(scriptAssignments.scriptId, id), eq(scriptAssignments.organizationId, context.organization.id)));
+      assignmentCount = assignments.length;
+      const operationIds = assignments
+        .map((assignment) => assignment.discordOperationId)
+        .filter((operationId): operationId is string => Boolean(operationId));
+
+      if (operationIds.length) {
+        const operations = await transaction
+          .select({ id: discordOperations.id, state: discordOperations.state })
+          .from(discordOperations)
+          .where(and(
+            eq(discordOperations.organizationId, context.organization.id),
+            inArray(discordOperations.id, operationIds),
+          ))
+          .for("update");
+        if (operations.some((operation) => operation.state === "running")) {
+          throw new MutationError(409, "A Discord notification is being delivered. Try deleting this script again in a moment.");
+        }
+        const cancellableIds = operations
+          .filter((operation) => operation.state === "queued" || operation.state === "failed")
+          .map((operation) => operation.id);
+        if (cancellableIds.length) {
+          const canceled = await transaction
+            .delete(discordOperations)
+            .where(and(
+              eq(discordOperations.organizationId, context.organization.id),
+              inArray(discordOperations.id, cancellableIds),
+            ))
+            .returning({ id: discordOperations.id });
+          canceledNotificationCount = canceled.length;
+          canceledNotificationIds = canceled.map((operation) => operation.id);
+        }
+      }
+
+      await transaction.insert(activityEvents).values({
+        organizationId: context.organization.id,
+        actorUserId: context.internalUser?.id ?? null,
+        type: "script.deleted",
+        summary: `Script “${script.title}” was deleted.`,
+        metadata: { scriptId: id, assignmentCount, canceledNotificationCount },
+      });
+      const deleted = await transaction
+        .delete(scripts)
+        .where(and(eq(scripts.id, id), eq(scripts.organizationId, context.organization.id)))
+        .returning({ id: scripts.id });
+      if (!deleted.length) throw new MutationError(404, "Script not found");
+    });
+
+    invalidatePortalData();
+    return Response.json({ ok: true, title, assignmentCount, canceledNotificationCount, canceledNotificationIds });
   } catch (error) {
     return mutationErrorResponse(error);
   }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { canonicalUrlFor, parseReferenceUrl, type ReferencePlatform } from "./reference-url";
 
-export { canonicalUrlFor, parseReferenceUrl, referencePlatformOf, type ParsedReference, type ReferencePlatform } from "./reference-url";
+export { parseReferenceUrl } from "./reference-url";
 
 export type ResolvedReel = {
   platform: ReferencePlatform;
@@ -30,7 +30,7 @@ function apiKey(): string {
  * Expands a TikTok share link (vm.tiktok.com/…, /t/…) into its canonical URL so
  * the numeric video id can be read. Free — consumes no Viral credits.
  */
-export async function resolveTikTokShortUrl(shortUrl: string, signal?: AbortSignal): Promise<string> {
+async function resolveTikTokShortUrl(shortUrl: string, signal?: AbortSignal): Promise<string> {
   const response = await fetch(`${VIRAL_API_URL}/videos/tracked/resolve-tiktok-short-url`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": apiKey() },
@@ -60,7 +60,7 @@ export async function resolveTikTokShortUrl(shortUrl: string, signal?: AbortSign
  * `/videos/{platform}/{id}/download` is limited to videos the organization
  * already tracks, whereas `/live/...` reads fresh upstream data.
  */
-export async function resolveReference(input: { platform: ReferencePlatform; videoId: string }, signal?: AbortSignal): Promise<ResolvedReel> {
+async function resolveReference(input: { platform: ReferencePlatform; videoId: string }, signal?: AbortSignal): Promise<ResolvedReel> {
   const { platform, videoId } = input;
   const response = await fetch(`${VIRAL_API_URL}/live/${platform}/videos/${encodeURIComponent(videoId)}`, {
     headers: { "x-api-key": apiKey() },

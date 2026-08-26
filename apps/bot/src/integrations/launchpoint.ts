@@ -2,7 +2,7 @@ const API_BASE = "https://dashboard.launchpointhq.com/api/v1";
 import type { ProviderActivity, ProviderCreator, ProviderProgram, ProviderRelationship, SigningProviderAdapter } from "@result/domain";
 import { deriveRelationshipState } from "@result/domain";
 
-export class LaunchpointApiError extends Error {
+class LaunchpointApiError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
     this.name = "LaunchpointApiError";

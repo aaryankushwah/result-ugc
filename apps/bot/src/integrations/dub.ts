@@ -8,7 +8,7 @@ export interface IssueDubLinkInput {
   externalId?: string;
 }
 
-export interface IssuedDubLink {
+interface IssuedDubLink {
   id: string;
   shortLink: string;
   destinationUrl: string;

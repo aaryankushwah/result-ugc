@@ -92,7 +92,7 @@ export type ChannelResolverDeps = {
   createCreatorChannel: typeof createCreatorChannel;
 };
 
-export const defaultChannelResolverDeps: ChannelResolverDeps = { findCreatorChannel, createCreatorChannel };
+const defaultChannelResolverDeps: ChannelResolverDeps = { findCreatorChannel, createCreatorChannel };
 
 /**
  * Resolves a creator's private channel, most-trusted source first:

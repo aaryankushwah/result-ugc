@@ -8,8 +8,11 @@ import {
   Clipboard,
   Clock3,
   Copy,
+  Eye,
   ExternalLink,
   File,
+  FlaskConical,
+  Gauge,
   Image as ImageIcon,
   LayoutDashboard,
   Link2,
@@ -23,6 +26,7 @@ import {
   Table2,
   Trash2,
   TriangleAlert,
+  Trophy,
   UserRoundCheck,
   Video,
 } from "lucide-react";
@@ -38,7 +42,7 @@ import { parseReferenceUrl } from "@/lib/reference-url";
 import { cleanScriptTitle } from "@/lib/script-title";
 import { ditherColorForStage } from "@/lib/pipeline-stage-color";
 import { DitherGradient } from "@/components/dither-kit/gradient";
-import { mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl } from "@/lib/script-studio-state";
+import { mergeScriptAssignments, partitionScriptAssets, referencePlatformFromUrl, removeStudioScript, restoreStudioScript } from "@/lib/script-studio-state";
 import type { ScriptStudioData, StudioAsset, StudioCreator, StudioScript } from "@/lib/script-studio-data";
 
 type StudioScreen = "bank" | "writer";
@@ -54,6 +58,7 @@ type GenerationOutcome = {
 export function ScriptStudio({ initialData, canManage }: { initialData: ScriptStudioData; canManage: boolean }) {
   const [screen, setScreen] = useState<StudioScreen>("bank");
   const [scripts, setScripts] = useState(initialData.scripts);
+  const [failedNotifications, setFailedNotifications] = useState(initialData.failedNotifications);
   const [active, setActive] = useState<StudioScript | null>(initialData.scripts[0] ?? null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -65,6 +70,8 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   const [importing, setImporting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [brandOpen, setBrandOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<StudioScript | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [brand, setBrand] = useState(initialData.brand);
   const [lastGeneration, setLastGeneration] = useState<GenerationOutcome | null>(null);
 
@@ -276,6 +283,36 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
     }
   };
 
+  const deleteScript = async () => {
+    if (!deleteTarget || !canManage) return;
+    const target = deleteTarget;
+    const originalIndex = scripts.findIndex((script) => script.id === target.id);
+    const wasActive = active?.id === target.id;
+    setDeleting(true);
+    setDeleteTarget(null);
+    setScripts((current) => removeStudioScript(current, target.id));
+    if (wasActive) {
+      setLastGeneration(null);
+      setActive(null);
+      setScreen("bank");
+    }
+    notify(`Deleted “${target.title.trim() || "Untitled script"}”`);
+    try {
+      if (isUuid(target.id)) {
+        const response = await fetch(`/api/scripts/${target.id}`, { method: "DELETE" });
+        const result = await response.json() as { error?: string; canceledNotificationIds?: string[] };
+        if (!response.ok) throw new Error(result.error ?? "Script could not be deleted");
+        const canceledIds = new Set(result.canceledNotificationIds ?? []);
+        if (canceledIds.size) setFailedNotifications((current) => current.filter((notification) => !canceledIds.has(notification.operationId)));
+      }
+    } catch (error) {
+      setScripts((current) => restoreStudioScript(current, target, originalIndex));
+      notify(`${error instanceof Error ? error.message : "Script could not be deleted"} · restored`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const assign = async (creatorIds: string[], dueAt: string, message: string, notifyCreator: boolean) => {
     if (!active) return;
     setAssigning(true);
@@ -315,15 +352,33 @@ export function ScriptStudio({ initialData, canManage }: { initialData: ScriptSt
   };
 
   return <div className="script-studio-shell">
-    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={initialData.failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
+    {screen === "bank" ? <ScriptBank scripts={filtered} allScripts={scripts} query={query} setQuery={setQuery} status={status} setStatus={setStatus} openWriter={openWriter} requestDelete={setDeleteTarget} openImport={() => setImportOpen(true)} openBrand={() => setBrandOpen(true)} failedNotifications={failedNotifications} notify={notify} updateMetadata={updateCardMetadata} canManage={canManage} sourceMode={initialData.sourceMode} /> : active ? <ScriptWriter script={active} updateScript={updateActive} goBack={() => { setScreen("bank"); setLastGeneration(null); }} save={save} saving={saving} deleting={deleting} assigning={assigning} generating={generating} generate={generate} generation={lastGeneration} dismissGeneration={() => setLastGeneration(null)} openDelete={() => setDeleteTarget(active)} openAssign={() => setAssignOpen(true)} notify={notify} canManage={canManage} /> : null}
     <ImportDialog open={importOpen} setOpen={setImportOpen} onImport={importReel} onCreate={createDraft} importing={importing} />
     <BrandDialog key={brandOpen ? "brand-open" : "brand-closed"} open={brandOpen} setOpen={setBrandOpen} brand={brand} setBrand={setBrand} notify={notify} canManage={canManage} />
     <AssignDialog key={`${active?.id ?? "none"}-${assignOpen ? "open" : "closed"}`} open={assignOpen} setOpen={setAssignOpen} script={active} creators={initialData.creators} assigning={assigning} onAssign={assign} />
+    <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleting) setDeleteTarget(null); }}>
+      <DialogContent className="script-delete-dialog" showCloseButton={!deleting}>
+        <DialogHeader>
+          <DialogTitle>Delete “{deleteTarget?.title.trim() || "Untitled script"}”?</DialogTitle>
+          <DialogDescription>
+            {deleteTarget && isUuid(deleteTarget.id)
+              ? "This permanently removes the script, its versions, assignments, resources, and test records. Discord messages already delivered to creators will remain."
+              : "This removes the unsaved draft from this session."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+          <Button variant="destructive" onClick={deleteScript} disabled={deleting}>
+            <Trash2 />Delete script
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     {toast ? <div className="studio-toast" role="status"><Check />{toast}</div> : null}
   </div>;
 }
 
-function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, openWriter, openImport, openBrand, failedNotifications, notify, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; status:string; setStatus:(value:string)=>void; openWriter:(script:StudioScript)=>void; openImport:()=>void; openBrand:()=>void; failedNotifications:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
+function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, openWriter, requestDelete, openImport, openBrand, failedNotifications, notify, updateMetadata, canManage, sourceMode }: { scripts:StudioScript[]; allScripts:StudioScript[]; query:string; setQuery:(value:string)=>void; status:string; setStatus:(value:string)=>void; openWriter:(script:StudioScript)=>void; requestDelete:(script:StudioScript)=>void; openImport:()=>void; openBrand:()=>void; failedNotifications:ScriptStudioData["failedNotifications"]; notify:(message:string)=>void; updateMetadata:(script:StudioScript,patch:Partial<Pick<StudioScript,"pipelineStage"|"category"|"priority">>)=>void; canManage:boolean; sourceMode:ScriptStudioData["sourceMode"] }) {
   const [view,setView]=useState<"pipeline"|"table">("pipeline");
   const [dragged,setDragged]=useState<string|null>(null);
   const [dropStage,setDropStage]=useState<StudioScript["pipelineStage"]|null>(null);
@@ -345,7 +400,17 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
     <div className="pipeline-titlebar"><div><p className="eyebrow">CREATIVE TESTING SYSTEM</p><h1>Script pipeline</h1><p>Every concept moves from reference to test, iteration, and a measurable winner.</p></div><div className="pipeline-title-actions">{sourceMode==="database"?<span className="neon-live"><i/>Neon live</span>:null}{canManage?<><button className="studio-secondary" onClick={openBrand}><Building2/>Brand</button><Button className="studio-primary" onClick={openImport}><Plus/>New script</Button></>:null}</div></div>
     {sourceMode==="preview"?<div className="studio-preview-banner"><Sparkles/><div><strong>Preview data</strong><span>Neon is connected. Create the first real script to replace these example cards.</span></div></div>:null}
     {failedNotifications.length?<FailedNotificationStrip items={failedNotifications} notify={notify}/>:null}
-    <div className="pipeline-overview"><article><span>ACTIVE TESTS</span><strong>{activeTests}</strong><small>{allScripts.reduce((sum,script)=>sum+script.performance.liveTests,0)} variants live</small></article><article><span>TESTED VIEWS</span><strong>{compactNumber(totalViews)}</strong><small>Across tracked variants</small></article><article><span>WINNING CONCEPTS</span><strong>{winners}</strong><small>{allScripts.length?Math.round(winners/allScripts.length*100):0}% winner rate</small></article><article><span>AVG. HOOK RATE</span><strong>{hookRates.length?`${Math.round(hookRates.reduce((sum,value)=>sum+value,0)/hookRates.length*100)}%`:"—"}</strong><small>Across measured tests</small></article></div>
+    <section className="overview-metric-grid script-overview-metrics" aria-label="Script performance summary">
+      {[
+        { label:"Active tests", value:activeTests, icon:FlaskConical },
+        { label:"Tested views", value:compactNumber(totalViews), icon:Eye },
+        { label:"Winning concepts", value:winners, icon:Trophy },
+        { label:"Average hook rate", value:hookRates.length?`${Math.round(hookRates.reduce((sum,value)=>sum+value,0)/hookRates.length*100)}%`:"—", icon:Gauge },
+      ].map((metric)=><article className="metric-card overview-metric-card" key={metric.label}>
+        <span className="metric-icon"><metric.icon /></span>
+        <div className="overview-metric-copy"><p>{metric.label}</p><strong>{metric.value}</strong></div>
+      </article>)}
+    </section>
     <div className="pipeline-controls"><div className="pipeline-views"><button className={view==="pipeline"?"active":""} onClick={()=>setView("pipeline")}><LayoutDashboard/>Pipeline</button><button className={view==="table"?"active":""} onClick={()=>setView("table")}><Table2/>Table</button></div><div className="category-tabs">{categories.slice(0,7).map((category)=><button key={category} className={status===category?"active":""} onClick={()=>setStatus(category)}>{category==="all"?"All categories":category}<span>{category==="all"?allScripts.length:allScripts.filter((script)=>script.category===category).length}</span></button>)}</div><label className="pipeline-search"><Search/><input value={query} onChange={(event)=>setQuery(event.target.value)} placeholder="Search scripts"/></label></div>
     {view==="pipeline"?<div className="pipeline-board">{stages.map((stage)=>{
       const cards=filteredByCategory.filter((script)=>script.pipelineStage===stage.id);
@@ -360,16 +425,16 @@ function ScriptBank({ scripts, allScripts, query, setQuery, status, setStatus, o
       >
         <header><div><span><i/>{stage.label}</span><strong>{cards.length}</strong></div><p>{stage.description}</p></header>
         <div className="pipeline-cards">
-          {cards.map((script)=><article className="pipeline-card" key={script.id} draggable={canManage} onDragStart={(event)=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",script.id);setDragged(script.id);setDropStage(script.pipelineStage);}} onDragEnd={()=>{setDragged(null);setDropStage(null);}} data-dragging={dragged===script.id||undefined}><DitherGradient className="pipeline-card-wash" from={ditherColorForStage(script.pipelineStage)} direction="up" cell={5} /><div className="pipeline-card-top"><span className="pipeline-platform" title={script.targetPlatform}><i aria-hidden="true" />{script.targetPlatform}</span><select className="priority-pill" data-priority={script.priority} value={script.priority} onChange={(event)=>updateMetadata(script,{priority:event.target.value as StudioScript["priority"]})} onClick={(event)=>event.stopPropagation()} aria-label={`${script.title} priority`}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div><button className="pipeline-card-title" onClick={()=>openWriter(script)}><strong>{cleanScriptTitle(script.title)}</strong></button><div className="pipeline-card-tags"><select value={script.category} onChange={(event)=>updateMetadata(script,{category:event.target.value})} aria-label={`${script.title} category`}><option>{script.category}</option>{["Pain point","Listicle","POV","Education","Founder story","Contrarian","Product demo","Trend remix"].filter((item)=>item!==script.category).map((item)=><option key={item}>{item}</option>)}</select><span>{script.format}</span></div><div className="pipeline-card-stats"><div><strong>{compactNumber(script.performance.views)}</strong><span>views</span></div><div><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>hook rate</span></div><div><strong>{script.performance.tests}</strong><span>tests</span></div></div><footer><div className="assignment-faces">{script.assignments.length?script.assignments.slice(0,3).map((assignment)=><span key={assignment.id} title={assignment.creatorName}>{initials(assignment.creatorName)}</span>):<em>Unassigned</em>}</div><time>{timeAgo(script.updatedAt)}</time><button onClick={()=>openWriter(script)} aria-label={`Open ${script.title}`}><ArrowUpRight/></button></footer></article>)}
+          {cards.map((script)=><article className="pipeline-card" key={script.id} draggable={canManage} onDragStart={(event)=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",script.id);setDragged(script.id);setDropStage(script.pipelineStage);}} onDragEnd={()=>{setDragged(null);setDropStage(null);}} data-dragging={dragged===script.id||undefined}><DitherGradient className="pipeline-card-wash" from={ditherColorForStage(script.pipelineStage)} direction="up" cell={5} /><div className="pipeline-card-top"><span className="pipeline-platform" title={script.targetPlatform}><i aria-hidden="true" />{script.targetPlatform}</span><select className="priority-pill" data-priority={script.priority} value={script.priority} onChange={(event)=>updateMetadata(script,{priority:event.target.value as StudioScript["priority"]})} onClick={(event)=>event.stopPropagation()} aria-label={`${script.title} priority`}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>{canManage?<button type="button" className="pipeline-card-delete" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} onPointerDown={(event)=>event.stopPropagation()} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button>:null}</div><button className="pipeline-card-title" onClick={()=>openWriter(script)}><strong>{cleanScriptTitle(script.title)}</strong></button><div className="pipeline-card-tags"><select value={script.category} onChange={(event)=>updateMetadata(script,{category:event.target.value})} aria-label={`${script.title} category`}><option>{script.category}</option>{["Pain point","Listicle","POV","Education","Founder story","Contrarian","Product demo","Trend remix"].filter((item)=>item!==script.category).map((item)=><option key={item}>{item}</option>)}</select><span>{script.format}</span></div><div className="pipeline-card-stats"><div><strong>{compactNumber(script.performance.views)}</strong><span>views</span></div><div><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>hook rate</span></div><div><strong>{script.performance.tests}</strong><span>tests</span></div></div><footer><div className="assignment-faces">{script.assignments.length?script.assignments.slice(0,3).map((assignment)=><span key={assignment.id} title={assignment.creatorName}>{initials(assignment.creatorName)}</span>):<em>Unassigned</em>}</div><time>{timeAgo(script.updatedAt)}</time><button onClick={()=>openWriter(script)} aria-label={`Open ${script.title}`}><ArrowUpRight/></button></footer></article>)}
           {isDropTarget?<div className="pipeline-drop-preview" aria-hidden="true"><span>Drop script here</span></div>:null}
           {canManage&&stage.id!=="retired"?<button className="pipeline-add" onClick={openImport}><Plus/>Add script</button>:null}
         </div>
       </section>;
-    })}</div>:<div className="pipeline-table"><div className="pipeline-table-head"><span>Script</span><span>Stage</span><span>Category</span><span>Views</span><span>Hook rate</span><span>Tests</span><span/></div>{filteredByCategory.map((script)=><button key={script.id} onClick={()=>openWriter(script)}><div><strong>{cleanScriptTitle(script.title)}</strong><span>{script.format}</span></div><span>{stages.find((stage)=>stage.id===script.pipelineStage)?.label}</span><span>{script.category}</span><strong>{compactNumber(script.performance.views)}</strong><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>{script.performance.tests}</span><ArrowUpRight/></button>)}</div>}
+    })}</div>:<div className="pipeline-table"><div className="pipeline-table-head"><span>Script</span><span>Stage</span><span>Category</span><span>Views</span><span>Hook rate</span><span>Tests</span><span/></div>{filteredByCategory.map((script)=><div className="pipeline-table-row" key={script.id} role="button" tabIndex={0} onClick={()=>openWriter(script)} onKeyDown={(event)=>{if((event.target as HTMLElement).closest("button"))return;if(event.key==="Enter"||event.key===" "){event.preventDefault();openWriter(script);}}}><div><strong>{cleanScriptTitle(script.title)}</strong><span>{script.format}</span></div><span>{stages.find((stage)=>stage.id===script.pipelineStage)?.label}</span><span>{script.category}</span><strong>{compactNumber(script.performance.views)}</strong><strong>{script.performance.hookRate===null?"—":`${Math.round(script.performance.hookRate*100)}%`}</strong><span>{script.performance.tests}</span><div className="pipeline-table-actions"><button type="button" onClick={(event)=>{event.stopPropagation();requestDelete(script);}} aria-label={`Delete ${script.title}`} title="Delete script"><Trash2/></button><ArrowUpRight/></div></div>)}</div>}
   </div>;
 }
 
-function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, generating, generate, generation, dismissGeneration, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; assigning:boolean; generating:boolean; generate:()=>void; generation:GenerationOutcome|null; dismissGeneration:()=>void; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
+function ScriptWriter({ script, updateScript, goBack, save, saving, deleting, assigning, generating, generate, generation, dismissGeneration, openDelete, openAssign, notify, canManage }: { script:StudioScript; updateScript:(updater:(script:StudioScript)=>StudioScript)=>void; goBack:()=>void; save:()=>void; saving:boolean; deleting:boolean; assigning:boolean; generating:boolean; generate:()=>void; generation:GenerationOutcome|null; dismissGeneration:()=>void; openDelete:()=>void; openAssign:()=>void; notify:(message:string)=>void; canManage:boolean }) {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(true);
   const [assetDialog, setAssetDialog] = useState<"reference_video"|"resource"|null>(null);
@@ -452,7 +517,7 @@ function ScriptWriter({ script, updateScript, goBack, save, saving, assigning, g
     return () => window.removeEventListener("keydown",handleSave);
   },[canSave,save]);
   return <div className="writer-frame">
-    <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button className="writer-generate" onClick={generate} disabled={!canGenerate} title="Swap the business, keep every other word">{generating?<Clock3/>:<Sparkles/>}{generating?"Generating…":"Generate"}</button><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
+    <header className="writer-header"><button className="writer-back" onClick={goBack}><ArrowLeft /> Scripts</button><div className="writer-actions"><button onClick={copyScript} disabled={!scriptText.trim()}>{copied?<Check/>:<Copy/>}{copied?"Copied":"Copy"}</button>{canManage?<><button className="writer-delete" onClick={openDelete} disabled={saving || deleting || assigning || generating}><Trash2/>Delete</button><button className="writer-generate" onClick={generate} disabled={!canGenerate} title="Swap the business, keep every other word">{generating?<Clock3/>:<Sparkles/>}{generating?"Generating…":"Generate"}</button><button onClick={save} disabled={!canSave}>{saving?<Clock3/>:<Clipboard/>}{saving?"Saving…":script.latestVersion ? `Save v${script.latestVersion + 1}` : "Save"}</button><Button className="studio-primary" onClick={openAssign} disabled={!scriptText.trim() || saving || assigning}>{assigning?<Clock3/>:<Send />}{assigning?"Assigning…":"Assign"}</Button></>:null}</div></header>
     <main className="simple-script-writer">
       <input className="simple-script-title" aria-label="Script title" value={script.title} placeholder="Untitled script" onChange={(event) => updateScript((current) => ({...current,title:event.target.value,updatedAt:new Date().toISOString()}))}/>
       <div className="simple-script-toolbar">

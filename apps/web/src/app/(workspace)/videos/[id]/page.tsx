@@ -1,6 +1,7 @@
 import { ArrowLeft, ExternalLink, FileVideo2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SourceImage } from "@/components/source-image";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "@/components/ui";
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
@@ -14,7 +15,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
   const creator = video.creatorId ? data.creators.find((item) => item.id === video.creatorId && item.source === "result") ?? null : null;
   return <div className="page-stack creator-profile">
     <Link href="/videos" className="back-link"><ArrowLeft /> All videos</Link>
-    <header className="profile-header"><div className="profile-identity"><span className="profile-avatar">{video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <FileVideo2 />}</span><div><div className="badge-row"><StateBadge label={video.platform} tone="info" /><StateBadge label={video.included ? "included" : "excluded"} tone={video.included ? "success" : "neutral"} /><TrackingBadge state={video.trackingState} /></div><h1>{video.caption}</h1><p>@{video.accountUsername} · {formatDate(video.publishedAt)}</p></div></div><div className="profile-actions">{video.sourceUrl ? <a className="primary-button" href={video.sourceUrl} target="_blank" rel="noreferrer">Watch original <ExternalLink /></a> : null}</div></header>
+    <header className="profile-header"><div className="profile-identity"><span className="profile-avatar">{video.thumbnailUrl ? <SourceImage src={video.thumbnailUrl} width={56} height={56} /> : <FileVideo2 />}</span><div><div className="badge-row"><StateBadge label={video.platform} tone="info" /><StateBadge label={video.included ? "included" : "excluded"} tone={video.included ? "success" : "neutral"} /><TrackingBadge state={video.trackingState} /></div><h1>{video.caption}</h1><p>@{video.accountUsername} · {formatDate(video.publishedAt)}</p></div></div><div className="profile-actions">{video.sourceUrl ? <a className="primary-button" href={video.sourceUrl} target="_blank" rel="noreferrer">Watch original <ExternalLink /></a> : null}</div></header>
     <section className="metric-grid profile-metrics">{[
       { label: "Views", value: video.views }, { label: "Likes", value: video.likes }, { label: "Comments", value: video.comments }, { label: "Shares", value: video.shares }, { label: "Saves", value: video.bookmarks }, { label: "Engagement", value: formatPercent(video.engagementRate) },
     ].map((metric) => <article className="metric-card" key={metric.label}><div><p>{metric.label}</p><strong>{typeof metric.value === "number" ? formatNumber(metric.value) : metric.value}</strong></div></article>)}</section>

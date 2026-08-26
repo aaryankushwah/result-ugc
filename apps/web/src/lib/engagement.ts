@@ -2,7 +2,7 @@ import type { PortalVideo } from "./portal-types";
 
 export type EngagementTotals = { likes: number; comments: number; shares: number; bookmarks: number };
 
-export const emptyEngagement: EngagementTotals = { likes: 0, comments: 0, shares: 0, bookmarks: 0 };
+const emptyEngagement: EngagementTotals = { likes: 0, comments: 0, shares: 0, bookmarks: 0 };
 
 /**
  * Splits engagement into its parts for a set of videos, so a creator or account

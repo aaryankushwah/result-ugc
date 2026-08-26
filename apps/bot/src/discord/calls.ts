@@ -25,7 +25,7 @@ function parts(date: Date, timeZone: string): Record<string, number> {
   return Object.fromEntries(entries.filter((entry) => entry.type !== "literal").map((entry) => [entry.type, Number(entry.value)]));
 }
 
-export function localTimeToUtc(date: string, hour: number, minute: number, timeZone: string): Date {
+function localTimeToUtc(date: string, hour: number, minute: number, timeZone: string): Date {
   const [year, month, day] = date.split("-").map(Number) as [number, number, number];
   const localAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
   let guess = localAsUtc;

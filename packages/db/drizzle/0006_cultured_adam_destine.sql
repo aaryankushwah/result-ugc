@@ -1,0 +1,2 @@
+CREATE INDEX "creator_notes_org_created_idx" ON "creator_notes" USING btree ("organization_id","created_at");--> statement-breakpoint
+CREATE INDEX "sync_runs_org_started_idx" ON "sync_runs" USING btree ("organization_id","started_at");

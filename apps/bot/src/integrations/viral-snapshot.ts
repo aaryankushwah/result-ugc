@@ -1,6 +1,6 @@
 const FIFTEEN_MINUTES = 15 * 60 * 1_000;
 
-export async function requestViralSnapshotSync(): Promise<void> {
+async function requestViralSnapshotSync(): Promise<void> {
   const portalUrl = process.env.RESULT_PORTAL_URL;
   const secret = process.env.RESULT_PORTAL_CRON_SECRET;
   if (!portalUrl || !secret) return;
