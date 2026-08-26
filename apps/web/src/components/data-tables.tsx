@@ -64,7 +64,14 @@ function SocialPlatformIcon({ platform }: { platform: string }) {
   return <>{platform.slice(0, 2).toUpperCase()}</>;
 }
 function AccountPlatformIcons({ accounts }: { accounts: PortalAccount[] }) {
-  return <div className="account-platforms"><strong>{accounts.length}</strong>{accounts.slice(0, 4).map((account) => <span key={account.id} data-platform={account.platform.toLowerCase()} title={account.platform} aria-label={account.platform}><SocialPlatformIcon platform={account.platform} /></span>)}</div>;
+  return (
+    <div className="account-platforms">
+      <strong>{accounts.length}</strong>
+      <div className="account-platform-icons">
+        {accounts.slice(0, 4).map((account) => <span key={account.id} data-platform={account.platform.toLowerCase()} title={account.platform} aria-label={account.platform}><SocialPlatformIcon platform={account.platform} /></span>)}
+      </div>
+    </div>
+  );
 }
 function PostActivity({ days }: { days: PostActivityDay[] }) {
   return <div className="post-activity" aria-label={`Posts in the last seven days: ${days.map((day) => `${day.date} ${day.count}`).join(", ")}`}>{days.map((day) => <span className="post-activity-day" data-active={day.count > 0 || undefined} key={day.date} title={`${day.date}: ${day.count} ${day.count === 1 ? "post" : "posts"}`}><small>{day.label}</small><strong>{day.count}</strong></span>)}</div>;
@@ -355,14 +362,14 @@ function CreatorAccountsTable({
       <Table className="dense-table creator-tree-table">
         <TableHeader>
           {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id}>{group.headers.map((header) => <TableHead key={header.id}>{header.isPlaceholder ? null : header.column.getCanSort() ? <SortButton label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.column.id} sorted={header.column.getIsSorted()} toggle={() => header.column.toggleSorting()} /> : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>)}</TableRow>
+            <TableRow key={group.id}>{group.headers.map((header) => <TableHead data-column={header.column.id} key={header.id}>{header.isPlaceholder ? null : header.column.getCanSort() ? <SortButton label={typeof header.column.columnDef.header === "string" ? header.column.columnDef.header : header.column.id} sorted={header.column.getIsSorted()} toggle={() => header.column.toggleSorting()} /> : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>)}</TableRow>
           ))}
         </TableHeader>
         <TableBody>
           {rows.length ? rows.map((row) => (
             <Fragment key={row.id}>
               <TableRow className="creator-parent-row" data-state={row.getIsSelected() ? "selected" : undefined}>
-                {row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
+                {row.getVisibleCells().map((cell) => <TableCell data-column={cell.column.id} key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
               </TableRow>
               {expanded[row.original.id] ? <>
                 <TableRow className="nested-account-header-row">
