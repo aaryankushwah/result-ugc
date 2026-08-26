@@ -759,8 +759,8 @@ kbd { padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; bac
 .panel-header h2 { margin: 0; letter-spacing: -.02em; }
 .panel-header p { margin: 4px 0 0; color: #656565; }
 .chart-panel { position: relative; min-height: 355px; }
-.chart-panel > .panel-header { min-height: 44px; padding: 9px 14px; }
-.chart-panel .performance-heading { font-size: 14px; line-height: 1; letter-spacing: .015em; }
+.chart-panel > .panel-header { min-height: 52px; padding: 12px 16px; }
+.chart-panel .performance-heading { font-size: 19px; font-weight: 650; line-height: 1.2; letter-spacing: -.025em; }
 .chart-wrap { height: 265px; padding: 7px 5px 4px; }
 .dither-chart-wrap > div { height: 100%; width: 100%; }
 .range-tabs, .view-toggle { padding: 3px; display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: 8px; background: #101010; }
@@ -1427,7 +1427,7 @@ body { font-size: 15px; line-height: 1.5; letter-spacing: -.01em; }
 
 .light :is(.panel,.data-panel,.metric-card,.profile-header,.freshness-strip,.source-banner,.funnel-rail,.login-card,.integration-card,.settings-card,.chart-card,.table-card,.creator-accounts-panel) { border-color: var(--border); background: #fff; }
 .light :is(.panel,.data-panel,.overview-metric-grid) { box-shadow: none; }
-.light .panel-header { background: #fafbfc; }
+.light .panel-header { background: #fff; }
 .light :is(.table-toolbar,.table-pagination) { background: #fafbfc; }
 .light :is(.todo-list a,.rank-list > a) { border-bottom-color: #e7eaee; }
 .light .funnel-rail { background: var(--border); }
