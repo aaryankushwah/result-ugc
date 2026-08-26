@@ -202,14 +202,16 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
       id: "discord",
       accessorFn: (row) => row.discord.state,
       header: "Discord",
-      cell: ({ row }) => <StateBadge label={row.original.discord.state} tone={row.original.discord.state === "connected" ? "success" : "neutral"} />,
+      cell: ({ row }) => row.original.discord.state === "connected"
+        ? <span className="discord-connected-dot" role="img" aria-label="Discord connected" title="Discord connected" />
+        : <StateBadge label={row.original.discord.state} tone="neutral" />,
     },
     {
       id: "relationships",
       accessorFn: (row) => row.relationships.length,
       header: "Signing",
       cell: ({ row }) => row.original.relationships.length ? (
-        <div className="badge-row">{row.original.relationships.map((relationship) => <StateBadge key={relationship.id} label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} />)}</div>
+        <div className="badge-row">{row.original.relationships.map((relationship) => <span className="relationship-provider" data-provider={relationship.provider} key={relationship.id}><StateBadge label={relationship.provider} tone={relationship.state === "signed_active" ? "success" : "neutral"} /></span>)}</div>
       ) : <span className="muted-cell">No contract found</span>,
     },
     { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) },
