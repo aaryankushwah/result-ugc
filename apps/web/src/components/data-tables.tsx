@@ -25,6 +25,7 @@ import { calendarWeekPostActivity, type PostActivityDay } from "@/lib/table-metr
 import { useColumnVisibility } from "@/lib/use-column-visibility";
 import { buildVideoVisibilityRequests, countVideosChanging, videoVisibilityFailureMessage, videoVisibilityResultMessage } from "@/lib/video-visibility";
 import { formatDate, formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from "./ui";
+import { formatCpm } from "@/lib/launchpoint-cpm";
 
 function SortButton({ label, sorted, toggle }: { label: string; sorted: false | "asc" | "desc"; toggle: () => void }) { return <Button variant="ghost" size="xs" className="sort-button" onClick={toggle}>{label}{sorted === "asc" ? <ArrowUp /> : sorted === "desc" ? <ArrowDown /> : <ArrowUpDown />}</Button>; }
 function TableToolbar({ search, setSearch, placeholder, children, columns, toggleColumn }: { search: string; setSearch: (value: string) => void; placeholder: string; children?: React.ReactNode; columns: Array<{ id: string; label: string; visible: boolean }>; toggleColumn: (id: string) => void }) { return <div className="table-toolbar"><div className="table-search"><Search /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={placeholder} />{search ? <Button variant="ghost" size="icon-xs" onClick={() => setSearch("")} aria-label="Clear search"><X /></Button> : null}</div>{children}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="sm" className="toolbar-button"><Columns3 /> Columns</Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-44">{columns.map((column) => <DropdownMenuCheckboxItem key={column.id} checked={column.visible} onCheckedChange={() => toggleColumn(column.id)}>{column.label}</DropdownMenuCheckboxItem>)}</DropdownMenuContent></DropdownMenu></div>; }
@@ -226,6 +227,7 @@ export function CreatorAccountsRoster({ creators, videos }: { creators: PortalCr
     },
     { accessorKey: "posts30d", header: "30d posts", cell: ({ getValue }) => formatNumber(Number(getValue())) },
     { accessorKey: "views30d", header: "30d views", cell: ({ getValue }) => <strong className="primary-metric-cell">{formatNumber(Number(getValue()))}</strong> },
+    { accessorKey: "realizedCpm", header: "Realized CPM", cell: ({ getValue }) => <strong>{formatCpm(getValue() as number | null | undefined)}</strong> },
     {
       id: "averageViews",
       accessorFn: (row) => {
@@ -332,6 +334,7 @@ function CreatorAccountsTable({
     relationships: "Posts",
     posts30d: "Views",
     views30d: "Avg. views",
+    realizedCpm: "Realized CPM",
     averageViews: "Engagement",
     // Account rows report the provider's lifetime totals, matching how the
     // columns above already read for a single account.
@@ -354,6 +357,7 @@ function CreatorAccountsTable({
     if (columnId === "relationships") return formatNumber(account.posts);
     if (columnId === "posts30d") return <strong>{formatNumber(account.views)}</strong>;
     if (columnId === "views30d") return formatNumber(account.averageViews);
+    if (columnId === "realizedCpm") return <strong>{formatCpm(account.realizedCpm)}</strong>;
     if (columnId === "averageViews") return formatPercent(account.engagementRate);
     if (columnId === "comments30d") return formatNumber(account.comments);
     if (columnId === "likes30d") return formatNumber(account.likes);
@@ -407,7 +411,7 @@ export function VideoTable({ videos, visibility: initialVisibilityMode = "includ
   const columns = useMemo<ColumnDef<PortalVideo>[]>(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(checked) => table.toggleAllPageRowsSelected(Boolean(checked))} aria-label="Select page" />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(checked) => row.toggleSelected(Boolean(checked))} aria-label={`Select ${row.original.caption}`} /> },
     { accessorKey: "caption", header: "Video", cell: ({ row }) => <Link href={`/videos/${encodeURIComponent(row.original.id)}`} className="video-cell"><span className="video-thumb">{row.original.thumbnailUrl ? <SourceImage src={row.original.thumbnailUrl} width={32} height={38} /> : null}</span><span><strong>{row.original.caption}</strong><small>@{row.original.accountUsername} · {row.original.platform}</small></span></Link> }, { accessorKey: "publishedAt", header: "Published", cell: ({ getValue }) => formatDate(getValue() as string | null) }, { accessorKey: "durationSeconds", header: "Duration", cell: ({ getValue }) => getValue() == null ? "—" : `${getValue()}s` },
-    { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "baselineMultiplier", header: "Baseline", cell: ({ getValue }) => `${Number(getValue()).toFixed(1)}×` }, { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "included", header: "Visibility", cell: ({ row }) => <VisibilityMenu videos={[row.original]} included={row.original.included} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
+    { accessorKey: "views", header: "Views", cell: ({ getValue }) => <strong>{formatNumber(Number(getValue()))}</strong> }, { accessorKey: "realizedCpm", header: "Realized CPM", cell: ({ getValue }) => formatCpm(getValue() as number | null | undefined) }, { accessorKey: "baselineMultiplier", header: "Baseline", cell: ({ getValue }) => `${Number(getValue()).toFixed(1)}×` }, { accessorKey: "likes", header: "Likes", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "comments", header: "Comments", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "shares", header: "Shares", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "bookmarks", header: "Saves", cell: ({ getValue }) => formatNumber(Number(getValue())) }, { accessorKey: "engagementRate", header: "Engagement", cell: ({ getValue }) => formatPercent(Number(getValue())) }, { accessorKey: "included", header: "Visibility", cell: ({ row }) => <VisibilityMenu videos={[row.original]} included={row.original.included} /> }, { accessorKey: "trackingState", header: "Tracking", cell: ({ row }) => <TrackingBadge state={row.original.trackingState} /> },
   ], []);
   // TanStack Table intentionally exposes unstable callbacks; React Compiler must not memoize this hook.
   // eslint-disable-next-line react-hooks/incompatible-library

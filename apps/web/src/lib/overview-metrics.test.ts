@@ -6,7 +6,7 @@ describe("overview metric preferences", () => {
     expect(readOverviewMetricIds(null)).toEqual(defaultOverviewMetricIds);
     expect(defaultOverviewMetricIds.every((id) => overviewMetricIds.includes(id))).toBe(true);
     expect(new Set(defaultOverviewMetricIds).size).toBe(defaultOverviewMetricIds.length);
-    expect(defaultOverviewMetricIds.slice(0, 3)).toEqual(["views", "engagement", "likes"]);
+    expect(defaultOverviewMetricIds.slice(0, 3)).toEqual(["cpm", "views", "engagement"]);
     // Keep the rail scannable: past ~8 the cards shrink below a readable width.
     expect(defaultOverviewMetricIds.length).toBeLessThanOrEqual(8);
   });

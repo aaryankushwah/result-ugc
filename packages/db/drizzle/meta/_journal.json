@@ -50,6 +50,13 @@
       "when": 1787757715446,
       "tag": "0006_cultured_adam_destine",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787770407005,
+      "tag": "0007_nifty_sage",
+      "breakpoints": true
     }
   ]
 }

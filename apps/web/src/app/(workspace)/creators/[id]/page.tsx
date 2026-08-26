@@ -9,6 +9,7 @@ import { formatNumber, formatPercent, StateBadge, timeAgo, TrackingBadge } from 
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
 import type { PortalCreator } from "@/lib/portal-types";
+import { formatConfiguredCpm, formatCpm } from "@/lib/launchpoint-cpm";
 
 const tabs = [
   { id: "accounts", label: "Accounts" },
@@ -49,6 +50,7 @@ function AccountOverview({ creator }: { creator: PortalCreator }) {
           <span className="creator-account-stat"><small>Followers</small><strong>{formatNumber(account.followers ?? 0)}</strong></span>
           <span className="creator-account-stat"><small>Posts</small><strong>{formatNumber(account.posts)}</strong></span>
           <span className="creator-account-stat"><small>Views</small><strong>{formatNumber(account.views)}</strong></span>
+          <span className="creator-account-stat"><small>Realized CPM</small><strong>{formatCpm(account.realizedCpm)}</strong></span>
           <span className="creator-account-stat"><small>Engagement</small><strong>{formatPercent(account.engagementRate)}</strong></span>
           <span className="creator-account-status">
             <StateBadge label={account.linkState} tone={account.linkState === "confirmed" ? "success" : "attention"} />
@@ -133,6 +135,8 @@ export default async function CreatorProfilePage({
             {[
               { label: "Posts in 30 days", value: formatNumber(creator.posts30d) },
               { label: "Views in 30 days", value: formatNumber(creator.views30d) },
+              { label: "Realized CPM", value: formatCpm(creator.realizedCpm) },
+              { label: "Configured CPM", value: formatConfiguredCpm(creator.configuredCpmMin, creator.configuredCpmMax) },
               { label: "Engagement", value: formatPercent(creator.engagementRate) },
             ].map((metric) => (
               <article className="metric-card" key={metric.label}><div><p>{metric.label}</p><strong>{metric.value}</strong></div></article>

@@ -9,6 +9,7 @@ import {
   creators,
   getDatabase,
   internalUsers,
+  launchpointAnalyticsSnapshots,
   organizations,
   signingRelationships,
   socialAccounts,
@@ -20,6 +21,7 @@ import { aggregateTrackingState, deriveAccountPerformanceHealth } from "@result/
 import type { PortalAccount, PortalActivity, PortalAttributionPoint, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
 import { engagementTotals, totalInteractions } from "./engagement";
 import { buildPerformance } from "./performance";
+import { accountAnalyticsByIdentity, creatorCpmMetrics, launchpointAccountKey } from "./launchpoint-cpm";
 
 const VIRAL_STALE_AFTER_MS = 30 * 60 * 1_000;
 const PROVIDER_STALE_AFTER_MS = 20 * 60 * 1_000;
@@ -33,6 +35,14 @@ function groupBy<T, K>(rows: T[], keyOf: (row: T) => K): Map<K, T[]> {
     else grouped.set(key, [row]);
   }
   return grouped;
+}
+
+function launchpointCreatorId(raw: Record<string, unknown> | null): string | null {
+  if (!raw) return null;
+  const creator = raw.creator;
+  if (!creator || typeof creator !== "object" || Array.isArray(creator)) return null;
+  const externalId = (creator as Record<string, unknown>).externalId;
+  return typeof externalId === "string" && externalId ? externalId : null;
 }
 
 function accountSourceUrl(platform: string, username: string): string | null {
@@ -62,7 +72,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const organization = (await db.select().from(organizations).where(eq(organizations.slug, "result")).limit(1))[0];
   if (!organization) return null;
 
-  const [creatorRows, discordRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows, attributionLinkRows, attributionSnapshotRows] = await Promise.all([
+  const [creatorRows, discordRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows, attributionLinkRows, attributionSnapshotRows, launchpointSnapshotRows] = await Promise.all([
     db.select().from(creators).where(eq(creators.organizationId, organization.id)),
     db.select().from(creatorDiscord).where(eq(creatorDiscord.organizationId, organization.id)),
     db.select().from(signingRelationships).where(eq(signingRelationships.organizationId, organization.id)),
@@ -74,11 +84,17 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     db.select().from(syncRuns).where(eq(syncRuns.organizationId, organization.id)).orderBy(desc(syncRuns.startedAt)).limit(250),
     db.select().from(creatorAttributionLinks).where(eq(creatorAttributionLinks.organizationId, organization.id)),
     db.select().from(attributionDailySnapshots).where(eq(attributionDailySnapshots.organizationId, organization.id)).orderBy(attributionDailySnapshots.bucketAt),
+    db.select().from(launchpointAnalyticsSnapshots).where(eq(launchpointAnalyticsSnapshots.organizationId, organization.id)).limit(1),
   ]);
+
+  const launchpointSnapshot = launchpointSnapshotRows[0] ?? null;
+  const launchpointAccountAnalytics = accountAnalyticsByIdentity(launchpointSnapshot?.accounts ?? []);
+  const launchpointVideoAnalytics = new Map((launchpointSnapshot?.videos ?? []).map((video) => [video.id, video]));
 
   const accounts: PortalAccount[] = accountRows.map((account) => {
     const resolvedCreatorId = account.creatorId ?? account.suggestedCreatorId ?? null;
     const username = account.username ?? "unknown";
+    const launchpointAccount = launchpointAccountAnalytics.get(launchpointAccountKey(account.platform, username) ?? "");
     return {
       id: account.viralOrgAccountId,
       creatorId: resolvedCreatorId,
@@ -103,6 +119,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       linkState: account.linkState,
       error: account.lastError,
       sourceUrl: accountSourceUrl(account.platform, username),
+      realizedCpm: launchpointAccount?.cpm ?? null,
+      launchpointEarnings: launchpointAccount?.totalEarnings ?? null,
     };
   });
 
@@ -112,6 +130,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     const accountRow = accountByDatabaseId.get(video.accountId);
     const account = portalAccountByDatabaseId.get(video.accountId);
     if (!accountRow || !account) return [];
+    const launchpointVideo = launchpointVideoAnalytics.get(video.viralVideoId) ?? launchpointVideoAnalytics.get(video.platformVideoId);
     return [{
       id: video.viralVideoId,
       accountId: account.id,
@@ -136,6 +155,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       refreshedAt: video.sourceRefreshedAt?.toISOString() ?? null,
       error: video.lastError,
       sourceUrl: videoSourceUrl(account.platform, account.username, video.platformVideoId),
+      realizedCpm: launchpointVideo?.cpm ?? null,
+      launchpointEarnings: launchpointVideo?.earnings ?? null,
     }];
   });
 
@@ -158,6 +179,11 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const managerById = new Map(userRows.map((user) => [user.id, user.displayName]));
   const discordByCreatorId = new Map(discordRows.map((row) => [row.creatorId, row]));
   const relationshipsByCreatorId = groupBy(relationshipRows, (row) => row.creatorId);
+  const launchpointCreatorIdByCreatorId = new Map(relationshipRows.flatMap((row) => {
+    if (row.provider !== "launchpoint") return [];
+    const externalId = launchpointCreatorId(row.raw);
+    return externalId ? [[row.creatorId, externalId] as const] : [];
+  }));
   const notesByCreatorId = groupBy(noteRows, (row) => row.creatorId);
   const accountsByCreatorId = new Map<string, PortalAccount[]>();
   for (const account of accounts) {
@@ -191,6 +217,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       error: row.lastError,
     }));
     const trackingState = aggregateTrackingState(confirmedAccounts.map((account) => account.trackingState));
+    const cpm = creatorCpmMetrics(launchpointCreatorIdByCreatorId.get(creator.id) ?? null, launchpointSnapshot?.accounts ?? [], launchpointSnapshot?.payStructures ?? []);
     return {
       id: creator.id,
       displayName: creator.displayName,
@@ -221,6 +248,10 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       trackingState,
       lastActivityAt: creator.lastActivityAt?.toISOString() ?? null,
       source: "result",
+      realizedCpm: cpm.realizedCpm,
+      launchpointEarnings: cpm.totalEarnings,
+      configuredCpmMin: cpm.configuredCpmMin,
+      configuredCpmMax: cpm.configuredCpmMax,
     };
   });
 
@@ -327,5 +358,12 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
     freshness,
     providerErrors: latestFailedBySource,
     sourceMode: "database",
+    launchpointAnalytics: launchpointSnapshot ? {
+      realizedCpm: launchpointSnapshot.summary.cpm ?? null,
+      snapshotCpm: launchpointSnapshot.snapshotSummary.cpm ?? null,
+      totalEarnings: launchpointSnapshot.summary.totalEarnings ?? 0,
+      totalViews: launchpointSnapshot.summary.totalViews ?? 0,
+      refreshedAt: launchpointSnapshot.sourceRefreshedAt.toISOString(),
+    } : null,
   };
 }

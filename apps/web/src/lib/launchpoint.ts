@@ -1,6 +1,6 @@
 import "server-only";
 
-import { creatorIdentityKey, type LaunchpointRelationshipInput, type LaunchpointSocialIdentityInput } from "@result/db";
+import { creatorIdentityKey, type LaunchpointAccountAnalytics, type LaunchpointAnalyticsSummary, type LaunchpointPayStructure, type LaunchpointRelationshipInput, type LaunchpointSocialIdentityInput, type LaunchpointVideoAnalytics } from "@result/db";
 import { deriveRelationshipState, launchpointSocialIdentityFromPost, type ProviderCreator } from "@result/domain";
 
 const API_BASE = "https://dashboard.launchpointhq.com/api/v1";
@@ -9,10 +9,12 @@ type LaunchpointCreator = { id?: string; name?: string; email?: string; username
 type LaunchpointContract = { id?: string; contractorId?: string; contractorName?: string; programId?: string; contractName?: string; status?: string; startsAt?: string | number; expiresAt?: string | number };
 type LaunchpointPost = { id?: string; creatorId?: string; contractorName?: string; url?: string; platform?: string };
 type LaunchpointPage<T> = { data?: T[]; page?: number; total?: number; totalPages?: number };
+type LaunchpointOverviewData = { summary?: LaunchpointAnalyticsSummary; snapshotSummary?: LaunchpointAnalyticsSummary };
+type LaunchpointOverview = LaunchpointOverviewData & { data?: LaunchpointOverviewData };
 
 // Launchpoint rejects larger limits; /posts permits 500 while the other
 // collections cap at 100. Keeping this endpoint-specific avoids 5x requests.
-const PAGE_LIMIT: Record<string, number> = { "/creators": 100, "/contracts": 100, "/posts": 500 };
+const PAGE_LIMIT: Record<string, number> = { "/creators": 100, "/contracts": 100, "/posts": 500, "/analytics/accounts": 100, "/analytics/videos": 100, "/pay-structures": 100 };
 const MAX_PAGES = 25;
 
 async function launchpointFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
@@ -53,11 +55,23 @@ export async function getLaunchpointDataset(): Promise<{
   creators: ProviderCreator[];
   relationships: LaunchpointRelationshipInput[];
   socialIdentities: LaunchpointSocialIdentityInput[];
+  analytics: {
+    summary: LaunchpointAnalyticsSummary;
+    snapshotSummary: LaunchpointAnalyticsSummary;
+    accounts: LaunchpointAccountAnalytics[];
+    videos: LaunchpointVideoAnalytics[];
+    payStructures: LaunchpointPayStructure[];
+    refreshedAt: string;
+  };
 }> {
-  const [creatorResult, contractResult, postResult] = await Promise.all([
+  const [creatorResult, contractResult, postResult, overviewResult, accountAnalytics, videoAnalytics, payStructures] = await Promise.all([
     launchpointBrowse<LaunchpointCreator>("/creators"),
     launchpointBrowse<LaunchpointContract>("/contracts", { scope: "company" }),
     launchpointBrowse<LaunchpointPost>("/posts"),
+    launchpointFetch<LaunchpointOverview>("/analytics/overview", { scope: "company" }),
+    launchpointBrowse<LaunchpointAccountAnalytics>("/analytics/accounts", { scope: "company" }),
+    launchpointBrowse<LaunchpointVideoAnalytics>("/analytics/videos", { scope: "company" }),
+    launchpointBrowse<LaunchpointPayStructure>("/pay-structures", { scope: "company" }),
   ]);
   const creatorById = new Map<string, LaunchpointCreator & { id: string }>();
   for (const creator of creatorResult) {
@@ -115,5 +129,18 @@ export async function getLaunchpointDataset(): Promise<{
     const identity = launchpointSocialIdentityFromPost(post, creatorExternalId);
     return identity ? [identity] : [];
   });
-  return { creators, relationships, socialIdentities };
+  const overview = overviewResult.data ?? overviewResult;
+  return {
+    creators,
+    relationships,
+    socialIdentities,
+    analytics: {
+      summary: overview.summary ?? {},
+      snapshotSummary: overview.snapshotSummary ?? {},
+      accounts: accountAnalytics,
+      videos: videoAnalytics,
+      payStructures,
+      refreshedAt: new Date().toISOString(),
+    },
+  };
 }

@@ -8,6 +8,7 @@ import { formatNumber, formatPercent, PageTitle, StateBadge, timeAgo, TrackingBa
 import { requireUser } from "@/lib/auth";
 import { getPortalData } from "@/lib/portal-data";
 import { creatorPostActivity } from "@/lib/table-metrics";
+import { formatCpm } from "@/lib/launchpoint-cpm";
 import styles from "./overview.module.css";
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string; series?: string; stats?: string }> }) {
@@ -39,6 +40,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     { label: "Tracking stale or failed", count: data.accounts.filter((account) => account.trackingState === "stale" || account.trackingState === "failed").length, href: "/accounts?health=stale", tone: "neutral" as const },
   ];
   const metricCards: OverviewMetric[] = [
+    { id: "cpm", label: "Realized CPM", value: formatCpm(data.launchpointAnalytics?.realizedCpm), icon: "cpm" },
     { id: "views", label: "Views", value: formatNumber(totals.views), icon: "eye" },
     { id: "engagement", label: "Engagement", value: formatPercent(totals.engagement), icon: "activity" },
     { id: "likes", label: "Likes", value: formatNumber(totals.likes), icon: "heart" },

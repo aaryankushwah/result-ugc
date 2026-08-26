@@ -35,6 +35,9 @@ export type PortalAccount = {
   linkState: "suggested" | "confirmed" | "unlinked";
   error: string | null;
   sourceUrl: string | null;
+  /** Realized Launchpoint earnings per 1,000 views, in dollars. */
+  realizedCpm?: number | null;
+  launchpointEarnings?: number | null;
 };
 
 export type PortalVideo = {
@@ -61,6 +64,9 @@ export type PortalVideo = {
   refreshedAt: string | null;
   error: string | null;
   sourceUrl: string | null;
+  /** Present only when a stable Launchpoint video ID exactly matches this record. */
+  realizedCpm?: number | null;
+  launchpointEarnings?: number | null;
 };
 
 export type PortalRelationship = {
@@ -108,6 +114,10 @@ export type PortalCreator = {
   trackingState: TrackingState;
   lastActivityAt: string | null;
   source: "result" | "viral_candidate";
+  realizedCpm?: number | null;
+  launchpointEarnings?: number | null;
+  configuredCpmMin?: number | null;
+  configuredCpmMax?: number | null;
 };
 
 export type PortalActivity = {
@@ -174,4 +184,11 @@ export type PortalData = {
   freshness: Freshness[];
   providerErrors: string[];
   sourceMode: "database" | "live_provider" | "unconfigured";
+  launchpointAnalytics?: {
+    realizedCpm: number | null;
+    snapshotCpm: number | null;
+    totalEarnings: number;
+    totalViews: number;
+    refreshedAt: string;
+  } | null;
 };

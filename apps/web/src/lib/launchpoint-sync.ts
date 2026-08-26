@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDatabase, organizations, reconcileLaunchpointDataset, syncRuns } from "@result/db";
+import { getDatabase, launchpointAnalyticsSnapshots, organizations, reconcileLaunchpointDataset, syncRuns } from "@result/db";
 import { eq } from "drizzle-orm";
 import { getLaunchpointDataset } from "./launchpoint";
 
@@ -14,6 +14,26 @@ export async function syncLaunchpointSnapshots(): Promise<{ creators: number; ch
   try {
     const dataset = await getLaunchpointDataset();
     const result = await reconcileLaunchpointDataset({ organizationId: organization.id, ...dataset });
+    await db.insert(launchpointAnalyticsSnapshots).values({
+      organizationId: organization.id,
+      summary: dataset.analytics.summary,
+      snapshotSummary: dataset.analytics.snapshotSummary,
+      accounts: dataset.analytics.accounts,
+      videos: dataset.analytics.videos,
+      payStructures: dataset.analytics.payStructures,
+      sourceRefreshedAt: new Date(dataset.analytics.refreshedAt),
+    }).onConflictDoUpdate({
+      target: launchpointAnalyticsSnapshots.organizationId,
+      set: {
+        summary: dataset.analytics.summary,
+        snapshotSummary: dataset.analytics.snapshotSummary,
+        accounts: dataset.analytics.accounts,
+        videos: dataset.analytics.videos,
+        payStructures: dataset.analytics.payStructures,
+        sourceRefreshedAt: new Date(dataset.analytics.refreshedAt),
+        updatedAt: new Date(),
+      },
+    });
     if (run) await db.update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsSeen: result.creatorsSeen, recordsChanged: result.changed }).where(eq(syncRuns.id, run.id));
     return { creators: result.creatorsSeen, changed: result.changed };
   } catch (error) {

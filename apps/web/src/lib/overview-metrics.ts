@@ -4,6 +4,7 @@ export const overviewMetricIds = [
   "accounts",
   "videos",
   "views",
+  "cpm",
   "averageViews",
   "likes",
   "comments",
@@ -17,7 +18,7 @@ export type OverviewMetricId = (typeof overviewMetricIds)[number];
 
 // Eight fits the rail at a readable card size. The rest stay one click away in the
 // picker — packing all twelve in shrinks every card past the point of being scannable.
-export const defaultOverviewMetricIds: OverviewMetricId[] = ["views", "engagement", "likes", "comments", "shares", "videos", "averageViews", "active"];
+export const defaultOverviewMetricIds: OverviewMetricId[] = ["cpm", "views", "engagement", "likes", "comments", "shares", "videos", "averageViews"];
 
 export function readOverviewMetricIds(value: string | null): OverviewMetricId[] {
   if (!value) return defaultOverviewMetricIds;

@@ -425,6 +425,59 @@ export const syncRuns = pgTable("sync_runs", {
   metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
 }, (table) => [index("sync_runs_org_started_idx").on(table.organizationId, table.startedAt)]);
 
+export type LaunchpointAnalyticsSummary = {
+  totalViews?: number;
+  totalEarnings?: number;
+  cpm?: number | null;
+};
+
+export type LaunchpointAccountAnalytics = {
+  handle: string;
+  platform: string;
+  contractorId: string;
+  contractorName?: string;
+  totalViews?: number;
+  totalEarnings?: number;
+  cpm?: number | null;
+};
+
+export type LaunchpointVideoAnalytics = {
+  id: string;
+  title?: string;
+  platform?: string;
+  views?: number;
+  earnings?: number;
+  cpm?: number | null;
+  paid?: boolean;
+  contractorName?: string;
+  uploadedAt?: number;
+};
+
+export type LaunchpointPayStructure = {
+  creatorId: string;
+  creatorName?: string;
+  programId?: string;
+  programName?: string;
+  contractId?: string | null;
+  money?: {
+    cpmCents?: number | null;
+    maxCpmEarnableCents?: number | null;
+  } | null;
+};
+
+/** Latest successful Launchpoint analytics payload. One row is replaced per workspace. */
+export const launchpointAnalyticsSnapshots = pgTable("launchpoint_analytics_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  summary: jsonb("summary").$type<LaunchpointAnalyticsSummary>().notNull().default({}),
+  snapshotSummary: jsonb("snapshot_summary").$type<LaunchpointAnalyticsSummary>().notNull().default({}),
+  accounts: jsonb("accounts").$type<LaunchpointAccountAnalytics[]>().notNull().default([]),
+  videos: jsonb("videos").$type<LaunchpointVideoAnalytics[]>().notNull().default([]),
+  payStructures: jsonb("pay_structures").$type<LaunchpointPayStructure[]>().notNull().default([]),
+  sourceRefreshedAt: timestamp("source_refreshed_at", { withTimezone: true }).notNull(),
+  ...timestamps,
+}, (table) => [uniqueIndex("launchpoint_analytics_snapshots_org_unique").on(table.organizationId)]);
+
 export const discordOperations = pgTable("discord_operations", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
