@@ -31,7 +31,7 @@ client.once(Events.ClientReady, (readyClient) => {
       results.forEach((result, index) => { if (result.status === "rejected") console.error(`${labels[index]} failed`, result.reason); });
     });
     startViralSnapshotSchedule((error) => console.error("Viral snapshot sync failed", error));
-    startDubAttributionSchedule(readyClient, (error) => console.error("Dub attribution sync failed", error));
+    startDubAttributionSchedule((error) => console.error("Dub attribution sync failed", error));
   })().catch((error) => console.error("Bot startup synchronization failed", error));
   setInterval(() => {
     void runReminderSweep(readyClient).catch((error) => console.error("Reminder sweep failed", error));

@@ -1,6 +1,4 @@
-import type { Client, TextBasedChannel } from "discord.js";
 import {
-  activityEvents,
   attributionDailySnapshots,
   creatorAttributionLinks,
   creatorDiscord,
@@ -10,7 +8,7 @@ import {
   syncRuns,
 } from "@result/db";
 import { and, eq } from "drizzle-orm";
-import { creatorDubExternalId, creatorDubKey, getDubLink, issueDubLink, type DubLinkSnapshot } from "../integrations/dub.js";
+import { getDubLink, type DubLinkSnapshot } from "../integrations/dub.js";
 
 const SYNC_INTERVAL_MS = 15 * 60 * 1_000;
 
@@ -100,79 +98,39 @@ async function saveSnapshot(input: {
   });
 }
 
-async function notifyCreator(client: Client, channelId: string | null, shortLink: string): Promise<void> {
-  if (!channelId) throw new Error("Creator does not have a private Discord channel.");
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel?.isTextBased() || !("send" in channel)) throw new Error("Creator Discord channel is unavailable.");
-  await (channel as TextBasedChannel & { send: (value: string) => Promise<unknown> }).send(
-    `Your Result attribution link is ready: ${shortLink}\n\nUse this link anywhere you send viewers to Result. Clicks and conversions will be attributed to you automatically.`,
-  );
-}
-
-async function syncDubAttribution(client: Client): Promise<void> {
-  const destinationUrl = process.env.DUB_DEFAULT_URL?.trim();
-  if (!process.env.DATABASE_URL || !process.env.DUB_API_KEY || !destinationUrl) return;
+async function syncDubAttribution(): Promise<void> {
+  if (!process.env.DATABASE_URL || !process.env.DUB_API_KEY) return;
   const db = getDatabase();
-  for (const guild of client.guilds.cache.values()) {
-    const organization = (await db.select({ id: organizations.id }).from(organizations).where(and(eq(organizations.slug, "result"), eq(organizations.discordGuildId, guild.id))).limit(1))[0];
+  const organizationRows = await db.select({ id: organizations.id }).from(organizations).where(eq(organizations.slug, "result"));
+  for (const organization of organizationRows) {
     if (!organization) continue;
     const [run] = await db.insert(syncRuns).values({ organizationId: organization.id, source: "dub", state: "running" }).returning({ id: syncRuns.id });
     let seen = 0;
-    let changed = 0;
     const errors: string[] = [];
     try {
-      const [creatorRows, connectionRows, linkRows] = await Promise.all([
-        db.select({ id: creators.id, displayName: creators.displayName }).from(creators).where(and(eq(creators.organizationId, organization.id), eq(creators.lifecycle, "active"))),
-        db.select().from(creatorDiscord).where(and(eq(creatorDiscord.organizationId, organization.id), eq(creatorDiscord.guildId, guild.id))),
-        db.select().from(creatorAttributionLinks).where(eq(creatorAttributionLinks.organizationId, organization.id)),
-      ]);
-      const connectionByCreator = new Map(connectionRows.map((row) => [row.creatorId, row]));
-      const linkByCreator = new Map(linkRows.map((row) => [row.creatorId, row]));
-      for (const creator of creatorRows) {
-        const connection = connectionByCreator.get(creator.id);
+      const linkRows = await db.select().from(creatorAttributionLinks).where(eq(creatorAttributionLinks.organizationId, organization.id));
+      for (const existing of linkRows) {
         seen += 1;
         try {
-          const existing = linkByCreator.get(creator.id);
-          const snapshot = existing
-            ? await getDubLink(existing.providerLinkId)
-            : await issueDubLink({
-              creatorId: creator.id,
-              creatorName: creator.displayName,
-              destinationUrl,
-              externalId: creatorDubExternalId(creator.id),
-              key: creatorDubKey(connection?.username ?? creator.displayName, creator.id),
-            });
-          if (!snapshot.destinationUrl) snapshot.destinationUrl = destinationUrl;
-          await persistDubLinkSnapshot({ organizationId: organization.id, creatorId: creator.id, snapshot });
-          if (!existing) {
-            changed += 1;
-            await db.insert(activityEvents).values({ organizationId: organization.id, creatorId: creator.id, type: "attribution.link_created", summary: "Dub attribution link created.", metadata: { provider: "dub", linkId: snapshot.id, shortLink: snapshot.shortLink } });
-          }
-          if (connection?.privateChannelId && !existing?.discordDeliveredAt) {
-            await notifyCreator(client, connection.privateChannelId, snapshot.shortLink).then(async () => {
-              await db.update(creatorAttributionLinks).set({ discordDeliveredAt: new Date(), updatedAt: new Date() }).where(and(eq(creatorAttributionLinks.organizationId, organization.id), eq(creatorAttributionLinks.creatorId, creator.id)));
-              await db.insert(activityEvents).values({ organizationId: organization.id, creatorId: creator.id, type: "attribution.link_delivered", summary: "Dub attribution link posted to the creator's Discord channel.", metadata: { shortLink: snapshot.shortLink, channelId: connection.privateChannelId } });
-            }).catch(async (error) => {
-              await db.insert(activityEvents).values({ organizationId: organization.id, creatorId: creator.id, type: "attribution.link_delivery_failed", summary: "Dub link was created but could not be posted to Discord.", metadata: { error: error instanceof Error ? error.message : String(error) } });
-            });
-          }
+          const snapshot = await getDubLink(existing.providerLinkId);
+          if (!snapshot.destinationUrl) snapshot.destinationUrl = existing.destinationUrl;
+          await persistDubLinkSnapshot({ organizationId: organization.id, creatorId: existing.creatorId, snapshot });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          errors.push(`${creator.displayName}: ${message}`);
-          const existing = linkByCreator.get(creator.id);
-          if (existing) await db.update(creatorAttributionLinks).set({ state: "sync_issue", lastErrorAt: new Date(), lastError: message, updatedAt: new Date() }).where(eq(creatorAttributionLinks.id, existing.id));
+          errors.push(`${existing.shortLink}: ${message}`);
+          await db.update(creatorAttributionLinks).set({ state: "sync_issue", lastErrorAt: new Date(), lastError: message, updatedAt: new Date() }).where(eq(creatorAttributionLinks.id, existing.id));
         }
       }
       const state = errors.length === seen && seen > 0 ? "failed" : "succeeded";
-      if (run) await db.update(syncRuns).set({ state, finishedAt: new Date(), recordsSeen: seen, recordsChanged: changed, error: errors.length ? errors.join(" | ").slice(0, 4000) : null }).where(eq(syncRuns.id, run.id));
+      if (run) await db.update(syncRuns).set({ state, finishedAt: new Date(), recordsSeen: seen, recordsChanged: 0, error: errors.length ? errors.join(" | ").slice(0, 4000) : null }).where(eq(syncRuns.id, run.id));
     } catch (error) {
-      if (run) await db.update(syncRuns).set({ state: "failed", finishedAt: new Date(), recordsSeen: seen, recordsChanged: changed, error: error instanceof Error ? error.message : String(error) }).where(eq(syncRuns.id, run.id));
+      if (run) await db.update(syncRuns).set({ state: "failed", finishedAt: new Date(), recordsSeen: seen, recordsChanged: 0, error: error instanceof Error ? error.message : String(error) }).where(eq(syncRuns.id, run.id));
       throw error;
     }
   }
 }
 
-export function startDubAttributionSchedule(client: Client, onError: (error: unknown) => void): void {
-  void syncDubAttribution(client).catch(onError);
-  setInterval(() => void syncDubAttribution(client).catch(onError), SYNC_INTERVAL_MS).unref();
+export function startDubAttributionSchedule(onError: (error: unknown) => void): void {
+  void syncDubAttribution().catch(onError);
+  setInterval(() => void syncDubAttribution().catch(onError), SYNC_INTERVAL_MS).unref();
 }

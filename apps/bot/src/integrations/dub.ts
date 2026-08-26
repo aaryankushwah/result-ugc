@@ -86,8 +86,8 @@ export async function issueDubLink(input: IssueDubLinkInput): Promise<DubLinkSna
   const body = partnerId
     ? { partnerId, url: input.destinationUrl, ...(input.key ? { key: input.key } : {}), comments: `Result UGC creator ${creatorLabel} · ${campaign}`, linkProps: { externalId } }
     : { url: input.destinationUrl, ...(input.key ? { key: input.key } : {}), externalId, comments: `Result UGC creator ${creatorLabel} · ${campaign}`, trackConversion: true };
-  const response = await fetch(`https://api.dub.co/${partnerId ? "partners/links" : "links/upsert"}`, {
-    method: partnerId ? "POST" : "PUT",
+  const response = await fetch(`https://api.dub.co/${partnerId ? "partners/links" : "links"}`, {
+    method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(10_000),
@@ -96,6 +96,21 @@ export async function issueDubLink(input: IssueDubLinkInput): Promise<DubLinkSna
   if (!response.ok) throw new Error(errorMessage(payload));
   if (!payload) throw new Error("Dub returned an empty link response.");
   return parseLink(payload, input.destinationUrl, externalId, partnerId);
+}
+
+export async function updateDubLink(linkId: string, input: { key: string; externalId: string; comments: string }): Promise<DubLinkSnapshot> {
+  const token = configured("DUB_API_KEY");
+  if (!token) throw new Error("Dub is not configured. Add DUB_API_KEY to the bot host's .env.");
+  const response = await fetch(`https://api.dub.co/links/${encodeURIComponent(linkId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const payload = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined;
+  if (!response.ok) throw new Error(errorMessage(payload));
+  if (!payload) throw new Error("Dub returned an empty link response.");
+  return parseLink(payload, "", input.externalId);
 }
 
 export async function getDubLink(linkId: string): Promise<DubLinkSnapshot> {
