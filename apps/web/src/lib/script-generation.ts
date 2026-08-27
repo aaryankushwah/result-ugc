@@ -14,9 +14,18 @@ import {
 } from "./script-prompt";
 
 /** Routed through the Vercel AI Gateway — a plain "provider/model" string, no provider key of our own. */
-const SCRIPT_MODEL = "anthropic/claude-sonnet-5";
+export const SCRIPT_MODEL = "anthropic/claude-sonnet-4.6";
+export const SCRIPT_GENERATION_TIMEOUT_MS = 45_000;
 
 export class ScriptGenerationError extends Error {}
+
+export function scriptGenerationErrorFrom(error: unknown): ScriptGenerationError {
+  const errorName = error && typeof error === "object" && "name" in error ? String(error.name) : "";
+  if (errorName === "AbortError" || errorName === "TimeoutError") {
+    return new ScriptGenerationError("Generation took too long. Please try again.");
+  }
+  return new ScriptGenerationError(error instanceof Error ? `Generation failed: ${error.message}` : "Generation failed.");
+}
 
 const generationSchema = z.object({
   sections: z.array(z.object({
@@ -69,9 +78,13 @@ export async function generateScript(input: {
       schema: generationSchema,
       system: SCRIPT_SYSTEM_PROMPT,
       prompt: buildGenerationPrompt(input.brand, usableSections.map((section) => ({ id: section.id, label: section.label, copy: section.copy }))),
+      // Vercel ends this function at 60 seconds. Do not let provider retries
+      // consume the whole request and turn a recoverable error into a 504.
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(SCRIPT_GENERATION_TIMEOUT_MS),
     }));
   } catch (error) {
-    throw new ScriptGenerationError(error instanceof Error ? `Generation failed: ${error.message}` : "Generation failed.");
+    throw scriptGenerationErrorFrom(error);
   }
 
   const copyById = new Map(object.sections.map((section) => [section.id, section.copy]));
