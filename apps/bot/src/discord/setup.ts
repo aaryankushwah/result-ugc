@@ -226,11 +226,53 @@ export function findCreatorChannel(guild: Guild, userId: string): TextChannel | 
   return channel?.type === ChannelType.GuildText ? channel : undefined;
 }
 
+const creatorChannelPermissions = [
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.SendMessages,
+  PermissionFlagsBits.ReadMessageHistory,
+  PermissionFlagsBits.AttachFiles,
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AddReactions,
+];
+
+/**
+ * Builds the complete access list for a creator workspace. Reusing an existing
+ * channel must apply this again: the topic marker proves ownership, but does
+ * not prove that the creator's permission overwrite is still present.
+ */
+export function creatorChannelOverwrites(guild: Guild, member: GuildMember): OverwriteResolvable[] {
+  const manager = guild.roles.cache.find((role) => role.name === "UGC Manager");
+  const admin = guild.roles.cache.find((role) => role.name === "Admin");
+  const moderator = guild.roles.cache.find((role) => role.name === "Moderator");
+  const botId = guild.members.me?.id;
+  const overwrites = new Map<string, OverwriteResolvable>();
+  overwrites.set(guild.roles.everyone.id, {
+    id: guild.roles.everyone.id,
+    type: OverwriteType.Role,
+    deny: [PermissionFlagsBits.ViewChannel],
+  });
+  overwrites.set(member.id, { id: member.id, type: OverwriteType.Member, allow: creatorChannelPermissions });
+  overwrites.set(guild.ownerId, { id: guild.ownerId, type: OverwriteType.Member, allow: creatorChannelPermissions });
+  if (manager) overwrites.set(manager.id, { id: manager.id, type: OverwriteType.Role, allow: creatorChannelPermissions });
+  if (admin) overwrites.set(admin.id, { id: admin.id, type: OverwriteType.Role, allow: creatorChannelPermissions });
+  if (moderator) overwrites.set(moderator.id, { id: moderator.id, type: OverwriteType.Role, allow: creatorChannelPermissions });
+  if (botId) {
+    overwrites.set(botId, {
+      id: botId,
+      type: OverwriteType.Member,
+      allow: [...creatorChannelPermissions, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageMessages],
+    });
+  }
+  return [...overwrites.values()];
+}
+
 export async function createCreatorChannel(guild: Guild, member: GuildMember): Promise<TextChannel> {
   await guild.channels.fetch();
   await guild.roles.fetch();
+  const overwrites = creatorChannelOverwrites(guild, member);
   const existing = findCreatorChannel(guild, member.id);
   if (existing) {
+    await existing.permissionOverwrites.set(overwrites, auditReason);
     await existing.edit({
       topic: `Private workspace for ${member.user.tag}. Creator ID: ${member.id}.`,
       reason: auditReason,
@@ -246,37 +288,6 @@ export async function createCreatorChannel(guild: Guild, member: GuildMember): P
     parent = await guild.channels.create({ name: "CREATORS", type: ChannelType.GuildCategory, reason: auditReason });
   }
 
-  const manager = guild.roles.cache.find((role) => role.name === "UGC Manager");
-  const admin = guild.roles.cache.find((role) => role.name === "Admin");
-  const moderator = guild.roles.cache.find((role) => role.name === "Moderator");
-  const botId = guild.members.me?.id;
-  const permissions = [
-    PermissionFlagsBits.ViewChannel,
-    PermissionFlagsBits.SendMessages,
-    PermissionFlagsBits.ReadMessageHistory,
-    PermissionFlagsBits.AttachFiles,
-    PermissionFlagsBits.EmbedLinks,
-    PermissionFlagsBits.AddReactions,
-  ];
-  const overwrites = new Map<string, OverwriteResolvable>();
-  overwrites.set(guild.roles.everyone.id, {
-    id: guild.roles.everyone.id,
-    type: OverwriteType.Role,
-    deny: [PermissionFlagsBits.ViewChannel],
-  });
-  overwrites.set(member.id, { id: member.id, type: OverwriteType.Member, allow: permissions });
-  overwrites.set(guild.ownerId, { id: guild.ownerId, type: OverwriteType.Member, allow: permissions });
-  if (manager) overwrites.set(manager.id, { id: manager.id, type: OverwriteType.Role, allow: permissions });
-  if (admin) overwrites.set(admin.id, { id: admin.id, type: OverwriteType.Role, allow: permissions });
-  if (moderator) overwrites.set(moderator.id, { id: moderator.id, type: OverwriteType.Role, allow: permissions });
-  if (botId) {
-    overwrites.set(botId, {
-      id: botId,
-      type: OverwriteType.Member,
-      allow: [...permissions, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageMessages],
-    });
-  }
-
   const baseName = creatorChannelName(member);
   const nameTaken = guild.channels.cache.some(
     (channel) => channel.parentId === parent.id && channel.name === baseName,
@@ -286,7 +297,7 @@ export async function createCreatorChannel(guild: Guild, member: GuildMember): P
     type: ChannelType.GuildText,
     parent: parent.id,
     topic: `Private workspace for ${member.user.tag}. Creator ID: ${member.id}.`,
-    permissionOverwrites: [...overwrites.values()],
+    permissionOverwrites: overwrites,
     reason: auditReason,
   });
   await ensureCreatorWelcome(channel);
