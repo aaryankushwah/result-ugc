@@ -2411,6 +2411,36 @@ body,
    now carry the same restrained rounding as the workspace shell. */
 .pipeline-card-delete,.pipeline-card-top select.priority-pill { border-radius: 6px; }
 
+/* Each stage owns its vertical overflow so a large script library does not
+   turn the entire Studio into one very long page. The header remains visible
+   while cards, the drop preview, and the add action scroll together. */
+.pipeline-board { align-items: stretch; }
+.pipeline-column {
+  height: clamp(480px,64vh,700px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pipeline-column > header { flex: 0 0 auto; }
+.pipeline-cards {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-color: color-mix(in srgb,var(--pipeline-stage) 38%,var(--border)) transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.pipeline-cards:focus-visible { outline: 2px solid color-mix(in srgb,var(--pipeline-stage) 58%,transparent); outline-offset: -2px; }
+.pipeline-cards::-webkit-scrollbar { width: 7px; }
+.pipeline-cards::-webkit-scrollbar-track { background: transparent; }
+.pipeline-cards::-webkit-scrollbar-thumb { border-radius: 999px; background: color-mix(in srgb,var(--pipeline-stage) 38%,var(--border)); }
+@media (max-width: 640px) {
+  .pipeline-column { height: min(620px,68dvh); }
+}
+
 /* Keep notes as a lightweight companion to the full creator roster. */
 .creator-page { gap: 0; }
 .creator-page-view-tabs { height: 52px; margin: 20px 0 16px; display: flex; align-items: flex-end; gap: 26px; border-bottom: 1px solid var(--border); }
