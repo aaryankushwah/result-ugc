@@ -16,7 +16,7 @@ The existing Discord `#rules`, default text channel, and voice channel are left 
 
 - Setup: `/setup`, `/health`
 - Creators: `/add-creator`, `/delete-creator`, `/creator-assign`, `/creator-review`, `/creator-progress`, `/issue-link`, `/delete-link`
-- Warmup: run `/warmup` in a creator's private channel to start a 3-day countdown, or pass `days:1-90`; `/warmup-details` shows the staff-only active roster. Result Clanker posts one private-channel countdown per UTC day, while the manager portal reads the same canonical creator warmup rows.
+- Warmup: run `/warmup` in a creator's private channel to start a 3-day countdown, or pass `days:1-90`; `/warmup-details` posts the staff-only active roster visibly in the channel where it is run. Result Clanker posts one private-channel countdown per UTC day, while the manager portal reads the same canonical creator warmup rows.
 - Creator work: `/scripts`
 - Content: Launchpoint is the source of truth for creator submissions and approvals; legacy local content commands are hidden from Discord.
 - Launchpoint: `/launchpoint creators`, `/launchpoint contracts`, `/launchpoint programs`, `/launchpoint kpis`, `/launchpoint leaderboard`, `/launchpoint payouts` (read-only)

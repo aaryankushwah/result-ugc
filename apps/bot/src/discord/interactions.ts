@@ -894,6 +894,20 @@ async function handleCallSelect(interaction: import("discord.js").StringSelectMe
   }
 }
 
+export async function showWarmupDetails(
+  interaction: ChatInputCommandInteraction,
+  loadWarmups: typeof activeWarmupsForGuild = activeWarmupsForGuild,
+): Promise<void> {
+  if (!interaction.guild) return;
+  await interaction.deferReply();
+  const warmups = await loadWarmups(interaction.guild.id);
+  if (!warmups) {
+    await interaction.editReply("Warmup details are unavailable because this server is not connected to the Result database.");
+    return;
+  }
+  await interaction.editReply({ embeds: [buildWarmupDetailsEmbed(warmups)], allowedMentions: { parse: [] } });
+}
+
 async function handleCommand(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!interaction.guild) return;
   if (interaction.commandName === "add-creator") {
@@ -958,13 +972,7 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
       await interaction.reply({ content: "Only the moderation team can view all creator warmups.", flags: MessageFlags.Ephemeral });
       return;
     }
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const warmups = await activeWarmupsForGuild(interaction.guild.id);
-    if (!warmups) {
-      await interaction.editReply("Warmup details are unavailable because this server is not connected to the Result database.");
-      return;
-    }
-    await interaction.editReply({ embeds: [buildWarmupDetailsEmbed(warmups)], allowedMentions: { parse: [] } });
+    await showWarmupDetails(interaction);
     return;
   }
   if (interaction.commandName === "creator-review") {

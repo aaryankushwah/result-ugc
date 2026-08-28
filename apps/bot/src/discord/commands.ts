@@ -133,7 +133,7 @@ const commandBuilders = [
     .setDMPermission(false),
   new SlashCommandBuilder()
     .setName("warmup-details")
-    .setDescription("Show every creator currently in warmup")
+    .setDescription("Post every creator currently in warmup to this channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .setDMPermission(false),
   new SlashCommandBuilder()
