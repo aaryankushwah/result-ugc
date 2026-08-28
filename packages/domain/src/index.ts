@@ -27,6 +27,33 @@ export type AccountPerformanceHealthState = (typeof accountPerformanceHealthStat
 export const discordStates = ["connected", "missing_access", "applicant", "left", "unknown"] as const;
 export type DiscordState = (typeof discordStates)[number];
 
+export const defaultWarmupDays = 3;
+export const maximumWarmupDays = 90;
+const DAY_MS = 86_400_000;
+
+export function warmupDurationDays(value: number | null | undefined): number {
+  return value ?? defaultWarmupDays;
+}
+
+/**
+ * Warmups are operational calendar-day windows. A three-day warmup started on
+ * Monday reads 3 on Monday, 2 on Tuesday, 1 on Wednesday, and completes at the
+ * start of Thursday. UTC matches the bot's existing daily scheduling boundary.
+ */
+export function warmupEndAt(startedAt: Date, durationDays: number): Date {
+  const utcDayStart = Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth(), startedAt.getUTCDate());
+  return new Date(utcDayStart + durationDays * DAY_MS);
+}
+
+export function warmupDaysLeft(endsAt: Date | string, now = new Date()): number {
+  const utcDayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.max(0, Math.ceil((new Date(endsAt).getTime() - utcDayStart) / DAY_MS));
+}
+
+export function warmupReminderDate(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
 export const operationStates = ["queued", "running", "succeeded", "failed"] as const;
 export type OperationState = (typeof operationStates)[number];
 
@@ -38,6 +65,8 @@ export const discordOperationTypes = [
   "offboard_creator",
   "reconcile_creator",
   "send_script_assignment",
+  "send_warmup_reminder",
+  "send_warmup_complete",
 ] as const;
 export type DiscordOperationType = (typeof discordOperationTypes)[number];
 

@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import { loadEnv } from "./config/env.js";
 import { handleInteraction, launchpointCreatorDirectory } from "./discord/interactions.js";
 import { runReminderSweep } from "./discord/reminders.js";
+import { runWarmupReminderSweep } from "./discord/warmups.js";
 import { syncLaunchpointApprovedContent } from "./discord/launchpoint-sync.js";
 import { syncLaunchpointRelationships } from "./discord/provider-sync.js";
 import { startDubAttributionSchedule } from "./discord/dub-sync.js";
@@ -23,18 +24,22 @@ client.once(Events.ClientReady, (readyClient) => {
     await processDiscordOperationQueue(readyClient).catch((error) => console.error("Initial Discord operation queue failed", error));
     await Promise.allSettled([
       runReminderSweep(readyClient),
+      runWarmupReminderSweep(readyClient),
       syncLaunchpointApprovedContent(readyClient),
       launchpointCreatorDirectory(),
       syncLaunchpointRelationships(readyClient),
     ]).then((results) => {
-      const labels = ["Reminder sweep", "Launchpoint content sync", "Launchpoint creator directory preload", "Launchpoint relationship sync"];
+      const labels = ["Reminder sweep", "Warmup reminder sweep", "Launchpoint content sync", "Launchpoint creator directory preload", "Launchpoint relationship sync"];
       results.forEach((result, index) => { if (result.status === "rejected") console.error(`${labels[index]} failed`, result.reason); });
     });
     startViralSnapshotSchedule((error) => console.error("Viral snapshot sync failed", error));
     startDubAttributionSchedule((error) => console.error("Dub attribution sync failed", error));
   })().catch((error) => console.error("Bot startup synchronization failed", error));
   setInterval(() => {
-    void runReminderSweep(readyClient).catch((error) => console.error("Reminder sweep failed", error));
+    void Promise.all([
+      runReminderSweep(readyClient),
+      runWarmupReminderSweep(readyClient),
+    ]).catch((error) => console.error("Reminder sweep failed", error));
   }, 60 * 60 * 1_000).unref();
   setInterval(() => {
     void syncLaunchpointApprovedContent(readyClient).catch((error) => console.error("Launchpoint content sync failed", error));

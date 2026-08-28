@@ -83,6 +83,16 @@ export type PortalRelationship = {
   error: string | null;
 };
 
+export type PortalWarmup = {
+  id: string;
+  state: "active";
+  durationDays: number;
+  daysLeft: number;
+  startedAt: string;
+  endsAt: string;
+  lastReminderDate: string | null;
+};
+
 export type PortalCreator = {
   id: string;
   displayName: string;
@@ -91,6 +101,7 @@ export type PortalCreator = {
   attentionState: string | null;
   nextStep: string | null;
   managerName: string | null;
+  warmup: PortalWarmup | null;
   discord: {
     state: DiscordState;
     userId: string | null;

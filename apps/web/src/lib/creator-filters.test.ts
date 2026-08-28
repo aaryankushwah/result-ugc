@@ -7,7 +7,7 @@ function creator(overrides: Partial<PortalCreator> = {}): PortalCreator {
     id: "creator-1", displayName: "Jimi", email: null, lifecycle: "active", attentionState: null, nextStep: null, managerName: null,
     discord: { state: "connected", userId: "discord-1", username: "jimizhao", displayName: "Jimi", avatarUrl: null, channelId: null, guildId: null },
     relationships: [], accounts: [], notes: [], posts30d: 0, views30d: 0, likes30d: 0, comments30d: 0, shares30d: 0, bookmarks30d: 0,
-    engagementRate: 0, trackingState: "healthy", lastActivityAt: null, source: "result", ...overrides,
+    engagementRate: 0, trackingState: "healthy", warmup: null, lastActivityAt: null, source: "result", ...overrides,
   };
 }
 

@@ -57,6 +57,13 @@
       "when": 1787770407005,
       "tag": "0007_nifty_sage",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787924948728,
+      "tag": "0008_fluffy_puff_adder",
+      "breakpoints": true
     }
   ]
 }

@@ -2448,6 +2448,33 @@ body,
 .creator-page-view-tabs a:hover,.creator-page-view-tabs a.active { color: var(--text-primary); }
 .creator-page-view-tabs a.active::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; border-radius: 999px; background: var(--primary); content: ""; }
 .creator-page-view-tabs svg { width: 15px; height: 15px; }
+
+/* Creator warmup — the Discord countdown and manager portal share one roster. */
+.warmup-summary-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.warmup-summary-grid .metric-card { border-radius: 0; }
+.warmup-panel { overflow: hidden; }
+.warmup-list { padding: 6px; }
+.warmup-row { min-height: 78px; padding: 10px 12px; display: grid; grid-template-columns: 38px minmax(180px,1fr) 82px minmax(190px,.72fr) 16px; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
+.warmup-row:last-child { border-bottom: 0; }
+.warmup-row:hover { background: color-mix(in srgb,var(--foreground) 4%,transparent); }
+.warmup-row > svg { width: 14px; color: var(--muted-foreground); }
+.warmup-avatar { width: 38px; height: 38px; overflow: hidden; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--muted); font-weight: 700; }
+.warmup-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.warmup-identity,.warmup-countdown,.warmup-window { min-width: 0; display: flex; flex-direction: column; }
+.warmup-identity { gap: 3px; }
+.warmup-identity strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.warmup-identity small,.warmup-countdown small,.warmup-window small { color: var(--muted-foreground); font-size: 11px; }
+.warmup-countdown strong { font-family: var(--font-geist-mono); font-size: 22px; line-height: 1; }
+.warmup-window { gap: 8px; }
+.warmup-window > span { height: 5px; overflow: hidden; display: block; border-radius: 999px; background: var(--muted); }
+.warmup-window i { height: 100%; display: block; border-radius: inherit; background: var(--primary); }
+.warmup-source { margin-left: auto; }
+
+@media (max-width: 760px) {
+  .warmup-summary-grid { grid-template-columns: 1fr; }
+  .warmup-row { grid-template-columns: 38px minmax(0,1fr) 62px 14px; gap: 10px; }
+  .warmup-window { grid-column: 2 / -1; }
+}
 .creator-notes-board { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
 .creator-notes-board > article { min-height: 72px; padding: 10px 12px; display: grid; grid-template-columns: minmax(180px,220px) minmax(180px,.7fr) minmax(300px,1.3fr); align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
 .creator-notes-board > article:last-of-type { border-bottom: 0; }

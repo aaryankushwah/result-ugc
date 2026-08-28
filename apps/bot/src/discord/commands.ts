@@ -122,6 +122,21 @@ const commandBuilders = [
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .setDMPermission(false),
   new SlashCommandBuilder()
+    .setName("warmup")
+    .setDescription("Start or restart the creator's warmup in this private channel")
+    .addIntegerOption((option) => option
+      .setName("days")
+      .setDescription("Warmup length; defaults to 3 days")
+      .setMinValue(1)
+      .setMaxValue(90))
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDMPermission(false),
+  new SlashCommandBuilder()
+    .setName("warmup-details")
+    .setDescription("Show every creator currently in warmup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .setDMPermission(false),
+  new SlashCommandBuilder()
     .setName("help")
     .setDescription("Show Result Clanker's command guide")
     .setDMPermission(false),

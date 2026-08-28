@@ -6,6 +6,7 @@ import {
   creatorAttributionLinks,
   creatorDiscord,
   creatorNotes,
+  creatorWarmups,
   creators,
   getDatabase,
   internalUsers,
@@ -17,7 +18,7 @@ import {
   videos as videoTable,
 } from "@result/db";
 import { desc, eq } from "drizzle-orm";
-import { aggregateTrackingState, deriveAccountPerformanceHealth } from "@result/domain";
+import { aggregateTrackingState, deriveAccountPerformanceHealth, warmupDaysLeft } from "@result/domain";
 import type { PortalAccount, PortalActivity, PortalAttributionPoint, PortalCreator, PortalData, PortalRelationship, PortalVideo } from "./portal-types";
 import { engagementTotals, totalInteractions } from "./engagement";
 import { buildPerformance } from "./performance";
@@ -72,9 +73,10 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const organization = (await db.select().from(organizations).where(eq(organizations.slug, "result")).limit(1))[0];
   if (!organization) return null;
 
-  const [creatorRows, discordRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows, attributionLinkRows, attributionSnapshotRows, launchpointSnapshotRows] = await Promise.all([
+  const [creatorRows, discordRows, warmupRows, relationshipRows, accountRows, videoRows, userRows, noteRows, activityRows, runRows, attributionLinkRows, attributionSnapshotRows, launchpointSnapshotRows] = await Promise.all([
     db.select().from(creators).where(eq(creators.organizationId, organization.id)),
     db.select().from(creatorDiscord).where(eq(creatorDiscord.organizationId, organization.id)),
+    db.select().from(creatorWarmups).where(eq(creatorWarmups.organizationId, organization.id)),
     db.select().from(signingRelationships).where(eq(signingRelationships.organizationId, organization.id)),
     db.select().from(socialAccounts).where(eq(socialAccounts.organizationId, organization.id)),
     db.select().from(videoTable).where(eq(videoTable.organizationId, organization.id)),
@@ -179,6 +181,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const creatorById = new Map(creatorRows.map((creator) => [creator.id, creator]));
   const managerById = new Map(userRows.map((user) => [user.id, user.displayName]));
   const discordByCreatorId = new Map(discordRows.map((row) => [row.creatorId, row]));
+  const warmupByCreatorId = new Map(warmupRows.map((row) => [row.creatorId, row]));
   const relationshipsByCreatorId = groupBy(relationshipRows, (row) => row.creatorId);
   const launchpointCreatorIdByCreatorId = new Map(relationshipRows.flatMap((row) => {
     if (row.provider !== "launchpoint") return [];
@@ -196,6 +199,8 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const cutoff = Date.now() - 30 * 86_400_000;
   const resultCreators: PortalCreator[] = creatorRows.map((creator) => {
     const connection = discordByCreatorId.get(creator.id);
+    const warmup = warmupByCreatorId.get(creator.id);
+    const daysLeft = warmup ? warmupDaysLeft(warmup.endsAt) : 0;
     const creatorAccounts = accountsByCreatorId.get(creator.id) ?? [];
     const confirmedAccounts = creatorAccounts.filter((account) => account.linkState === "confirmed");
     const recentVideos = confirmedAccounts
@@ -227,6 +232,15 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       attentionState: creator.attentionState,
       nextStep: creator.nextStep,
       managerName: creator.managerUserId ? managerById.get(creator.managerUserId) ?? null : null,
+      warmup: warmup?.state === "active" && daysLeft > 0 ? {
+        id: warmup.id,
+        state: "active",
+        durationDays: warmup.durationDays,
+        daysLeft,
+        startedAt: warmup.startedAt.toISOString(),
+        endsAt: warmup.endsAt.toISOString(),
+        lastReminderDate: warmup.lastReminderDate,
+      } : null,
       discord: {
         state: connection?.state ?? "unknown",
         userId: connection?.discordUserId ?? null,
@@ -271,6 +285,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
       attentionState: "Needs creator confirmation",
       nextStep: "Match this account to its Result creator",
       managerName: null,
+      warmup: null,
       discord: { state: "unknown" as const, userId: null, username: null, displayName: null, avatarUrl: null, channelId: null, guildId: organization.discordGuildId },
       relationships: [],
       accounts: [{ ...account, creatorId: `viral-${account.id}` }],

@@ -11,6 +11,7 @@ import {
   activityEvents,
   creatorDiscord,
   creatorIdentityKey,
+  creatorWarmups,
   creators,
   discordOperations,
   getDatabase,
@@ -24,7 +25,8 @@ import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import { getGuildState } from "../data/store.js";
 import { createCreatorChannel, findCreatorChannel } from "./setup.js";
 import { staleDiscordOperationCutoff } from "./operation-queue.js";
-import { postToCreatorChannel } from "./script-delivery.js";
+import { postToCreatorChannel, resolveCreatorChannel } from "./script-delivery.js";
+import { buildWarmupCompletionMessage, buildWarmupReminderMessage } from "./warmups.js";
 
 const CREATOR_ROLE = "Verified Creator";
 const MEMBER_ROLE = "Member";
@@ -214,6 +216,7 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
     const applicantRole = guild.roles.cache.find((role) => role.name === APPLICANT_ROLE);
     let channelId = connection?.privateChannelId ?? null;
     let deliveredMessageId: string | null = null;
+    let skippedReason: string | null = null;
     if (["approve_applicant", "restore_access", "open_private_channel"].includes(operation.type)) {
       if (!member) throw new Error("Discord member is not in the guild");
       if (operation.type !== "open_private_channel") {
@@ -245,9 +248,38 @@ export async function processDiscordOperationQueue(client: Client): Promise<void
       });
       channelId = delivery.channelId;
       deliveredMessageId = delivery.messageId;
+    } else if (operation.type === "send_warmup_reminder" || operation.type === "send_warmup_complete") {
+      const warmupId = typeof operation.payload.warmupId === "string" ? operation.payload.warmupId : null;
+      const startedAt = typeof operation.payload.startedAt === "string" ? operation.payload.startedAt : null;
+      if (!warmupId || !startedAt) throw new Error("Warmup notification is missing its identity");
+      const currentWarmup = (await getDatabase().select({ state: creatorWarmups.state, startedAt: creatorWarmups.startedAt }).from(creatorWarmups).where(and(
+        eq(creatorWarmups.id, warmupId),
+        eq(creatorWarmups.organizationId, operation.organizationId),
+      )).limit(1))[0];
+      const expectedState = operation.type === "send_warmup_reminder" ? "active" : "completed";
+      if (!currentWarmup || currentWarmup.state !== expectedState || currentWarmup.startedAt.toISOString() !== startedAt) {
+        skippedReason = "Warmup was restarted or changed before this notification was delivered.";
+      } else {
+        const channel = await resolveCreatorChannel(guild, { discordUserId: userId, privateChannelId: channelId });
+        if (!channel) throw new Error("The creator has no private channel and one could not be created");
+        const content = operation.type === "send_warmup_reminder"
+          ? buildWarmupReminderMessage({ discordUserId: userId, daysLeft: typeof operation.payload.daysLeft === "number" ? operation.payload.daysLeft : 1 })
+          : buildWarmupCompletionMessage({ discordUserId: userId, durationDays: typeof operation.payload.durationDays === "number" ? operation.payload.durationDays : 3 });
+        const message = await channel.send({ content, allowedMentions: { users: [userId] } });
+        channelId = channel.id;
+        deliveredMessageId = message.id;
+        if (operation.type === "send_warmup_reminder" && typeof operation.payload.reminderDate === "string") {
+          await getDatabase().update(creatorWarmups).set({ lastReminderDate: operation.payload.reminderDate, updatedAt: new Date() }).where(and(
+            eq(creatorWarmups.id, warmupId),
+            eq(creatorWarmups.organizationId, operation.organizationId),
+            eq(creatorWarmups.state, "active"),
+            eq(creatorWarmups.startedAt, new Date(startedAt)),
+          ));
+        }
+      }
     } else throw new Error(`Unsupported operation type: ${operation.type}`);
-    await getDatabase().update(discordOperations).set({ state: "succeeded", finishedAt: new Date(), result: { channelId, discordUserId: userId, ...(deliveredMessageId ? { messageId: deliveredMessageId } : {}) }, lastError: null, updatedAt: new Date() }).where(eq(discordOperations.id, operation.id));
-    await logEvent(operation.organizationId, operation.creatorId, `discord.operation.${operation.type}.succeeded`, `Discord operation ${operation.type.replaceAll("_", " ")} succeeded.`, { operationId: operation.id, channelId });
+    await getDatabase().update(discordOperations).set({ state: "succeeded", finishedAt: new Date(), result: { channelId, discordUserId: userId, ...(deliveredMessageId ? { messageId: deliveredMessageId } : {}), ...(skippedReason ? { skippedReason } : {}) }, lastError: null, updatedAt: new Date() }).where(eq(discordOperations.id, operation.id));
+    await logEvent(operation.organizationId, operation.creatorId, `discord.operation.${operation.type}.succeeded`, `Discord operation ${operation.type.replaceAll("_", " ")} succeeded.`, { operationId: operation.id, channelId, skippedReason });
     // Notification-only operations change no identity state, so skip the guild sweep.
     if (requiresGuildReconciliation(operation.type)) await reconcileGuild(guild, [userId], "targeted");
   } catch (error) {

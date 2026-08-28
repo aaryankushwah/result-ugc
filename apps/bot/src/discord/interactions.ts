@@ -18,6 +18,7 @@ import {
   type Interaction,
 } from "discord.js";
 import { creatorDiscord, creators, getDatabase, organizations, scriptAssignments, scripts } from "@result/db";
+import { warmupDurationDays } from "@result/domain";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { blueprintChannels, categories, roles } from "../config/blueprint.js";
 import {
@@ -27,13 +28,14 @@ import {
 } from "../data/store.js";
 import { createCreatorChannel, creatorIdFromChannelTopic, findCreatorChannel, setupGuild, setupSummary } from "./setup.js";
 import { discordChannelNameMatches } from "./channel-names.js";
-import { archiveCreatorChannel } from "./platform-sync.js";
+import { archiveCreatorChannel, reconcileGuild } from "./platform-sync.js";
 import { buildScriptChecklist } from "./script-checklist.js";
 import { deleteDubLink, issueDubLink } from "../integrations/dub.js";
 import { persistDubLinkSnapshot, resolveDubCreator } from "./dub-sync.js";
 import { launchpointGet, launchpointList } from "../integrations/launchpoint.js";
 import { persistLaunchpointAssignment } from "./provider-sync.js";
 import { runReminderSweep } from "./reminders.js";
+import { activeWarmupsForGuild, buildWarmupDetailsEmbed, startCreatorWarmup } from "./warmups.js";
 import { CALL_TIMEZONES, type CallTimezone, currentMondayUtc, dateLabel, formatSlot, generateCallSlots, nextMondayUtc, validDate } from "./calls.js";
 
 const MIN_ACCOUNT_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -287,6 +289,7 @@ async function showHelp(interaction: ChatInputCommandInteraction): Promise<void>
         "**Creators** — `/add-creator`, `/delete-creator`, `/creator-assign`, `/creator-review`, `/issue-link`, `/delete-link`",
         "**Creator work** — `/scripts`",
         "**Progress** — `/creator-progress` sends the current weekly Launchpoint check-in",
+        "**Warmup** — `/warmup [days]` starts a creator countdown; `/warmup-details` shows every active warmup",
         "**Calls** — `/group-call`, `/group-call-results`, `/group-call-reset`",
         "**Content** — Launchpoint is the source of truth for submissions and approvals",
         "**Launchpoint** — `/launchpoint creators|contracts|programs|kpis|leaderboard|payouts` (read-only)",
@@ -905,6 +908,63 @@ async function handleCommand(interaction: ChatInputCommandInteraction): Promise<
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await runReminderSweep(interaction.client, true);
     await interaction.editReply("Posted the current Launchpoint creator progress report in #onboarding-alerts.");
+    return;
+  }
+  if (interaction.commandName === "warmup") {
+    if (!isStaff(interaction)) {
+      await interaction.reply({ content: "Only the moderation team can start a creator warmup.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const channel = interaction.channel;
+    const creatorDiscordUserId = channel && "topic" in channel ? creatorIdFromChannelTopic(channel.topic) : null;
+    if (!creatorDiscordUserId) {
+      await interaction.reply({ content: "Run `/warmup` inside the creator's private Result channel.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    await interaction.deferReply();
+    await reconcileGuild(interaction.guild, [creatorDiscordUserId], "targeted");
+    const durationDays = warmupDurationDays(interaction.options.getInteger("days"));
+    const result = await startCreatorWarmup({
+      guildId: interaction.guild.id,
+      discordUserId: creatorDiscordUserId,
+      durationDays,
+      startedByDiscordUserId: interaction.user.id,
+    });
+    if (result.state !== "started") {
+      const messages = {
+        database_unavailable: "Warmups need the Result database. Ask an admin to check `DATABASE_URL`.",
+        organization_unavailable: "This Discord server is not linked to the Result organization yet. Ask an admin to run `/health`.",
+        creator_unavailable: "This channel owner is not linked to a canonical Result creator yet. Ask an admin to run `/health`.",
+      } as const;
+      await interaction.editReply(messages[result.state]);
+      return;
+    }
+    const endTimestamp = Math.floor(result.warmup.endsAt.getTime() / 1_000);
+    const embed = new EmbedBuilder()
+      .setColor(Colors.Green)
+      .setTitle("Warmup started")
+      .setDescription(`<@${creatorDiscordUserId}> has **${result.warmup.daysLeft} day${result.warmup.daysLeft === 1 ? "" : "s"} left** in their warmup.`)
+      .addFields(
+        { name: "Duration", value: `${durationDays} day${durationDays === 1 ? "" : "s"}`, inline: true },
+        { name: "Ends", value: `<t:${endTimestamp}:D>`, inline: true },
+      )
+      .setFooter({ text: "Result Clanker will post one countdown update here each UTC day." })
+      .setTimestamp();
+    await interaction.editReply({ embeds: [embed], allowedMentions: { users: [creatorDiscordUserId] } });
+    return;
+  }
+  if (interaction.commandName === "warmup-details") {
+    if (!isStaff(interaction)) {
+      await interaction.reply({ content: "Only the moderation team can view all creator warmups.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const warmups = await activeWarmupsForGuild(interaction.guild.id);
+    if (!warmups) {
+      await interaction.editReply("Warmup details are unavailable because this server is not connected to the Result database.");
+      return;
+    }
+    await interaction.editReply({ embeds: [buildWarmupDetailsEmbed(warmups)], allowedMentions: { parse: [] } });
     return;
   }
   if (interaction.commandName === "creator-review") {

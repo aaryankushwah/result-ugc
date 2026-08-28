@@ -16,9 +16,21 @@ describe("Discord command contract", () => {
       "group-call-reset",
       "health",
       "creator-progress",
+      "warmup",
+      "warmup-details",
       "help",
       "scripts",
       "setup",
+    ]);
+  });
+
+  it("registers staff-only warmup commands with an optional bounded duration", () => {
+    const warmup = commandData.find((command) => command.name === "warmup");
+    const details = commandData.find((command) => command.name === "warmup-details");
+    expect(warmup?.default_member_permissions).toBeDefined();
+    expect(details?.default_member_permissions).toBeDefined();
+    expect(warmup?.options).toEqual([
+      expect.objectContaining({ name: "days", required: false, min_value: 1, max_value: 90 }),
     ]);
   });
 

@@ -70,6 +70,8 @@ describe("UGC server blueprint", () => {
       "group-call-reset",
       "health",
       "creator-progress",
+      "warmup",
+      "warmup-details",
       "help",
       "scripts",
       "setup",

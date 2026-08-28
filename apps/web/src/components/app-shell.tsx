@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Menu, Moon, MousePointerClick, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, UsersRound, Video, X, Zap } from "lucide-react";
+import { Activity, BarChart3, Bot, ChevronDown, FileCheck2, FilePenLine, Flame, Menu, Moon, MousePointerClick, PanelLeftClose, PanelLeftOpen, Search, Settings, Sun, UsersRound, Video, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -18,7 +18,7 @@ const nav = [
     { href: "/attribution", label: "Attribution", icon: MousePointerClick },
   ] },
   { label: "Operations", items: [
-    { href: "/scripts", label: "Script Studio", icon: FilePenLine }, { href: "/onboarding", label: "Onboarding", icon: FileCheck2 }, { href: "/activity", label: "Activity", icon: Activity },
+    { href: "/scripts", label: "Script Studio", icon: FilePenLine }, { href: "/onboarding", label: "Onboarding", icon: FileCheck2 }, { href: "/warmup", label: "Warmup", icon: Flame }, { href: "/activity", label: "Activity", icon: Activity },
   ] },
   { label: "Organization", items: [
     { href: "/integrations", label: "Integrations", icon: Zap }, { href: "/settings", label: "Settings", icon: Settings },

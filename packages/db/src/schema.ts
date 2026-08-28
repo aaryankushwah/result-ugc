@@ -87,6 +87,23 @@ export const creatorDiscord = pgTable("creator_discord", {
   uniqueIndex("creator_discord_member_unique").on(table.organizationId, table.guildId, table.discordUserId),
 ]);
 
+export const creatorWarmups = pgTable("creator_warmups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  creatorId: uuid("creator_id").notNull().references(() => creators.id, { onDelete: "cascade" }),
+  state: text("state").notNull().default("active"),
+  durationDays: integer("duration_days").notNull().default(3),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  lastReminderDate: text("last_reminder_date"),
+  startedByDiscordUserId: text("started_by_discord_user_id"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("creator_warmups_creator_unique").on(table.creatorId),
+  index("creator_warmups_org_state_ends_idx").on(table.organizationId, table.state, table.endsAt),
+]);
+
 export const signingRelationships = pgTable("signing_relationships", {
   id: uuid("id").primaryKey().defaultRandom(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
