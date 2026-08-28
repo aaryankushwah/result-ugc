@@ -361,10 +361,11 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   const freshnessFor = (source: "viral" | "discord" | "launchpoint" | "dub", staleAfter: number): PortalData["freshness"][number] => {
     const runs = runRows.filter((run) => run.source === source);
     const latestAttempt = runs[0];
-    const latestSuccess = runs.find((run) => run.state === "succeeded");
+    const latestSuccess = runs.find((run) => run.state === "succeeded" || run.state === "degraded");
     const successAt = latestSuccess?.finishedAt ?? null;
     if (!latestAttempt) return { source, lastSuccessAt: null, lastAttemptAt: null, state: "not_configured", message: "No synchronization yet" };
     if (latestAttempt.state === "failed") return { source, lastSuccessAt: successAt?.toISOString() ?? null, lastAttemptAt: latestAttempt.startedAt.toISOString(), state: "failed", message: latestAttempt.error ?? "Latest synchronization failed; showing the last successful snapshot" };
+    if (latestAttempt.state === "degraded") return { source, lastSuccessAt: successAt?.toISOString() ?? null, lastAttemptAt: latestAttempt.startedAt.toISOString(), state: "failed", message: `${latestAttempt.recordsSeen ?? 0} records refreshed, but part of the synchronization failed: ${latestAttempt.error ?? "provider action incomplete"}` };
     const stale = !successAt || Date.now() - successAt.getTime() > staleAfter;
     return { source, lastSuccessAt: successAt?.toISOString() ?? null, lastAttemptAt: latestAttempt.startedAt.toISOString(), state: stale ? "stale" : "fresh", message: stale ? `Showing ${latestSuccess?.recordsSeen ?? 0} cached records; refresh is overdue` : `${latestSuccess?.recordsSeen ?? 0} records synchronized` };
   };
@@ -377,7 +378,7 @@ export async function getDatabasePortalData(): Promise<PortalData | null> {
   ];
   const latestRunBySource = new Map<string, (typeof runRows)[number]>();
   for (const run of runRows) if (!latestRunBySource.has(run.source)) latestRunBySource.set(run.source, run);
-  const latestFailedBySource = [...latestRunBySource].flatMap(([source, run]) => run.state === "failed" && run.error ? [`${source}: ${run.error}`] : []);
+  const latestFailedBySource = [...latestRunBySource].flatMap(([source, run]) => run.state !== "succeeded" && run.error ? [`${source}: ${run.error}`] : []);
 
   return {
     organization: { id: organization.id, name: organization.name, slug: organization.slug },

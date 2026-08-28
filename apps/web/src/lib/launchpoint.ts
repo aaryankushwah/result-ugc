@@ -89,6 +89,7 @@ export async function getLaunchpointDataset(): Promise<{
     creatorById.set(post.creatorId, { id: post.creatorId, name: post.contractorName });
   }
   const rawCreators = [...creatorById.values()];
+  if (!rawCreators.length) throw new Error("Launchpoint returned no creators, contracts, or posts; preserving the last successful creator snapshot.");
   const creators: ProviderCreator[] = rawCreators.map((creator) => ({ externalId: creator.id, displayName: creator.name ?? creator.username ?? creator.email ?? creator.id, email: creator.email ?? null, username: creator.username ?? null, sourceUrl: `https://dashboard.launchpointhq.com/creators/${encodeURIComponent(creator.id)}` }));
   const relationships: LaunchpointRelationshipInput[] = contractResult.flatMap((contract) => {
     if (!contract.id || !contract.contractorId) return [];

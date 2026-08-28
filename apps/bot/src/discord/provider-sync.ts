@@ -12,7 +12,7 @@ import {
 import { launchpointSocialIdentityFromPost } from "@result/domain";
 import { and, eq } from "drizzle-orm";
 import { getGuildState } from "../data/store.js";
-import { LaunchpointAdapter } from "../integrations/launchpoint.js";
+import { LaunchpointAdapter, launchpointCreatorDirectoryFromPosts } from "../integrations/launchpoint.js";
 
 const adapter = new LaunchpointAdapter();
 
@@ -136,8 +136,10 @@ export async function syncLaunchpointRelationships(client: Client): Promise<void
       }
 
       const [providerCreators, relationships, posts] = await Promise.all([adapter.listCreators(), adapter.listRelationshipRecords(), adapter.listPosts()]);
+      const creatorDirectory = launchpointCreatorDirectoryFromPosts(providerCreators, posts);
+      if (!creatorDirectory.length) throw new Error("Launchpoint returned no creators, contracts, or posts; preserving the last successful creator snapshot.");
       const idsByName = new Map<string, Set<string>>();
-      for (const creator of providerCreators) {
+      for (const creator of creatorDirectory) {
         for (const value of [creator.displayName, creator.username, creator.email]) {
           const key = creatorIdentityKey(value);
           if (!key) continue;
@@ -157,7 +159,7 @@ export async function syncLaunchpointRelationships(client: Client): Promise<void
         const identity = launchpointSocialIdentityFromPost(post, creatorExternalId);
         return identity ? [identity] : [];
       });
-      const result = await reconcileLaunchpointDataset({ organizationId: org.id, creators: providerCreators, relationships, socialIdentities });
+      const result = await reconcileLaunchpointDataset({ organizationId: org.id, creators: creatorDirectory, relationships, socialIdentities });
       seen = result.creatorsSeen;
       changed += result.changed;
       if (run) await db.update(syncRuns).set({ state: "succeeded", finishedAt: new Date(), recordsSeen: seen, recordsChanged: changed }).where(eq(syncRuns.id, run.id));

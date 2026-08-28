@@ -1,6 +1,6 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { loadEnv } from "./config/env.js";
-import { handleInteraction, launchpointCreatorDirectory } from "./discord/interactions.js";
+import { handleInteraction } from "./discord/interactions.js";
 import { runReminderSweep } from "./discord/reminders.js";
 import { runWarmupReminderSweep } from "./discord/warmups.js";
 import { syncLaunchpointApprovedContent } from "./discord/launchpoint-sync.js";
@@ -25,13 +25,12 @@ client.once(Events.ClientReady, (readyClient) => {
     await Promise.allSettled([
       runReminderSweep(readyClient),
       runWarmupReminderSweep(readyClient),
-      syncLaunchpointApprovedContent(readyClient),
-      launchpointCreatorDirectory(),
-      syncLaunchpointRelationships(readyClient),
     ]).then((results) => {
-      const labels = ["Reminder sweep", "Warmup reminder sweep", "Launchpoint content sync", "Launchpoint creator directory preload", "Launchpoint relationship sync"];
+      const labels = ["Reminder sweep", "Warmup reminder sweep"];
       results.forEach((result, index) => { if (result.status === "rejected") console.error(`${labels[index]} failed`, result.reason); });
     });
+    await syncLaunchpointRelationships(readyClient).catch((error) => console.error("Launchpoint relationship sync failed", error));
+    await syncLaunchpointApprovedContent(readyClient).catch((error) => console.error("Launchpoint content sync failed", error));
     startViralSnapshotSchedule((error) => console.error("Viral snapshot sync failed", error));
     startDubAttributionSchedule((error) => console.error("Dub attribution sync failed", error));
   })().catch((error) => console.error("Bot startup synchronization failed", error));
@@ -42,8 +41,10 @@ client.once(Events.ClientReady, (readyClient) => {
     ]).catch((error) => console.error("Reminder sweep failed", error));
   }, 60 * 60 * 1_000).unref();
   setInterval(() => {
-    void syncLaunchpointApprovedContent(readyClient).catch((error) => console.error("Launchpoint content sync failed", error));
-    void syncLaunchpointRelationships(readyClient).catch((error) => console.error("Launchpoint relationship sync failed", error));
+    void (async () => {
+      await syncLaunchpointRelationships(readyClient).catch((error) => console.error("Launchpoint relationship sync failed", error));
+      await syncLaunchpointApprovedContent(readyClient).catch((error) => console.error("Launchpoint content sync failed", error));
+    })();
   }, 10 * 60 * 1_000).unref();
   setInterval(() => {
     for (const guild of readyClient.guilds.cache.values()) void reconcileGuild(guild).catch((error) => console.error(`Discord reconciliation failed for ${guild.id}`, error));

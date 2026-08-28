@@ -26,7 +26,7 @@ function wait(milliseconds: number): Promise<void> {
   return milliseconds > 0 ? new Promise((resolve) => setTimeout(resolve, milliseconds)) : Promise.resolve();
 }
 
-export async function launchpointGet<T = unknown>(path: string, params: Record<string, string | undefined> = {}, timeoutMs = 12_000, baseRetryDelayMs = 250): Promise<T> {
+export async function launchpointGet<T = unknown>(path: string, params: Record<string, string | undefined> = {}, timeoutMs = 30_000, baseRetryDelayMs = 250): Promise<T> {
   const url = new URL(`${API_BASE}${path}`);
   for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
   let lastError: unknown;
@@ -86,6 +86,21 @@ export type LaunchpointContract = { id?: string; creatorId?: string; programId?:
 type LaunchpointProgram = { id?: string; name?: string; status?: string };
 export type LaunchpointPost = { id?: string; creatorId?: string; contractorName?: string; title?: string; status?: string; uploadedAt?: number; createdAt?: string; url?: string; platform?: string };
 export type LaunchpointRelationshipRecord = ProviderRelationship & { creatorExternalId: string };
+
+export function launchpointCreatorDirectoryFromPosts(creators: ProviderCreator[], posts: LaunchpointPost[]): ProviderCreator[] {
+  const byId = new Map(creators.map((creator) => [creator.externalId, creator]));
+  for (const post of posts) {
+    if (!post.creatorId || byId.has(post.creatorId)) continue;
+    byId.set(post.creatorId, {
+      externalId: post.creatorId,
+      displayName: post.contractorName?.trim() || post.creatorId,
+      email: null,
+      username: null,
+      sourceUrl: `https://dashboard.launchpointhq.com/creators/${encodeURIComponent(post.creatorId)}`,
+    });
+  }
+  return [...byId.values()];
+}
 
 export class LaunchpointAdapter implements SigningProviderAdapter {
   readonly provider = "launchpoint" as const;
